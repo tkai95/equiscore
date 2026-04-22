@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Put, Patch, Body, UseGuards, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -25,6 +25,13 @@ export class ProfileController {
   async getProfile(@CurrentUser() user: RequestUser) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
     return this.profileService.getProfile(userId)
+  }
+
+  @Patch()
+  @ApiOperation({ summary: 'Update profile fields' })
+  async updateProfile(@CurrentUser() user: RequestUser, @Body() body: Record<string, unknown>) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.profileService.updateProfile(userId, body as never)
   }
 
   @Put('onboarding')

@@ -35,9 +35,8 @@ export class ScoringService {
       },
     })
 
-    // Update profile stage if needed
     await db.userProfile.updateMany({
-      where: { userId, profileStage: { in: ['created', 'onboarding', 'profile_building'] } },
+      where: { userId, profileStage: { notIn: ['scored', 'complete'] } },
       data: { profileStage: 'scored' },
     })
 

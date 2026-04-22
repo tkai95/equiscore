@@ -185,9 +185,49 @@ export class FeatureEngineeringService {
   private computeEndOfMonthBalances(
     accounts: Array<{ currentBalance: number | null; transactions: Array<{ direction: string; amount: number; bookedAt: Date }> }>
   ): number[] {
-    // Simplified: use current balance minus recent months of net activity
-    const totalCurrentBalance = accounts.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
-    return [totalCurrentBalance]
+    const now = new Date()
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    // Collect completed months that have at least one transaction across any account
+    const completedMonthKeys = new Set<string>()
+    for (const account of accounts) {
+      for (const txn of account.transactions) {
+        const key = `${txn.bookedAt.getFullYear()}-${String(txn.bookedAt.getMonth() + 1).padStart(2, '0')}`
+        if (key < currentMonthKey) completedMonthKeys.add(key)
+      }
+    }
+
+    if (completedMonthKeys.size === 0) return []
+
+    // oldest → newest
+    const sortedMonths = Array.from(completedMonthKeys).sort().slice(-12)
+
+    const monthlyTotals = new Map<string, number>(sortedMonths.map((m) => [m, 0]))
+
+    for (const account of accounts) {
+      if (account.currentBalance === null) continue
+
+      // Net flow per month: positive = more credits than debits
+      const flowByMonth = new Map<string, number>()
+      for (const txn of account.transactions) {
+        const key = `${txn.bookedAt.getFullYear()}-${String(txn.bookedAt.getMonth() + 1).padStart(2, '0')}`
+        const delta = txn.direction === 'credit' ? txn.amount : -txn.amount
+        flowByMonth.set(key, (flowByMonth.get(key) ?? 0) + delta)
+      }
+
+      // Walk backwards through completed months, accumulating a suffix sum of flows
+      // that occurred AFTER each target month (including the current partial month).
+      // endOfMonthBalance[M] = currentBalance - sum(flows in all months > M)
+      let suffixFlow = flowByMonth.get(currentMonthKey) ?? 0
+
+      for (let i = sortedMonths.length - 1; i >= 0; i--) {
+        const month = sortedMonths[i]!
+        monthlyTotals.set(month, monthlyTotals.get(month)! + (account.currentBalance - suffixFlow))
+        suffixFlow += flowByMonth.get(month) ?? 0
+      }
+    }
+
+    return sortedMonths.map((m) => monthlyTotals.get(m)!)
   }
 
   private computeAverageMonthlySpend(

@@ -26,9 +26,13 @@ export const api = {
   },
   profile: {
     get: (token: string) => apiFetch('/profile', {}, token),
+    update: (token: string, data: unknown) =>
+      apiFetch('/profile', { method: 'PATCH', body: JSON.stringify(data) }, token),
     completeOnboarding: (token: string, data: unknown) =>
       apiFetch('/profile/onboarding', { method: 'PUT', body: JSON.stringify(data) }, token),
     getAddresses: (token: string) => apiFetch('/profile/addresses', {}, token),
+    getEmployment: (token: string) => apiFetch('/profile/employment', {}, token),
+    getRental: (token: string) => apiFetch('/profile/rental', {}, token),
   },
   banking: {
     getLinkUrl: (token: string) =>

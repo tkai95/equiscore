@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
-import type { OnboardingData } from '@equiscore/shared'
+import type { OnboardingData, UpdateProfileData } from '@equiscore/shared'
 
 @Injectable()
 export class ProfileService {
@@ -116,6 +116,21 @@ export class ProfileService {
   async getRentalProfile(userId: string) {
     return db.rentalProfile.findFirst({
       where: { userId, isCurrent: true },
+    })
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileData) {
+    return db.userProfile.update({
+      where: { userId },
+      data: {
+        fullName: data.fullName,
+        dob: data.dob ? new Date(data.dob) : undefined,
+        nationality: data.nationality,
+        residencyStatus: data.residencyStatus,
+        employmentType: data.employmentType,
+        monthlyIncomeDeclared: data.monthlyIncomeDeclared,
+        monthlyRentDeclared: data.monthlyRentDeclared,
+      },
     })
   }
 

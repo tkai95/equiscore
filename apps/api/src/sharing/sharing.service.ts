@@ -16,7 +16,7 @@ export class SharingService {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + SHARE_TTL_DAYS)
 
-    return db.sharedProfile.create({
+    const link = await db.sharedProfile.create({
       data: {
         userId,
         trustScoreId,
@@ -26,6 +26,13 @@ export class SharingService {
         targetName,
       },
     })
+
+    await db.userProfile.updateMany({
+      where: { userId, profileStage: { not: 'complete' } },
+      data: { profileStage: 'complete' },
+    })
+
+    return link
   }
 
   async getMyShareLinks(userId: string) {
