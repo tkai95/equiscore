@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd ../.. && npm install && npx turbo build --filter=@equiscore/api"
+buildCommand = "npx turbo build --filter=@equiscore/api"
 
 [deploy]
 startCommand = "node apps/api/dist/main.js"
