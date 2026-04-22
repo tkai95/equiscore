@@ -32,9 +32,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('api/docs', app, document)
 
-  const port = process.env['PORT'] ?? 4000
-  await app.listen(port)
-  console.log(`Equiscore API running on http://localhost:${port}`)
+  const port = Number(process.env['PORT'] ?? 4000)
+  await app.listen(port, '0.0.0.0')
+  console.log(`Equiscore API listening on 0.0.0.0:${port}`)
   console.log(`Swagger docs: http://localhost:${port}/api/docs`)
 }
 
