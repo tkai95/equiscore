@@ -16,8 +16,18 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   app.use(helmet())
+  const allowedOrigins = (process.env['WEB_URL'] ?? 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
   app.enableCors({
-    origin: process.env['WEB_URL'] ?? 'http://localhost:3000',
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.some((o) => origin === o || origin.endsWith('.vercel.app'))) {
+        cb(null, true)
+      } else {
+        cb(new Error(`CORS: origin ${origin} not allowed`))
+      }
+    },
     credentials: true,
   })
 
