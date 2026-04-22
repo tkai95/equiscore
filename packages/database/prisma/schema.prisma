@@ -207,9 +207,50 @@ model BankAccount {
 
   bankConnection BankConnection   @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
   transactions   BankTransaction[]
+  directDebits   DirectDebit[]
+  standingOrders StandingOrder[]
 
   @@unique([bankConnectionId, externalAccountId])
   @@map("bank_accounts")
+}
+
+model DirectDebit {
+  id                  String    @id @default(cuid())
+  bankAccountId       String    @map("bank_account_id")
+  externalId          String    @map("external_id")
+  name                String?
+  reference           String?
+  previousAmount      Float?    @map("previous_amount")
+  currency            String    @default("GBP")
+  status              String    @default("active")
+  previousPaymentDate DateTime? @map("previous_payment_date")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([bankAccountId, externalId])
+  @@map("direct_debits")
+}
+
+model StandingOrder {
+  id                String    @id @default(cuid())
+  bankAccountId     String    @map("bank_account_id")
+  externalId        String    @map("external_id")
+  reference         String?
+  currency          String    @default("GBP")
+  frequency         String?
+  status            String    @default("active")
+  nextPaymentDate   DateTime? @map("next_payment_date")
+  nextPaymentAmount Float?    @map("next_payment_amount")
+  firstPaymentDate  DateTime? @map("first_payment_date")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([bankAccountId, externalId])
+  @@map("standing_orders")
 }
 
 enum AccountType {

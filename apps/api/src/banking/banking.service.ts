@@ -1,28 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { TransactionCategory } from '@prisma/client'
 import { db } from '@equiscore/database'
 import { TrueLayerService } from './truelayer.service'
 import { ConfigService } from '@nestjs/config'
 import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
 import { encrypt, decrypt } from '../common/utils/encryption'
-
-const CATEGORY_MAP: Record<string, TransactionCategory> = {
-  SALARY: TransactionCategory.salary,
-  INCOME: TransactionCategory.salary,
-  RENTAL: TransactionCategory.rent_payment,
-  BILLS: TransactionCategory.utilities,
-  TRANSPORT: TransactionCategory.transport,
-  SHOPPING: TransactionCategory.groceries,
-  ENTERTAINMENT: TransactionCategory.entertainment,
-  HEALTHCARE: TransactionCategory.healthcare,
-  EDUCATION: TransactionCategory.education,
-  SAVINGS: TransactionCategory.savings_transfer,
-  LOAN_REPAYMENT: TransactionCategory.loan_repayment,
-  GOVERNMENT: TransactionCategory.government_benefit,
-  INVESTMENT: TransactionCategory.investment,
-  CASH: TransactionCategory.cash_withdrawal,
-}
+import { classifyTransaction } from './transaction-classifier'
 
 @Injectable()
 export class BankingService {
@@ -135,7 +118,15 @@ export class BankingService {
                 externalTxnId: txn.transaction_id,
               },
             },
-            update: {},
+            update: {
+              category: classifyTransaction({
+                description: txn.description ?? null,
+                merchantName: txn.merchant_name ?? null,
+                amount: Math.abs(txn.amount),
+                direction: txn.amount >= 0 ? 'credit' : 'debit',
+                tlCategory: txn.transaction_category,
+              }),
+            },
             create: {
               bankAccountId: account.id,
               externalTxnId: txn.transaction_id,
@@ -144,7 +135,13 @@ export class BankingService {
               currency: txn.currency,
               description: txn.description,
               merchantName: txn.merchant_name,
-              category: this.mapCategory(txn.transaction_category),
+              category: classifyTransaction({
+                description: txn.description ?? null,
+                merchantName: txn.merchant_name ?? null,
+                amount: Math.abs(txn.amount),
+                direction: txn.amount >= 0 ? 'credit' : 'debit',
+                tlCategory: txn.transaction_category,
+              }),
               direction: txn.amount >= 0 ? 'credit' : 'debit',
               rawPayload: txn as never,
             },
@@ -153,6 +150,43 @@ export class BankingService {
           this.logger.warn(`Skipping transaction ${txn.transaction_id}: ${String(err)}`)
         }
       }
+
+      // Direct debits
+      const directDebits = await this.trueLayer.getDirectDebits(token, tlAccount.account_id)
+      for (const dd of directDebits) {
+        try {
+          await db.directDebit.upsert({
+            where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: dd.direct_debit_id } },
+            update: { name: dd.name, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
+            create: { bankAccountId: account.id, externalId: dd.direct_debit_id, name: dd.name, currency: dd.currency, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
+          })
+        } catch (err) {
+          this.logger.warn(`Skipping direct debit ${dd.direct_debit_id}: ${String(err)}`)
+        }
+      }
+
+      // Standing orders
+      const standingOrders = await this.trueLayer.getStandingOrders(token, tlAccount.account_id)
+      for (const so of standingOrders) {
+        try {
+          await db.standingOrder.upsert({
+            where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: so.standing_order_id } },
+            update: { reference: so.reference, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount },
+            create: { bankAccountId: account.id, externalId: so.standing_order_id, reference: so.reference, currency: so.currency, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount, firstPaymentDate: so.first_payment_date ? new Date(so.first_payment_date) : null },
+          })
+        } catch (err) {
+          this.logger.warn(`Skipping standing order ${so.standing_order_id}: ${String(err)}`)
+        }
+      }
+    }
+
+    // Identity — store verified name on accounts
+    const identity = await this.trueLayer.getIdentity(token)
+    if (identity?.full_name) {
+      await db.bankAccount.updateMany({
+        where: { bankConnectionId: connectionId },
+        data: { accountHolderName: identity.full_name },
+      })
     }
 
     await db.bankConnection.update({
@@ -194,12 +228,10 @@ export class BankingService {
     const account = await db.bankAccount.findFirst({
       where: { id: accountId, bankConnection: { userId } },
       include: {
-        bankConnection: {
-          select: { institutionName: true, connectionStatus: true },
-        },
-        transactions: {
-          orderBy: { bookedAt: 'desc' },
-        },
+        bankConnection: { select: { institutionName: true, connectionStatus: true } },
+        transactions: { orderBy: { bookedAt: 'desc' } },
+        directDebits: { orderBy: { createdAt: 'desc' } },
+        standingOrders: { orderBy: { createdAt: 'desc' } },
       },
     })
     if (!account) throw new NotFoundException('Account not found')
@@ -214,7 +246,4 @@ export class BankingService {
     return 'current'
   }
 
-  private mapCategory(category: string): TransactionCategory {
-    return CATEGORY_MAP[category.toUpperCase()] ?? TransactionCategory.other
-  }
 }

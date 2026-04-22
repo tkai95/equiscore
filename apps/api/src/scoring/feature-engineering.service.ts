@@ -19,9 +19,9 @@ export class FeatureEngineeringService {
         include: {
           bankAccounts: {
             include: {
-              transactions: {
-                orderBy: { bookedAt: 'desc' },
-              },
+              transactions: { orderBy: { bookedAt: 'desc' } },
+              directDebits: true,
+              standingOrders: true,
             },
           },
         },

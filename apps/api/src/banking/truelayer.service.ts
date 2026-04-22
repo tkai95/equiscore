@@ -27,6 +27,37 @@ export interface TrueLayerTransaction {
   merchant_name?: string
 }
 
+export interface TrueLayerDirectDebit {
+  direct_debit_id: string
+  timestamp: string
+  name: string
+  status: string
+  previous_payment_timestamp?: string
+  previous_payment_amount?: number
+  currency: string
+}
+
+export interface TrueLayerStandingOrder {
+  standing_order_id: string
+  currency: string
+  frequency?: string
+  status: string
+  timestamp: string
+  next_payment_date?: string
+  next_payment_amount?: number
+  reference?: string
+  first_payment_date?: string
+  first_payment_amount?: number
+}
+
+export interface TrueLayerIdentity {
+  full_name: string
+  date_of_birth?: string
+  addresses?: Array<{ address: string; city: string; zip: string; country: string }>
+  phones?: string[]
+  emails?: string[]
+}
+
 @Injectable()
 export class TrueLayerService {
   private readonly logger = new Logger(TrueLayerService.name)
@@ -109,6 +140,42 @@ export class TrueLayerService {
 
     const data = (await response.json()) as { results: TrueLayerTransaction[] }
     return data.results
+  }
+
+  async getDirectDebits(accessToken: string, accountId: string): Promise<TrueLayerDirectDebit[]> {
+    const res = await fetch(`${this.baseUrl}/data/v1/accounts/${accountId}/direct_debits`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) {
+      this.logger.warn(`Direct debits unavailable for ${accountId}: ${res.statusText}`)
+      return []
+    }
+    const data = (await res.json()) as { results: TrueLayerDirectDebit[] }
+    return data.results ?? []
+  }
+
+  async getStandingOrders(accessToken: string, accountId: string): Promise<TrueLayerStandingOrder[]> {
+    const res = await fetch(`${this.baseUrl}/data/v1/accounts/${accountId}/standing_orders`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) {
+      this.logger.warn(`Standing orders unavailable for ${accountId}: ${res.statusText}`)
+      return []
+    }
+    const data = (await res.json()) as { results: TrueLayerStandingOrder[] }
+    return data.results ?? []
+  }
+
+  async getIdentity(accessToken: string): Promise<TrueLayerIdentity | null> {
+    const res = await fetch(`${this.baseUrl}/data/v1/identity`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) {
+      this.logger.warn(`Identity unavailable: ${res.statusText}`)
+      return null
+    }
+    const data = (await res.json()) as { results: TrueLayerIdentity[] }
+    return data.results?.[0] ?? null
   }
 
   async getBalance(accessToken: string, accountId: string): Promise<number | null> {
