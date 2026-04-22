@@ -4,6 +4,8 @@ import { db } from '@equiscore/database'
 import { TrueLayerService } from './truelayer.service'
 import { ConfigService } from '@nestjs/config'
 import { ScoringService } from '../scoring/scoring.service'
+import { AuditService } from '../audit/audit.service'
+import { encrypt, decrypt } from '../common/utils/encryption'
 
 const CATEGORY_MAP: Record<string, TransactionCategory> = {
   SALARY: TransactionCategory.salary,
@@ -30,6 +32,7 @@ export class BankingService {
     private readonly trueLayer: TrueLayerService,
     private readonly config: ConfigService,
     private readonly scoringService: ScoringService,
+    private readonly audit: AuditService
   ) {}
 
   buildLinkUrl(userId: string): string {
@@ -49,8 +52,8 @@ export class BankingService {
         userId,
         providerName: 'truelayer',
         connectionStatus: 'active',
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken: encrypt(tokens.accessToken),
+        refreshToken: encrypt(tokens.refreshToken),
         tokenExpiresAt: expiresAt,
       },
     })
@@ -64,6 +67,8 @@ export class BankingService {
       },
       data: { profileStage: 'banking_connected' },
     })
+
+    this.audit.log(userId, 'bank.connected', { connectionId: connection.id })
 
     try {
       await this.scoringService.recompute(userId)
@@ -80,7 +85,7 @@ export class BankingService {
     })
     if (!connection) return
 
-    const token = accessToken ?? connection.accessToken ?? ''
+    const token = accessToken ?? decrypt(connection.accessToken ?? '')
     const tlAccounts = await this.trueLayer.getAccounts(token)
 
     const institutionName = tlAccounts[0]?.provider?.display_name ?? null
@@ -156,6 +161,10 @@ export class BankingService {
     })
 
     this.logger.log(`Synced ${tlAccounts.length} accounts for connection ${connectionId}`)
+    this.audit.log(connection.userId, 'bank.synced', {
+      connectionId,
+      accountsSynced: tlAccounts.length,
+    })
   }
 
   async syncAllForUser(userId: string): Promise<number> {

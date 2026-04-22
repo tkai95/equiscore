@@ -57,4 +57,7 @@ export const REASON_CODES = {
   IDENTITY_DOCUMENT: rc('IDENTITY_DOCUMENT', 'identityConfidence', 'positive', 'Government-issued identity document provided', 25),
   ADDRESS_CONSISTENT: rc('ADDRESS_CONSISTENT', 'identityConfidence', 'positive', 'Address information is consistent across sources', 20),
   NAME_MISMATCH: rc('NAME_MISMATCH', 'identityConfidence', 'negative', 'Name on bank account does not fully match profile name', -20),
+  RESIDENCY_STATUS_PROVIDED: rc('RESIDENCY_STATUS_PROVIDED', 'identityConfidence', 'positive', 'Residency status is on record', 8),
+  ESTABLISHED_UK_RESIDENT: rc('ESTABLISHED_UK_RESIDENT', 'identityConfidence', 'positive', 'Established UK residency history of 3+ years', 10),
+  RECENT_UK_ARRIVAL: rc('RECENT_UK_ARRIVAL', 'identityConfidence', 'neutral', 'Recently arrived in the UK — financial history is still being established', 0),
 }

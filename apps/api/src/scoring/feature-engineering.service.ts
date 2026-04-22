@@ -44,6 +44,15 @@ export class FeatureEngineeringService {
       ]
       const filled = fields.filter(Boolean).length
       features.profileFieldsComplete = filled / fields.length
+
+      features.residencyStatus = profile.residencyStatus ?? null
+
+      if (profile.ukMoveDate) {
+        const msPerYear = 1000 * 60 * 60 * 24 * 365.25
+        features.yearsInUK = (Date.now() - new Date(profile.ukMoveDate).getTime()) / msPerYear
+      } else if (profile.residencyStatus === 'british_citizen') {
+        features.yearsInUK = 20
+      }
     }
 
     // ── Banking features ──────────────────────────────────────────────────────
@@ -76,6 +85,8 @@ export class FeatureEngineeringService {
 
       // Rent detection
       features.recurringRentDetected = this.detectRecurringRent(allTransactions)
+
+      features.missedPaymentIndicators = this.detectMissedPayments(allTransactions)
 
       // End-of-month balances
       const endOfMonthBalances = this.computeEndOfMonthBalances(allAccounts)
@@ -180,6 +191,15 @@ export class FeatureEngineeringService {
       rentTxns.map((t) => `${t.bookedAt.getFullYear()}-${t.bookedAt.getMonth()}`)
     )
     return months.size >= 2
+  }
+
+  private detectMissedPayments(
+    transactions: Array<{ direction: string; amount: number; description: string | null }>
+  ): number {
+    // Returned/bounced payments appear as credits reversing a failed debit
+    // (returned DD, unpaid standing order, recalled payment)
+    const RETURN_PATTERN = /\b(returned|unpaid|unpaids|bounced|recalled|reversal|reversed|return unpaid)\b/i
+    return transactions.filter((t) => t.description && RETURN_PATTERN.test(t.description)).length
   }
 
   private computeEndOfMonthBalances(

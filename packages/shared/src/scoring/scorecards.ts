@@ -92,6 +92,30 @@ export function scoreIdentityConfidence(features: TrustFeatures): ScorecardResul
     codes.push(REASON_CODES.ADDRESS_CONSISTENT)
   }
 
+  // Residency status — informative signal, not a penalty for any legitimate status
+  if (features.residencyStatus) {
+    const residencyBonus: Record<string, number> = {
+      british_citizen: 10,
+      settled_status: 8,
+      pre_settled_status: 5,
+      student_visa: 5,
+      work_visa: 5,
+      refugee: 4,
+      asylum_seeker: 4,
+      other: 3,
+    }
+    total += residencyBonus[features.residencyStatus] ?? 3
+    codes.push(REASON_CODES.RESIDENCY_STATUS_PROVIDED)
+  }
+
+  // Time in UK — longer history = stronger identity anchor
+  if (features.yearsInUK >= 3) {
+    total += 10
+    codes.push(REASON_CODES.ESTABLISHED_UK_RESIDENT)
+  } else if (features.yearsInUK > 0 && features.yearsInUK < 1) {
+    codes.push(REASON_CODES.RECENT_UK_ARRIVAL)
+  }
+
   return { score: Math.max(0, Math.min(100, total)), reasonCodes: codes }
 }
 

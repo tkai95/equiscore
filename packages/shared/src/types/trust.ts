@@ -62,6 +62,10 @@ export interface TrustFeatures {
   selfDeclaredOnly: boolean
   openBankingConnected: boolean
   hasUploadedDocuments: boolean
+
+  // Residency signals
+  residencyStatus: string | null     // maps to ResidencyStatus enum values
+  yearsInUK: number                  // derived from ukMoveDate; 0 if unknown
 }
 
 export const TIER_LABELS: Record<TrustTier, string> = {

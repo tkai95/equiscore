@@ -4,13 +4,17 @@ import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import type { DocumentType } from '@equiscore/shared'
+import { AuditService } from '../audit/audit.service'
 
 @Injectable()
 export class DocumentsService {
   private s3: S3Client
   private bucket: string
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly audit: AuditService
+  ) {
     const projectRef = config.get<string>('SUPABASE_PROJECT_REF') ?? ''
     this.bucket = config.get<string>('SUPABASE_STORAGE_BUCKET') ?? 'equiscore-documents'
 
@@ -72,6 +76,12 @@ export class DocumentsService {
       data: { profileStage: 'documents_uploaded' },
     })
 
+    this.audit.log(userId, 'document.uploaded', {
+      documentId: doc.id,
+      documentType,
+      mimeType,
+    })
+
     return doc
   }
 
@@ -92,6 +102,13 @@ export class DocumentsService {
       new DeleteObjectCommand({ Bucket: this.bucket, Key: doc.fileKey })
     )
 
-    return db.uploadedDocument.delete({ where: { id: documentId } })
+    const deleted = await db.uploadedDocument.delete({ where: { id: documentId } })
+
+    this.audit.log(userId, 'document.deleted', {
+      documentId,
+      documentType: doc.documentType,
+    })
+
+    return deleted
   }
 }

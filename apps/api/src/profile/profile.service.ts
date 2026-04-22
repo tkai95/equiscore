@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import type { OnboardingData, UpdateProfileData } from '@equiscore/shared'
+import { AuditService } from '../audit/audit.service'
 
 @Injectable()
 export class ProfileService {
+  constructor(private readonly audit: AuditService) {}
   async getProfile(userId: string) {
     const profile = await db.userProfile.findUnique({
       where: { userId },
@@ -95,6 +97,7 @@ export class ProfileService {
         })
       }
 
+      this.audit.log(userId, 'profile.onboarding_completed')
       return profile
     })
   }
@@ -120,7 +123,7 @@ export class ProfileService {
   }
 
   async updateProfile(userId: string, data: UpdateProfileData) {
-    return db.userProfile.update({
+    const updated = await db.userProfile.update({
       where: { userId },
       data: {
         fullName: data.fullName,
@@ -132,6 +135,8 @@ export class ProfileService {
         monthlyRentDeclared: data.monthlyRentDeclared,
       },
     })
+    this.audit.log(userId, 'profile.updated', { fields: Object.keys(data) })
+    return updated
   }
 
   async updateProfileStage(userId: string, stage: string) {

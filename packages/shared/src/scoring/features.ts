@@ -20,4 +20,6 @@ export const DEFAULT_FEATURES: TrustFeatures = {
   selfDeclaredOnly: true,
   openBankingConnected: false,
   hasUploadedDocuments: false,
+  residencyStatus: null,
+  yearsInUK: 0,
 }
