@@ -3,10 +3,14 @@ import { db } from '@equiscore/database'
 import { computeTrustScore, SCORE_VERSION } from '@equiscore/shared'
 import type { ScorecardType } from '@equiscore/shared'
 import { FeatureEngineeringService } from './feature-engineering.service'
+import { AuditService } from '../audit/audit.service'
 
 @Injectable()
 export class ScoringService {
-  constructor(private readonly featureEngineering: FeatureEngineeringService) {}
+  constructor(
+    private readonly featureEngineering: FeatureEngineeringService,
+    private readonly audit: AuditService
+  ) {}
 
   async recompute(userId: string, scorecardType: ScorecardType = 'general') {
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -38,6 +42,13 @@ export class ScoringService {
     await db.userProfile.updateMany({
       where: { userId, profileStage: { notIn: ['scored', 'complete'] } },
       data: { profileStage: 'scored' },
+    })
+
+    this.audit.log(userId, 'score.computed', {
+      scoreId: score.id,
+      scorecardType,
+      overallScore: score.overallScore,
+      overallTier: score.overallTier,
     })
 
     return score

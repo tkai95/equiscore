@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(xargs grep *)",
+      "Bash(git commit -m 'fix\\(auth\\): use issuer-derived JWKS endpoint for Clerk JWT verification *)",
+      "Bash(git commit -m 'fix\\(auth\\): fetch email from Clerk Backend API when not in JWT *)",
+      "Bash(git commit -m 'fix\\(banking\\): use sandbox auth URL for TrueLayer sandbox clients *)",
+      "WebSearch",
+      "WebFetch(domain:docs.truelayer.com)",
+      "WebFetch(domain:truelayer.zendesk.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:documenter.getpostman.com)",
+      "WebFetch(domain:support.truelayer.com)",
+      "Bash(git commit -m 'fix\\(banking\\): use uk-cs-mock provider for TrueLayer sandbox *)",
+      "Bash(git commit -m 'fix\\(banking\\): swallow individual transaction errors during sync *)",
+      "Bash(git commit -m 'feat: add profile, documents, share, and settings pages *)",
+      "Bash(git commit -m 'feat\\(banking\\): transaction drill-down view and auto-score recompute *)"
+    ]
+  }
+}

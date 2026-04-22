@@ -2,8 +2,9 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import Link from 'next/link'
 import { api } from '@/lib/api'
-import { Landmark, RefreshCw, CheckCircle, AlertCircle, CreditCard, Building2, PiggyBank, Briefcase } from 'lucide-react'
+import { Landmark, RefreshCw, CheckCircle, AlertCircle, CreditCard, Building2, PiggyBank, Briefcase, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BankAccount {
@@ -128,9 +129,10 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
           {accounts.map((account) => {
             const Icon = ACCOUNT_TYPE_ICONS[account.accountType]
             return (
-              <div
+              <Link
                 key={account.id}
-                className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100"
+                href={`/dashboard/connections/${account.id}`}
+                className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md hover:ring-gray-200"
               >
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
                   <Icon className="h-5 w-5 text-blue-600" />
@@ -162,7 +164,8 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                     {account.bankConnection.connectionStatus}
                   </span>
                 </div>
-              </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+              </Link>
             )
           })}
         </div>

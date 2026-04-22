@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { ThrottlerModule } from '@nestjs/throttler'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { APP_GUARD } from '@nestjs/core'
 import { HealthController } from './health/health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ProfileModule } from './profile/profile.module'
@@ -8,6 +9,7 @@ import { BankingModule } from './banking/banking.module'
 import { DocumentsModule } from './documents/documents.module'
 import { ScoringModule } from './scoring/scoring.module'
 import { SharingModule } from './sharing/sharing.module'
+import { AuditModule } from './audit/audit.module'
 
 @Module({
   controllers: [HealthController],
@@ -20,6 +22,8 @@ import { SharingModule } from './sharing/sharing.module'
     DocumentsModule,
     ScoringModule,
     SharingModule,
+    AuditModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

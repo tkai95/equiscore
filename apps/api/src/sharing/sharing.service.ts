@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { randomBytes } from 'crypto'
+import { AuditService } from '../audit/audit.service'
 
 const SHARE_TTL_DAYS = 30
 
 @Injectable()
 export class SharingService {
+  constructor(private readonly audit: AuditService) {}
+
   async createShareLink(userId: string, trustScoreId: string, targetType?: string, targetName?: string) {
     const score = await db.trustScore.findFirst({
       where: { id: trustScoreId, userId },
@@ -32,6 +35,12 @@ export class SharingService {
       data: { profileStage: 'complete' },
     })
 
+    this.audit.log(userId, 'share_link.created', {
+      shareLinkId: link.id,
+      targetType,
+      targetName,
+    })
+
     return link
   }
 
@@ -47,13 +56,17 @@ export class SharingService {
     const link = await db.sharedProfile.findFirst({ where: { id: shareId, userId } })
     if (!link) throw new NotFoundException('Share link not found')
 
-    return db.sharedProfile.update({
+    const revoked = await db.sharedProfile.update({
       where: { id: shareId },
       data: { revokedAt: new Date() },
     })
+
+    this.audit.log(userId, 'share_link.revoked', { shareLinkId: shareId })
+
+    return revoked
   }
 
-  async getPublicProfile(token: string) {
+  async getPublicProfile(token: string, ipAddress?: string) {
     const shared = await db.sharedProfile.findUnique({
       where: { shareToken: token },
       include: {
@@ -68,11 +81,17 @@ export class SharingService {
     if (shared.revokedAt) throw new ForbiddenException('This profile link has been revoked')
     if (shared.expiresAt < new Date()) throw new ForbiddenException('This profile link has expired')
 
-    // Increment view count
     await db.sharedProfile.update({
       where: { id: shared.id },
       data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
     })
+
+    this.audit.log(
+      shared.userId,
+      'share_link.viewed',
+      { shareLinkId: shared.id, targetType: shared.targetType },
+      ipAddress
+    )
 
     // Return safe partner-facing view (no PII beyond what's needed)
     return {

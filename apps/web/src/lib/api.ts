@@ -38,6 +38,8 @@ export const api = {
     getLinkUrl: (token: string) =>
       apiFetch<{ url: string }>('/open-banking/link-token', { method: 'POST' }, token),
     getAccounts: (token: string) => apiFetch('/open-banking/accounts', {}, token),
+    getAccountTransactions: (token: string, accountId: string) =>
+      apiFetch(`/open-banking/accounts/${accountId}/transactions`, {}, token),
     sync: (token: string) =>
       apiFetch<{ synced: number }>('/open-banking/sync', { method: 'POST' }, token),
   },

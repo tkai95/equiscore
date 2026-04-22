@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { TransactionCategory } from '@prisma/client'
 import { db } from '@equiscore/database'
 import { TrueLayerService } from './truelayer.service'
 import { ConfigService } from '@nestjs/config'
+import { ScoringService } from '../scoring/scoring.service'
 
 const CATEGORY_MAP: Record<string, TransactionCategory> = {
   SALARY: TransactionCategory.salary,
@@ -27,7 +28,8 @@ export class BankingService {
 
   constructor(
     private readonly trueLayer: TrueLayerService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly scoringService: ScoringService,
   ) {}
 
   buildLinkUrl(userId: string): string {
@@ -62,6 +64,12 @@ export class BankingService {
       },
       data: { profileStage: 'banking_connected' },
     })
+
+    try {
+      await this.scoringService.recompute(userId)
+    } catch (err) {
+      this.logger.warn(`Score auto-recompute failed after bank connect: ${String(err)}`)
+    }
 
     return connection
   }
@@ -171,6 +179,22 @@ export class BankingService {
         },
       },
     })
+  }
+
+  async getAccountTransactions(userId: string, accountId: string) {
+    const account = await db.bankAccount.findFirst({
+      where: { id: accountId, bankConnection: { userId } },
+      include: {
+        bankConnection: {
+          select: { institutionName: true, connectionStatus: true },
+        },
+        transactions: {
+          orderBy: { bookedAt: 'desc' },
+        },
+      },
+    })
+    if (!account) throw new NotFoundException('Account not found')
+    return account
   }
 
   private mapAccountType(type: string): 'current' | 'savings' | 'credit_card' | 'business' {

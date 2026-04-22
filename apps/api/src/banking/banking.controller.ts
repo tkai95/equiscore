@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Post, Query, Redirect, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, Param, Post, Query, Redirect, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -48,6 +48,18 @@ export class BankingController {
   async getAccounts(@CurrentUser() user: RequestUser) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     return this.bankingService.getAccounts(dbUser.id)
+  }
+
+  @Get('accounts/:accountId/transactions')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get transactions for a specific bank account' })
+  async getAccountTransactions(
+    @CurrentUser() user: RequestUser,
+    @Param('accountId') accountId: string,
+  ) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.bankingService.getAccountTransactions(dbUser.id, accountId)
   }
 
   @Post('sync')

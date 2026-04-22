@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Delete, Param, Body, UseGuards } from '@nestjs/common'
+import { Controller, Post, Get, Delete, Param, Body, UseGuards, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { SharingService } from './sharing.service'
 import { AuthService } from '../auth/auth.service'
+import type { Request } from 'express'
 
 @ApiTags('sharing')
 @Controller()
@@ -49,8 +51,9 @@ export class SharingController {
   }
 
   @Get('public/profile/:token')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @ApiOperation({ summary: 'View a shared profile (partner/landlord endpoint)' })
-  async viewPublic(@Param('token') token: string) {
-    return this.sharingService.getPublicProfile(token)
+  async viewPublic(@Param('token') token: string, @Req() req: Request) {
+    return this.sharingService.getPublicProfile(token, req.ip)
   }
 }
