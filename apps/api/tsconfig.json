@@ -7,13 +7,16 @@
     "lib": ["ES2021"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "rootDir": "../../",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "strict": true,
+    "noImplicitAny": false,
+    "noUncheckedIndexedAccess": false,
     "paths": {
       "@equiscore/shared": ["../../packages/shared/src"],
       "@equiscore/database": ["../../packages/database/src"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../../packages/shared/src/**/*", "../../packages/database/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
