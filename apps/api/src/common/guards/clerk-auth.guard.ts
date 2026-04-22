@@ -26,7 +26,7 @@ export class ClerkAuthGuard implements CanActivate {
 
       request.user = {
         clerkId: payload.sub,
-        email: payload.email as string,
+        email: (payload['email'] as string | undefined) ?? '',
       }
 
       return true
