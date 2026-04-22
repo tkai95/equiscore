@@ -4,5 +4,5 @@ buildCommand = "npx turbo build --filter=@equiscore/api"
 
 [deploy]
 startCommand = "node apps/api/dist/main.js"
-healthcheckPath = "/api/v1/health"
+healthcheckPath = "/health"
 restartPolicyType = "on_failure"
