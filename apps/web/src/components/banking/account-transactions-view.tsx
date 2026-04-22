@@ -65,7 +65,7 @@ function monthLabel(key: string) {
 }
 
 function getMeta(category: string | null) {
-  return (category && CATEGORY_META[category]) ?? CATEGORY_META['other']!
+  return (category ? CATEGORY_META[category] : undefined) ?? CATEGORY_META['other']!
 }
 
 export function AccountTransactionsView({ accountId }: { accountId: string }) {
