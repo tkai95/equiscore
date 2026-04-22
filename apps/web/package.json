@@ -10,8 +10,8 @@
     "start": "next start"
   },
   "dependencies": {
-    "@equiscore/shared": "*",
     "@clerk/nextjs": "^5.2.0",
+    "@equiscore/shared": "*",
     "@hookform/resolvers": "^3.6.0",
     "@radix-ui/react-dialog": "^1.1.0",
     "@radix-ui/react-dropdown-menu": "^2.1.0",
@@ -33,6 +33,7 @@
     "react-dom": "^18.3.0",
     "react-hook-form": "^7.52.0",
     "tailwind-merge": "^2.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.0"
   },
   "devDependencies": {
