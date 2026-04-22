@@ -30,11 +30,12 @@ export interface TrueLayerTransaction {
 export class TrueLayerService {
   private readonly logger = new Logger(TrueLayerService.name)
   private readonly baseUrl: string
-  private readonly authUrl = 'https://auth.truelayer.com'
+  private readonly authUrl: string
 
   constructor(private readonly config: ConfigService) {
     const isSandbox = config.get<string>('TRUELAYER_SANDBOX') !== 'false'
     this.baseUrl = isSandbox ? 'https://api.truelayer-sandbox.com' : 'https://api.truelayer.com'
+    this.authUrl = isSandbox ? 'https://auth.truelayer-sandbox.com' : 'https://auth.truelayer.com'
   }
 
   buildAuthUrl(redirectUri: string, state: string): string {
