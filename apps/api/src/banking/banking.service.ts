@@ -1,23 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { TransactionCategory } from '@prisma/client'
 import { db } from '@equiscore/database'
 import { TrueLayerService } from './truelayer.service'
 import { ConfigService } from '@nestjs/config'
 
-const CATEGORY_MAP: Record<string, string> = {
-  SALARY: 'salary',
-  INCOME: 'salary',
-  RENTAL: 'rent_payment',
-  BILLS: 'utilities',
-  TRANSPORT: 'transport',
-  SHOPPING: 'groceries',
-  ENTERTAINMENT: 'entertainment',
-  HEALTHCARE: 'healthcare',
-  EDUCATION: 'education',
-  SAVINGS: 'savings_transfer',
-  LOAN_REPAYMENT: 'loan_repayment',
-  GOVERNMENT: 'government_benefit',
-  INVESTMENT: 'investment',
-  CASH: 'cash_withdrawal',
+const CATEGORY_MAP: Record<string, TransactionCategory> = {
+  SALARY: TransactionCategory.salary,
+  INCOME: TransactionCategory.salary,
+  RENTAL: TransactionCategory.rent_payment,
+  BILLS: TransactionCategory.utilities,
+  TRANSPORT: TransactionCategory.transport,
+  SHOPPING: TransactionCategory.groceries,
+  ENTERTAINMENT: TransactionCategory.entertainment,
+  HEALTHCARE: TransactionCategory.healthcare,
+  EDUCATION: TransactionCategory.education,
+  SAVINGS: TransactionCategory.savings_transfer,
+  LOAN_REPAYMENT: TransactionCategory.loan_repayment,
+  GOVERNMENT: TransactionCategory.government_benefit,
+  INVESTMENT: TransactionCategory.investment,
+  CASH: TransactionCategory.cash_withdrawal,
 }
 
 @Injectable()
@@ -158,7 +159,7 @@ export class BankingService {
     return 'current'
   }
 
-  private mapCategory(category: string): string | undefined {
-    return CATEGORY_MAP[category.toUpperCase()] ?? 'other'
+  private mapCategory(category: string): TransactionCategory {
+    return CATEGORY_MAP[category.toUpperCase()] ?? TransactionCategory.other
   }
 }
