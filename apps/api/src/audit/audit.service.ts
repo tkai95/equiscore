@@ -18,7 +18,7 @@ export class AuditService {
         data: {
           userId,
           eventType,
-          metadata: metadata ?? undefined,
+          metadata: metadata ? (metadata as never) : undefined,
           ipAddress: ipAddress ?? null,
           userAgent: userAgent ?? null,
         },
