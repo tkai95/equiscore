@@ -75,6 +75,14 @@ export class BankingService {
     const token = accessToken ?? connection.accessToken ?? ''
     const tlAccounts = await this.trueLayer.getAccounts(token)
 
+    const institutionName = tlAccounts[0]?.provider?.display_name ?? null
+    if (institutionName) {
+      await db.bankConnection.update({
+        where: { id: connectionId },
+        data: { institutionName },
+      })
+    }
+
     for (const tlAccount of tlAccounts) {
       const balance = await this.trueLayer.getBalance(token, tlAccount.account_id)
 
@@ -106,27 +114,31 @@ export class BankingService {
       const transactions = await this.trueLayer.getTransactions(token, tlAccount.account_id)
 
       for (const txn of transactions) {
-        await db.bankTransaction.upsert({
-          where: {
-            bankAccountId_externalTxnId: {
+        try {
+          await db.bankTransaction.upsert({
+            where: {
+              bankAccountId_externalTxnId: {
+                bankAccountId: account.id,
+                externalTxnId: txn.transaction_id,
+              },
+            },
+            update: {},
+            create: {
               bankAccountId: account.id,
               externalTxnId: txn.transaction_id,
+              bookedAt: new Date(txn.timestamp),
+              amount: Math.abs(txn.amount),
+              currency: txn.currency,
+              description: txn.description,
+              merchantName: txn.merchant_name,
+              category: this.mapCategory(txn.transaction_category),
+              direction: txn.amount >= 0 ? 'credit' : 'debit',
+              rawPayload: txn as never,
             },
-          },
-          update: {},
-          create: {
-            bankAccountId: account.id,
-            externalTxnId: txn.transaction_id,
-            bookedAt: new Date(txn.timestamp),
-            amount: Math.abs(txn.amount),
-            currency: txn.currency,
-            description: txn.description,
-            merchantName: txn.merchant_name,
-            category: this.mapCategory(txn.transaction_category),
-            direction: txn.amount >= 0 ? 'credit' : 'debit',
-            rawPayload: txn as never,
-          },
-        })
+          })
+        } catch (err) {
+          this.logger.warn(`Skipping transaction ${txn.transaction_id}: ${String(err)}`)
+        }
       }
     }
 
