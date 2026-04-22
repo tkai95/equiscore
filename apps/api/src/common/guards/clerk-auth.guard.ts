@@ -18,10 +18,10 @@ export class ClerkAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('No authentication token provided')
 
     try {
-      const jwksUrl = `https://api.clerk.com/v1/jwks`
-      const JWKS = jose.createRemoteJWKSet(new URL(jwksUrl))
+      const issuer = this.config.get<string>('CLERK_ISSUER') ?? ''
+      const JWKS = jose.createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`))
       const { payload } = await jose.jwtVerify(token, JWKS, {
-        issuer: this.config.get<string>('CLERK_ISSUER'),
+        issuer,
       })
 
       request.user = {
