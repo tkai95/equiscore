@@ -3,3 +3,9 @@
 # and workspace packages need prisma (dev) for `prisma generate`.
 [phases.install]
 cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = [
+  "npx prisma generate --schema=packages/database/prisma/schema.prisma",
+  "npx turbo build --filter=@equiscore/api",
+]
