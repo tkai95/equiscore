@@ -1,27 +1,35 @@
-import { Injectable, ConflictException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { db } from '@equiscore/database'
 
 @Injectable()
 export class AuthService {
-  /**
-   * Upserts a user record from a verified Clerk JWT.
-   * Called on first authenticated request to sync the Clerk identity into our DB.
-   */
-  async syncUser(clerkId: string, email: string | undefined) {
-    if (!email) {
-      const existing = await db.user.findUnique({
-        where: { authProviderId: clerkId },
-        include: { profile: true },
-      })
-      if (existing) return existing
-      throw new Error('email claim missing from JWT — add it to the Clerk JWT template')
+  constructor(private readonly config: ConfigService) {}
+
+  private async fetchEmailFromClerk(clerkId: string): Promise<string> {
+    const secretKey = this.config.get<string>('CLERK_SECRET_KEY') ?? ''
+    const res = await fetch(`https://api.clerk.com/v1/users/${clerkId}`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+    })
+    if (!res.ok) throw new Error(`Clerk user lookup failed: ${res.statusText}`)
+    const data = (await res.json()) as {
+      email_addresses: Array<{ email_address: string; id: string }>
+      primary_email_address_id: string
     }
+    const primary = data.email_addresses.find(
+      (e) => e.id === data.primary_email_address_id
+    )
+    return primary?.email_address ?? data.email_addresses[0]?.email_address ?? ''
+  }
+
+  async syncUser(clerkId: string, email: string | undefined) {
+    const resolvedEmail = email || (await this.fetchEmailFromClerk(clerkId))
     return db.user.upsert({
       where: { authProviderId: clerkId },
-      update: { email },
+      update: { email: resolvedEmail },
       create: {
         authProviderId: clerkId,
-        email,
+        email: resolvedEmail,
         profile: {
           create: {
             profileStage: 'created',
