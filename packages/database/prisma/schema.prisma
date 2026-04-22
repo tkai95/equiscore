@@ -1,0 +1,447 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  authProviderId String   @unique @map("auth_provider_id")
+  status         UserStatus @default(active)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  profile        UserProfile?
+  addresses      UserAddress[]
+  employment     EmploymentProfile[]
+  bankConnections BankConnection[]
+  documents      UploadedDocument[]
+  rentalProfiles  RentalProfile[]
+  trustFeatures  TrustFeature[]
+  trustScores    TrustScore[]
+  sharedProfiles SharedProfile[]
+  auditEvents    AuditEvent[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+
+  @@map("user_status")
+}
+
+// ─── User Profile ──────────────────────────────────────────────────────────────
+
+model UserProfile {
+  id                  String           @id @default(cuid())
+  userId              String           @unique @map("user_id")
+  fullName            String?          @map("full_name")
+  dob                 DateTime?
+  nationality         String?
+  residencyStatus     ResidencyStatus? @map("residency_status")
+  ukMoveDate          DateTime?        @map("uk_move_date")
+  employmentType      EmploymentType?  @map("employment_type")
+  monthlyIncomeDeclared Float?         @map("monthly_income_declared")
+  monthlyRentDeclared Float?           @map("monthly_rent_declared")
+  profileStage        ProfileStage     @default(created) @map("profile_stage")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+enum ResidencyStatus {
+  british_citizen
+  settled_status
+  pre_settled_status
+  student_visa
+  work_visa
+  refugee
+  asylum_seeker
+  other
+
+  @@map("residency_status")
+}
+
+enum EmploymentType {
+  employed_full_time
+  employed_part_time
+  self_employed
+  gig_worker
+  student
+  graduate
+  unemployed
+  other
+
+  @@map("employment_type")
+}
+
+enum ProfileStage {
+  created
+  onboarding
+  profile_building
+  banking_connected
+  documents_uploaded
+  scored
+  complete
+
+  @@map("profile_stage")
+}
+
+// ─── Addresses ────────────────────────────────────────────────────────────────
+
+model UserAddress {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  addressLine1 String   @map("address_line_1")
+  addressLine2 String?  @map("address_line_2")
+  city         String
+  postcode     String
+  country      String   @default("GB")
+  fromDate     DateTime @map("from_date")
+  toDate       DateTime? @map("to_date")
+  isCurrent    Boolean  @default(false) @map("is_current")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_addresses")
+}
+
+// ─── Employment ───────────────────────────────────────────────────────────────
+
+model EmploymentProfile {
+  id                    String         @id @default(cuid())
+  userId                String         @map("user_id")
+  employmentType        EmploymentType @map("employment_type")
+  employerName          String?        @map("employer_name")
+  jobTitle              String?        @map("job_title")
+  monthlyIncomeDeclared Float?         @map("monthly_income_declared")
+  payFrequency          PayFrequency?  @map("pay_frequency")
+  contractType          ContractType?  @map("contract_type")
+  startDate             DateTime?      @map("start_date")
+  endDate               DateTime?      @map("end_date")
+  isCurrent             Boolean        @default(true) @map("is_current")
+  createdAt             DateTime       @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("employment_profiles")
+}
+
+enum PayFrequency {
+  weekly
+  fortnightly
+  monthly
+  irregular
+
+  @@map("pay_frequency")
+}
+
+enum ContractType {
+  permanent
+  fixed_term
+  zero_hours
+  freelance
+  other
+
+  @@map("contract_type")
+}
+
+// ─── Bank Connections ─────────────────────────────────────────────────────────
+
+model BankConnection {
+  id                String           @id @default(cuid())
+  userId            String           @map("user_id")
+  providerName      String           @map("provider_name") // e.g. "truelayer"
+  providerAccountId String?          @map("provider_account_id")
+  institutionName   String?          @map("institution_name")
+  connectionStatus  ConnectionStatus @default(pending) @map("connection_status")
+  accessToken       String?          @map("access_token") // encrypted at rest
+  refreshToken      String?          @map("refresh_token") // encrypted at rest
+  tokenExpiresAt    DateTime?        @map("token_expires_at")
+  consentId         String?          @map("consent_id")
+  lastSyncedAt      DateTime?        @map("last_synced_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankAccounts BankAccount[]
+
+  @@map("bank_connections")
+}
+
+enum ConnectionStatus {
+  pending
+  active
+  expired
+  error
+
+  @@map("connection_status")
+}
+
+model BankAccount {
+  id                  String      @id @default(cuid())
+  bankConnectionId    String      @map("bank_connection_id")
+  externalAccountId   String      @map("external_account_id")
+  accountName         String?     @map("account_name")
+  accountHolderName   String?     @map("account_holder_name")
+  accountType         AccountType @map("account_type")
+  currency            String      @default("GBP")
+  maskedAccountNumber String?     @map("masked_account_number")
+  currentBalance      Float?      @map("current_balance")
+  syncedAt            DateTime?   @map("synced_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  bankConnection BankConnection   @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
+  transactions   BankTransaction[]
+
+  @@unique([bankConnectionId, externalAccountId])
+  @@map("bank_accounts")
+}
+
+enum AccountType {
+  current
+  savings
+  credit_card
+  business
+
+  @@map("account_type")
+}
+
+model BankTransaction {
+  id             String                @id @default(cuid())
+  bankAccountId  String                @map("bank_account_id")
+  externalTxnId  String                @map("external_txn_id")
+  bookedAt       DateTime              @map("booked_at")
+  amount         Float
+  currency       String                @default("GBP")
+  description    String?
+  merchantName   String?               @map("merchant_name")
+  category       TransactionCategory?
+  direction      TransactionDirection
+  rawPayload     Json?                 @map("raw_payload")
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([bankAccountId, externalTxnId])
+  @@index([bankAccountId, bookedAt])
+  @@index([category])
+  @@map("bank_transactions")
+}
+
+enum TransactionDirection {
+  credit
+  debit
+
+  @@map("transaction_direction")
+}
+
+enum TransactionCategory {
+  salary
+  rent_payment
+  groceries
+  transport
+  utilities
+  savings_transfer
+  loan_repayment
+  entertainment
+  healthcare
+  education
+  gig_income
+  government_benefit
+  investment
+  cash_withdrawal
+  other
+
+  @@map("transaction_category")
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+model UploadedDocument {
+  id                 String             @id @default(cuid())
+  userId             String             @map("user_id")
+  documentType       DocumentType       @map("document_type")
+  fileUrl            String             @map("file_url")
+  fileKey            String             @map("file_key") // S3 key
+  fileSizeBytes      Int?               @map("file_size_bytes")
+  mimeType           String?            @map("mime_type")
+  verificationStatus VerificationStatus @default(pending) @map("verification_status")
+  extractedMetadata  Json?              @map("extracted_metadata")
+  uploadedAt         DateTime           @default(now()) @map("uploaded_at")
+  reviewedAt         DateTime?          @map("reviewed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("uploaded_documents")
+}
+
+enum DocumentType {
+  passport
+  national_id
+  biometric_residence_permit
+  driving_licence
+  bank_statement
+  payslip
+  employment_letter
+  tenancy_agreement
+  utility_bill
+  p60
+  p45
+  tax_return
+  other
+
+  @@map("document_type")
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+  needs_review
+
+  @@map("verification_status")
+}
+
+// ─── Rental Profiles ──────────────────────────────────────────────────────────
+
+model RentalProfile {
+  id                 String    @id @default(cuid())
+  userId             String    @map("user_id")
+  monthlyRentDeclared Float?   @map("monthly_rent_declared")
+  landlordName       String?   @map("landlord_name")
+  tenancyStartDate   DateTime? @map("tenancy_start_date")
+  tenancyEndDate     DateTime? @map("tenancy_end_date")
+  propertyAddress    String?   @map("property_address")
+  isCurrent          Boolean   @default(true) @map("is_current")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("rental_profiles")
+}
+
+// ─── Trust Features ───────────────────────────────────────────────────────────
+
+model TrustFeature {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  featureKey       String   @map("feature_key")
+  featureValueNum  Float?   @map("feature_value_num")
+  featureValueText String?  @map("feature_value_text")
+  featureValueBool Boolean? @map("feature_value_bool")
+  scoreVersion     String   @map("score_version")
+  computedAt       DateTime @default(now()) @map("computed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, featureKey])
+  @@map("trust_features")
+}
+
+// ─── Trust Scores ─────────────────────────────────────────────────────────────
+
+model TrustScore {
+  id                      String        @id @default(cuid())
+  userId                  String        @map("user_id")
+  scorecardType           ScorecardType @map("scorecard_type")
+  scoreVersion            String        @map("score_version")
+  profileCompletenessScore Float        @map("profile_completeness_score")
+  verificationStrengthScore Float       @map("verification_strength_score")
+  identityConfidenceScore Float         @map("identity_confidence_score")
+  incomeStabilityScore    Float         @map("income_stability_score")
+  affordabilityScore      Float         @map("affordability_score")
+  rentalReliabilityScore  Float         @map("rental_reliability_score")
+  financialStabilityScore Float         @map("financial_stability_score")
+  overallScore            Float         @map("overall_score")
+  overallTier             TrustTier     @map("overall_tier")
+  fraudRisk               FraudRisk     @map("fraud_risk")
+  reasonCodes             Json          @map("reason_codes")
+  computedAt              DateTime      @default(now()) @map("computed_at")
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sharedProfiles SharedProfile[]
+
+  @@index([userId, computedAt])
+  @@map("trust_scores")
+}
+
+enum ScorecardType {
+  general
+  tenant
+  lender_readiness
+  telecom
+
+  @@map("scorecard_type")
+}
+
+enum TrustTier {
+  A
+  B
+  C
+  D
+  E
+
+  @@map("trust_tier")
+}
+
+enum FraudRisk {
+  pass
+  review
+  high_risk
+
+  @@map("fraud_risk")
+}
+
+// ─── Shared Profiles ──────────────────────────────────────────────────────────
+
+model SharedProfile {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  trustScoreId  String    @map("trust_score_id")
+  shareToken    String    @unique @map("share_token")
+  expiresAt     DateTime  @map("expires_at")
+  targetType    String?   @map("target_type") // "landlord", "employer", "lender"
+  targetName    String?   @map("target_name")
+  viewCount     Int       @default(0) @map("view_count")
+  lastViewedAt  DateTime? @map("last_viewed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustScore TrustScore @relation(fields: [trustScoreId], references: [id])
+
+  @@map("shared_profiles")
+}
+
+// ─── Audit Events ─────────────────────────────────────────────────────────────
+
+model AuditEvent {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  eventType String    @map("event_type")
+  actorType String    @default("user") @map("actor_type")
+  metadata  Json?
+  ipAddress String?   @map("ip_address")
+  userAgent String?   @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([eventType])
+  @@map("audit_events")
+}

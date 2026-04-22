@@ -1,0 +1,52 @@
+import { Controller, Post, Get, Query, UseGuards } from '@nestjs/common'
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger'
+import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
+import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
+import { ScoringService } from './scoring.service'
+import { AuthService } from '../auth/auth.service'
+import type { ScorecardType } from '@equiscore/shared'
+
+@ApiTags('scores')
+@Controller('scores')
+@UseGuards(ClerkAuthGuard)
+@ApiBearerAuth()
+export class ScoringController {
+  constructor(
+    private readonly scoringService: ScoringService,
+    private readonly authService: AuthService
+  ) {}
+
+  private async resolveUserId(clerkId: string, email: string): Promise<string> {
+    const user = await this.authService.syncUser(clerkId, email)
+    return user.id
+  }
+
+  @Post('recompute')
+  @ApiOperation({ summary: 'Trigger score recomputation' })
+  @ApiQuery({ name: 'type', required: false, enum: ['general', 'tenant', 'lender_readiness', 'telecom'] })
+  async recompute(
+    @CurrentUser() user: RequestUser,
+    @Query('type') type: ScorecardType = 'general'
+  ) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.scoringService.recompute(userId, type)
+  }
+
+  @Get('latest')
+  @ApiOperation({ summary: 'Get latest trust score' })
+  @ApiQuery({ name: 'type', required: false, enum: ['general', 'tenant', 'lender_readiness', 'telecom'] })
+  async getLatest(
+    @CurrentUser() user: RequestUser,
+    @Query('type') type: ScorecardType = 'general'
+  ) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.scoringService.getLatestScore(userId, type)
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get score history' })
+  async getHistory(@CurrentUser() user: RequestUser) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.scoringService.getScoreHistory(userId)
+  }
+}
