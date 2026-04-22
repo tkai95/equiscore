@@ -1,0 +1,5 @@
+# Railway/Nixpacks sets NODE_ENV=production during install, so plain `npm ci`
+# skips devDependencies. The API build needs @nestjs/cli, typescript, ts-loader,
+# and workspace packages need prisma (dev) for `prisma generate`.
+[phases.install]
+cmds = ["npm ci --include=dev"]
