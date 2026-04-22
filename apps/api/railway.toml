@@ -3,6 +3,6 @@ builder = "nixpacks"
 buildCommand = "npx turbo build --filter=@equiscore/api"
 
 [deploy]
-startCommand = "node apps/api/dist/apps/api/src/main.js"
+startCommand = "node apps/api/dist/main.js"
 healthcheckPath = "/api/v1/health"
 restartPolicyType = "on_failure"
