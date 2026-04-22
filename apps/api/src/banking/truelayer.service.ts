@@ -13,6 +13,7 @@ export interface TrueLayerAccount {
   account_type: string
   currency: string
   account_number?: { iban?: string; number?: string; sort_code?: string }
+  provider?: { provider_id: string; display_name: string; logo_uri?: string }
 }
 
 export interface TrueLayerTransaction {
@@ -31,11 +32,12 @@ export class TrueLayerService {
   private readonly logger = new Logger(TrueLayerService.name)
   private readonly baseUrl: string
   private readonly authUrl: string
+  private readonly isSandbox: boolean
 
   constructor(private readonly config: ConfigService) {
-    const isSandbox = config.get<string>('TRUELAYER_SANDBOX') !== 'false'
-    this.baseUrl = isSandbox ? 'https://api.truelayer-sandbox.com' : 'https://api.truelayer.com'
-    this.authUrl = isSandbox ? 'https://auth.truelayer-sandbox.com' : 'https://auth.truelayer.com'
+    this.isSandbox = config.get<string>('TRUELAYER_SANDBOX') !== 'false'
+    this.baseUrl = this.isSandbox ? 'https://api.truelayer-sandbox.com' : 'https://api.truelayer.com'
+    this.authUrl = this.isSandbox ? 'https://auth.truelayer-sandbox.com' : 'https://auth.truelayer.com'
   }
 
   buildAuthUrl(redirectUri: string, state: string): string {
@@ -46,7 +48,7 @@ export class TrueLayerService {
       scope: 'info accounts balance transactions cards offline_access',
       redirect_uri: redirectUri,
       state,
-      providers: 'uk-ob-all uk-oauth-all',
+      providers: this.isSandbox ? 'uk-cs-mock' : 'uk-ob-all uk-oauth-all',
     })
     return `${this.authUrl}/?${params.toString()}`
   }
