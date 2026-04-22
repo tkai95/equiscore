@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Redirect, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, Post, Query, Redirect, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config'
 @ApiTags('open-banking')
 @Controller('open-banking')
 export class BankingController {
+  private readonly logger = new Logger(BankingController.name)
+
   constructor(
     private readonly bankingService: BankingService,
     private readonly authService: AuthService,
@@ -26,11 +28,17 @@ export class BankingController {
   }
 
   @Get('callback')
+  @Redirect()
   @ApiOperation({ summary: 'TrueLayer OAuth callback — handles code exchange and data sync' })
   async callback(@Query('code') code: string, @Query('state') state: string) {
-    await this.bankingService.handleCallback(code, state)
     const webUrl = this.config.get<string>('WEB_URL') ?? 'http://localhost:3000'
-    return { redirect: `${webUrl}/dashboard?bank_connected=true` }
+    try {
+      await this.bankingService.handleCallback(code, state)
+      return { url: `${webUrl}/dashboard/connections?bank_connected=true` }
+    } catch (error) {
+      this.logger.error('Banking callback failed', error)
+      return { url: `${webUrl}/dashboard/connections?bank_error=true` }
+    }
   }
 
   @Get('accounts')
@@ -48,7 +56,7 @@ export class BankingController {
   @ApiOperation({ summary: 'Re-sync bank data' })
   async sync(@CurrentUser() user: RequestUser) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
-    const accounts = await this.bankingService.getAccounts(dbUser.id)
-    return { synced: accounts.length }
+    const synced = await this.bankingService.syncAllForUser(dbUser.id)
+    return { synced }
   }
 }

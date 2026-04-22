@@ -138,6 +138,16 @@ export class BankingService {
     this.logger.log(`Synced ${tlAccounts.length} accounts for connection ${connectionId}`)
   }
 
+  async syncAllForUser(userId: string): Promise<number> {
+    const connections = await db.bankConnection.findMany({
+      where: { userId, connectionStatus: 'active' },
+    })
+    for (const conn of connections) {
+      await this.syncConnection(conn.id)
+    }
+    return connections.length
+  }
+
   async getAccounts(userId: string) {
     return db.bankAccount.findMany({
       where: {
