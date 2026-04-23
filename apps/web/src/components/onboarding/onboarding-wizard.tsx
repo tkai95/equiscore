@@ -15,10 +15,10 @@ import { Step4Rental } from './step-4-rental'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
-  { id: 1, label: 'About you' },
-  { id: 2, label: 'Address' },
-  { id: 3, label: 'Work & income' },
-  { id: 4, label: 'Housing' },
+  { id: 1, label: 'About you', optional: false },
+  { id: 2, label: 'Address', optional: false },
+  { id: 3, label: 'Work & income', optional: true },
+  { id: 4, label: 'Housing', optional: true },
 ]
 
 export function OnboardingWizard() {
@@ -55,13 +55,37 @@ export function OnboardingWizard() {
     }
   }
 
+  const handleSkip = async () => {
+    if (step < 4) {
+      setStep(step + 1)
+      return
+    }
+
+    // Skip on last step = submit with whatever we have so far
+    setIsSubmitting(true)
+    try {
+      const token = await getToken()
+      await api.profile.completeOnboarding(token!, formData)
+      router.push('/dashboard?onboarding_complete=true')
+    } catch (err) {
+      console.error('Onboarding failed', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
       {/* Progress header */}
       <div className="border-b border-gray-100 p-6">
         <div className="mb-4 flex items-center justify-between text-sm text-gray-500">
           <span>Step {step} of {STEPS.length}</span>
-          <span>{STEPS[step - 1]?.label}</span>
+          <span>
+            {STEPS[step - 1]?.label}
+            {STEPS[step - 1]?.optional && (
+              <span className="ml-1.5 text-xs text-gray-400">(optional)</span>
+            )}
+          </span>
         </div>
         <div className="flex gap-2">
           {STEPS.map((s) => (
@@ -96,13 +120,24 @@ export function OnboardingWizard() {
         ) : (
           <div />
         )}
-        <button
-          onClick={form.handleSubmit(handleNext as never)}
-          disabled={isSubmitting}
-          className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isSubmitting ? 'Saving...' : step === 4 ? 'Complete profile' : 'Continue'}
-        </button>
+        <div className="flex items-center gap-3">
+          {STEPS[step - 1]?.optional && (
+            <button
+              onClick={handleSkip}
+              disabled={isSubmitting}
+              className="text-sm text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            >
+              Skip for now
+            </button>
+          )}
+          <button
+            onClick={form.handleSubmit(handleNext as never)}
+            disabled={isSubmitting}
+            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Saving...' : step === 4 ? 'Complete profile' : 'Continue'}
+          </button>
+        </div>
       </div>
     </div>
   )

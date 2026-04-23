@@ -2,27 +2,43 @@
 
 import Link from 'next/link'
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react'
-import type { TrustTier } from '@equiscore/shared'
 
 interface Props {
   score: { profileCompletenessScore: number } | null | undefined
+  profileStage: string | null
   isLoading: boolean
 }
 
-const STEPS = [
-  { key: 'profile', label: 'Complete your profile', href: '/dashboard/profile' },
-  { key: 'bank', label: 'Connect a bank account', href: '/dashboard/connections' },
-  { key: 'documents', label: 'Upload supporting documents', href: '/dashboard/documents' },
-  { key: 'score', label: 'Generate your trust score', href: '/dashboard/trust-score' },
-  { key: 'share', label: 'Share your profile', href: '/dashboard/share' },
+const STAGE_ORDER = [
+  'created',
+  'onboarding',
+  'profile_building',
+  'banking_connected',
+  'documents_uploaded',
+  'scored',
+  'complete',
 ]
 
-export function ProfileCompletionCard({ score, isLoading }: Props) {
-  const completionPct = score ? Math.round(score.profileCompletenessScore) : 0
+const STEPS = [
+  { key: 'profile', label: 'Complete your profile', href: '/dashboard/profile', doneFrom: 'profile_building' },
+  { key: 'bank', label: 'Connect a bank account', href: '/dashboard/connections', doneFrom: 'banking_connected' },
+  { key: 'documents', label: 'Upload supporting documents', href: '/dashboard/documents', doneFrom: 'documents_uploaded' },
+  { key: 'score', label: 'Generate your trust score', href: '/dashboard/trust-score', doneFrom: 'scored' },
+  { key: 'share', label: 'Share your profile', href: '/dashboard/share', doneFrom: 'complete' },
+]
 
+function stageIndex(stage: string | null): number {
+  return STAGE_ORDER.indexOf(stage ?? 'created')
+}
+
+export function ProfileCompletionCard({ score, profileStage, isLoading }: Props) {
   if (isLoading) {
     return <div className="h-full animate-pulse rounded-2xl bg-gray-100" />
   }
+
+  const currentStageIdx = stageIndex(profileStage)
+  const stepsDone = STEPS.filter((s) => currentStageIdx >= stageIndex(s.doneFrom)).length
+  const completionPct = Math.round((stepsDone / STEPS.length) * 100)
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
@@ -39,8 +55,8 @@ export function ProfileCompletionCard({ score, isLoading }: Props) {
       </div>
 
       <div className="space-y-3">
-        {STEPS.map((step, i) => {
-          const done = completionPct > (i / STEPS.length) * 100
+        {STEPS.map((step) => {
+          const done = currentStageIdx >= stageIndex(step.doneFrom)
           return (
             <div key={step.key} className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -49,7 +65,7 @@ export function ProfileCompletionCard({ score, isLoading }: Props) {
                 ) : (
                   <Circle className="h-4 w-4 text-gray-300" />
                 )}
-                <span className={done ? 'text-sm text-gray-500 line-through' : 'text-sm text-gray-700'}>
+                <span className={done ? 'text-sm text-gray-400 line-through' : 'text-sm text-gray-700'}>
                   {step.label}
                 </span>
               </div>

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 export function DashboardOverview() {
   const { getToken } = useAuth()
 
-  const { data: score, isLoading } = useQuery({
+  const { data: score, isLoading: scoreLoading } = useQuery({
     queryKey: ['score', 'general'],
     queryFn: async () => {
       const token = await getToken()
@@ -32,6 +32,16 @@ export function DashboardOverview() {
       } | null>
     },
   })
+
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const token = await getToken()
+      return api.profile.get(token!) as Promise<{ profileStage: string } | null>
+    },
+  })
+
+  const isLoading = scoreLoading || profileLoading
 
   return (
     <div className="space-y-8">
@@ -69,7 +79,7 @@ export function DashboardOverview() {
 
         {/* Profile completion */}
         <div className="col-span-2">
-          <ProfileCompletionCard score={score} isLoading={isLoading} />
+          <ProfileCompletionCard score={score} profileStage={profile?.profileStage ?? null} isLoading={isLoading} />
         </div>
       </div>
 
