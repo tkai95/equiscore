@@ -43,13 +43,17 @@ export class BankingService {
 
     await this.syncConnection(connection.id, tokens.accessToken)
 
-    await db.userProfile.updateMany({
-      where: {
-        userId,
-        profileStage: { notIn: ['scored', 'complete'] },
-      },
-      data: { profileStage: 'banking_connected' },
-    })
+    try {
+      await db.userProfile.updateMany({
+        where: {
+          userId,
+          profileStage: { notIn: ['scored', 'complete'] },
+        },
+        data: { profileStage: 'banking_connected' },
+      })
+    } catch (err) {
+      this.logger.warn(`Profile stage update failed: ${String(err)}`)
+    }
 
     this.audit.log(userId, 'bank.connected', { connectionId: connection.id })
 
@@ -152,41 +156,53 @@ export class BankingService {
       }
 
       // Direct debits
-      const directDebits = await this.trueLayer.getDirectDebits(token, tlAccount.account_id)
-      for (const dd of directDebits) {
-        try {
-          await db.directDebit.upsert({
-            where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: dd.direct_debit_id } },
-            update: { name: dd.name, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
-            create: { bankAccountId: account.id, externalId: dd.direct_debit_id, name: dd.name, currency: dd.currency, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
-          })
-        } catch (err) {
-          this.logger.warn(`Skipping direct debit ${dd.direct_debit_id}: ${String(err)}`)
+      try {
+        const directDebits = await this.trueLayer.getDirectDebits(token, tlAccount.account_id)
+        for (const dd of directDebits) {
+          try {
+            await db.directDebit.upsert({
+              where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: dd.direct_debit_id } },
+              update: { name: dd.name, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
+              create: { bankAccountId: account.id, externalId: dd.direct_debit_id, name: dd.name, currency: dd.currency, status: dd.status, previousAmount: dd.previous_payment_amount, previousPaymentDate: dd.previous_payment_timestamp ? new Date(dd.previous_payment_timestamp) : null },
+            })
+          } catch (err) {
+            this.logger.warn(`Skipping direct debit ${dd.direct_debit_id}: ${String(err)}`)
+          }
         }
+      } catch (err) {
+        this.logger.warn(`Direct debits sync failed for ${tlAccount.account_id}: ${String(err)}`)
       }
 
       // Standing orders
-      const standingOrders = await this.trueLayer.getStandingOrders(token, tlAccount.account_id)
-      for (const so of standingOrders) {
-        try {
-          await db.standingOrder.upsert({
-            where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: so.standing_order_id } },
-            update: { reference: so.reference, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount },
-            create: { bankAccountId: account.id, externalId: so.standing_order_id, reference: so.reference, currency: so.currency, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount, firstPaymentDate: so.first_payment_date ? new Date(so.first_payment_date) : null },
-          })
-        } catch (err) {
-          this.logger.warn(`Skipping standing order ${so.standing_order_id}: ${String(err)}`)
+      try {
+        const standingOrders = await this.trueLayer.getStandingOrders(token, tlAccount.account_id)
+        for (const so of standingOrders) {
+          try {
+            await db.standingOrder.upsert({
+              where: { bankAccountId_externalId: { bankAccountId: account.id, externalId: so.standing_order_id } },
+              update: { reference: so.reference, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount },
+              create: { bankAccountId: account.id, externalId: so.standing_order_id, reference: so.reference, currency: so.currency, frequency: so.frequency, status: so.status, nextPaymentDate: so.next_payment_date ? new Date(so.next_payment_date) : null, nextPaymentAmount: so.next_payment_amount, firstPaymentDate: so.first_payment_date ? new Date(so.first_payment_date) : null },
+            })
+          } catch (err) {
+            this.logger.warn(`Skipping standing order ${so.standing_order_id}: ${String(err)}`)
+          }
         }
+      } catch (err) {
+        this.logger.warn(`Standing orders sync failed for ${tlAccount.account_id}: ${String(err)}`)
       }
     }
 
     // Identity — store verified name on accounts
-    const identity = await this.trueLayer.getIdentity(token)
-    if (identity?.full_name) {
-      await db.bankAccount.updateMany({
-        where: { bankConnectionId: connectionId },
-        data: { accountHolderName: identity.full_name },
-      })
+    try {
+      const identity = await this.trueLayer.getIdentity(token)
+      if (identity?.full_name) {
+        await db.bankAccount.updateMany({
+          where: { bankConnectionId: connectionId },
+          data: { accountHolderName: identity.full_name },
+        })
+      }
+    } catch (err) {
+      this.logger.warn(`Identity sync failed for connection ${connectionId}: ${String(err)}`)
     }
 
     await db.bankConnection.update({
