@@ -14,6 +14,14 @@ export class ProfileService {
     return profile
   }
 
+  async ensureProfile(userId: string) {
+    return db.userProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId, profileStage: 'created' },
+    })
+  }
+
   async completeOnboarding(userId: string, data: OnboardingData) {
     const user = await db.user.findUnique({ where: { id: userId } })
     if (!user) throw new NotFoundException('User not found')

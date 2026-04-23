@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { api } from '@/lib/api'
 import { updateProfileSchema } from '@equiscore/shared'
 import type { UpdateProfileData } from '@equiscore/shared'
+import Link from 'next/link'
 import { User, MapPin, Briefcase, Home, Edit2, Check, X } from 'lucide-react'
 import { cn, formatDate, formatCurrency } from '@/lib/utils'
 
@@ -262,7 +263,13 @@ export function ProfileView() {
   if (!profile) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-100">
-        <p className="text-gray-500">No profile found. Complete onboarding to get started.</p>
+        <p className="mb-4 text-gray-500">No profile found. Complete onboarding to get started.</p>
+        <Link
+          href="/onboarding"
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Start onboarding
+        </Link>
       </div>
     )
   }

@@ -24,7 +24,7 @@ export class AuthService {
 
   async syncUser(clerkId: string, email: string | undefined) {
     const resolvedEmail = email || (await this.fetchEmailFromClerk(clerkId))
-    return db.user.upsert({
+    const user = await db.user.upsert({
       where: { authProviderId: clerkId },
       update: { email: resolvedEmail },
       create: {
@@ -38,6 +38,16 @@ export class AuthService {
       },
       include: { profile: true },
     })
+
+    // Guard: ensure profile row exists for pre-existing users that were created
+    // before the profile nested-create was in place.
+    if (!user.profile) {
+      await db.userProfile.create({
+        data: { userId: user.id, profileStage: 'created' },
+      })
+    }
+
+    return user
   }
 
   async getMe(clerkId: string) {
