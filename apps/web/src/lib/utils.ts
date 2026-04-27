@@ -15,19 +15,19 @@ export function formatDate(date: string | Date): string {
 }
 
 export const TIER_COLORS: Record<TrustTier, string> = {
-  A: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-  B: 'text-blue-600 bg-blue-50 border-blue-200',
-  C: 'text-amber-600 bg-amber-50 border-amber-200',
-  D: 'text-orange-600 bg-orange-50 border-orange-200',
-  E: 'text-red-600 bg-red-50 border-red-200',
+  A: 'text-[#123C35] bg-[#F0F7F5] border-[#C8D2C3]',
+  B: 'text-[#3D6658] bg-[#EBF2EF] border-[#B5CEC8]',
+  C: 'text-[#5F6761] bg-[#F2F5F2] border-[#C8D2C3]',
+  D: 'text-[#C7A66A] bg-[#FAF7F2] border-[#E3D3B3]',
+  E: 'text-[#A96E52] bg-[#F9F3EF] border-[#E5C9BB]',
 }
 
 export const TIER_RING_COLORS: Record<TrustTier, string> = {
-  A: 'stroke-emerald-500',
-  B: 'stroke-blue-500',
-  C: 'stroke-amber-500',
-  D: 'stroke-orange-500',
-  E: 'stroke-red-500',
+  A: 'stroke-[#123C35]',
+  B: 'stroke-[#3D6658]',
+  C: 'stroke-[#8FA491]',
+  D: 'stroke-[#C7A66A]',
+  E: 'stroke-[#A96E52]',
 }
 
 export const DIMENSION_LABELS: Record<string, string> = {

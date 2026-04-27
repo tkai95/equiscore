@@ -83,8 +83,8 @@ function SectionHeader({
   return (
     <div className="mb-5 flex items-center justify-between">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-          <Icon className="h-4 w-4 text-blue-600" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
+          <Icon className="h-4 w-4 text-brand" />
         </div>
         <h2 className="font-semibold text-gray-900">{title}</h2>
       </div>
@@ -124,7 +124,7 @@ function EditForm({
   })
 
   const inputClass =
-    'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20'
+    'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
   const labelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
 
   return (
@@ -197,7 +197,7 @@ function EditForm({
         <button
           type="submit"
           disabled={isPending}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface hover:bg-brand-dark disabled:opacity-50"
         >
           <Check className="h-3.5 w-3.5" />
           {isPending ? 'Saving…' : 'Save changes'}
@@ -266,7 +266,7 @@ export function ProfileView() {
         <p className="mb-4 text-gray-500">No profile found. Complete onboarding to get started.</p>
         <Link
           href="/onboarding"
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-cream-surface hover:bg-brand-dark"
         >
           Start onboarding
         </Link>
@@ -313,8 +313,8 @@ export function ProfileView() {
         ) : (
           <>
             <div className="mb-5 flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                <User className="h-4 w-4 text-blue-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
+                <User className="h-4 w-4 text-brand" />
               </div>
               <h2 className="font-semibold text-gray-900">Edit personal information</h2>
             </div>
@@ -336,8 +336,8 @@ export function ProfileView() {
       {/* Address */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
         <div className="mb-5 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-            <MapPin className="h-4 w-4 text-blue-600" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
+            <MapPin className="h-4 w-4 text-brand" />
           </div>
           <h2 className="font-semibold text-gray-900">Current address</h2>
         </div>
@@ -359,8 +359,8 @@ export function ProfileView() {
       {currentEmployment && (
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
           <div className="mb-5 flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-              <Briefcase className="h-4 w-4 text-blue-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
+              <Briefcase className="h-4 w-4 text-brand" />
             </div>
             <h2 className="font-semibold text-gray-900">Employment detail</h2>
           </div>

@@ -34,9 +34,9 @@ const CATEGORY_META: Record<string, { label: string; signal: string; signalClass
   salary:             { label: 'Salary',        signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
   gig_income:         { label: 'Gig Income',    signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
   government_benefit: { label: 'Gov Benefit',   signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
-  rent_payment:       { label: 'Rent',          signal: 'Commitment',  signalClass: 'bg-blue-100 text-blue-700' },
-  loan_repayment:     { label: 'Loan',          signal: 'Commitment',  signalClass: 'bg-blue-100 text-blue-700' },
-  utilities:          { label: 'Utilities',     signal: 'Commitment',  signalClass: 'bg-blue-100 text-blue-700' },
+  rent_payment:       { label: 'Rent',          signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
+  loan_repayment:     { label: 'Loan',          signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
+  utilities:          { label: 'Utilities',     signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
   groceries:          { label: 'Groceries',     signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
   transport:          { label: 'Transport',     signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
   healthcare:         { label: 'Healthcare',    signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
@@ -175,13 +175,13 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
             placeholder="Search transactions…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="h-9 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
           />
         </div>
         <select
           value={filterSignal}
           onChange={e => setFilterSignal(e.target.value)}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
         >
           <option value="All">All signals</option>
           {SIGNAL_ORDER.filter(s => s !== '—').map(s => (
@@ -191,7 +191,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
         <select
           value={filterDirection}
           onChange={e => setFilterDirection(e.target.value)}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
         >
           <option value="All">In &amp; Out</option>
           <option value="Credit">Money in</option>
@@ -234,7 +234,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                 return (
                   <>
                     {/* Month group header */}
-                    <tr key={`header-${key}`} className="border-b border-gray-100 bg-blue-50/60">
+                    <tr key={`header-${key}`} className="border-b border-gray-100 bg-cream/60">
                       <td colSpan={3} className="px-4 py-2">
                         <span className="font-semibold text-gray-700">{monthLabel(key)}</span>
                         <span className="ml-2 text-xs text-gray-500">{txns.length} transactions</span>
@@ -287,7 +287,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                               <span className={cn(
                                 'inline-block rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
                                 meta.signal === 'Income'        && 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                                meta.signal === 'Commitment'    && 'bg-blue-50 text-blue-700 ring-blue-200',
+                                meta.signal === 'Commitment'    && 'bg-[#EBF2EF] text-[#3D6658] ring-[#B5CEC8]',
                                 meta.signal === 'Savings'       && 'bg-teal-50 text-teal-700 ring-teal-200',
                                 meta.signal === 'Living'        && 'bg-gray-50 text-gray-600 ring-gray-200',
                                 meta.signal === 'Discretionary' && 'bg-orange-50 text-orange-700 ring-orange-200',

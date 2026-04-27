@@ -134,8 +134,8 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 href={`/dashboard/connections/${account.id}`}
                 className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md hover:ring-gray-200"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
-                  <Icon className="h-5 w-5 text-blue-600" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cream">
+                  <Icon className="h-5 w-5 text-brand" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-gray-900">{account.accountName}</p>
@@ -171,8 +171,8 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4 rounded-2xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
-            <Landmark className="h-8 w-8 text-blue-600" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cream">
+            <Landmark className="h-8 w-8 text-brand" />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-900">No bank connected yet</p>
@@ -188,7 +188,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
         <button
           onClick={() => connectMutation.mutate()}
           disabled={connectMutation.isPending}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark disabled:opacity-60"
         >
           <Landmark className="h-4 w-4" />
           {connectMutation.isPending

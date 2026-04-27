@@ -95,14 +95,14 @@ export function SettingsView() {
                   <div
                     className={
                       done
-                        ? 'h-2.5 w-2.5 rounded-full bg-blue-500'
+                        ? 'h-2.5 w-2.5 rounded-full bg-brand'
                         : 'h-2.5 w-2.5 rounded-full border-2 border-gray-200'
                     }
                   />
                   <span
                     className={
                       current
-                        ? 'text-sm font-semibold text-blue-600'
+                        ? 'text-sm font-semibold text-brand'
                         : done
                         ? 'text-sm text-gray-700'
                         : 'text-sm text-gray-400'
@@ -111,7 +111,7 @@ export function SettingsView() {
                     {STAGE_LABELS[stage]}
                   </span>
                   {current && (
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    <span className="rounded-full bg-cream px-2 py-0.5 text-xs font-medium text-brand border border-[#D8D6C9]">
                       Current
                     </span>
                   )}

@@ -73,7 +73,7 @@ export function TrustScoreView() {
         <button
           onClick={() => recompute.mutate()}
           disabled={recompute.isPending}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface hover:bg-brand-dark disabled:opacity-50"
         >
           <RefreshCw className={cn('h-4 w-4', recompute.isPending && 'animate-spin')} />
           {score ? 'Refresh score' : 'Generate score'}
@@ -81,7 +81,7 @@ export function TrustScoreView() {
       </div>
 
       {!score && !recompute.isPending && (
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-8 text-center">
+        <div className="rounded-2xl border border-[#D8D6C9] bg-cream p-8 text-center">
           <p className="mb-4 text-gray-700">
             You don&apos;t have a trust score yet. Click &quot;Generate score&quot; to create your
             first profile assessment.

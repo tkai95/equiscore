@@ -41,7 +41,7 @@ export function RecentActivity({ score }: Props) {
             ) : rc.sentiment === 'negative' ? (
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
             ) : (
-              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-400" />
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-sage" />
             )}
             <span className="text-sm text-gray-700">{rc.message}</span>
           </div>

@@ -35,7 +35,7 @@ export function Step3Employment({ form }: Props) {
         <label className="mb-1.5 block text-sm font-medium text-gray-700">Employment type</label>
         <select
           {...register('employmentType')}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         >
           <option value="">Select your situation</option>
           {EMPLOYMENT_OPTIONS.map((o) => (
@@ -56,7 +56,7 @@ export function Step3Employment({ form }: Props) {
             <input
               {...register('employerName')}
               placeholder="e.g. Acme Ltd"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
           <div>
@@ -66,7 +66,7 @@ export function Step3Employment({ form }: Props) {
             <input
               {...register('jobTitle')}
               placeholder="e.g. Software Engineer"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
         </>
@@ -84,7 +84,7 @@ export function Step3Employment({ form }: Props) {
             min="0"
             step="100"
             placeholder="0"
-            className="w-full rounded-lg border border-gray-200 py-2.5 pl-7 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-200 py-2.5 pl-7 pr-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
         <p className="mt-1 text-xs text-gray-400">
@@ -98,7 +98,7 @@ export function Step3Employment({ form }: Props) {
         </label>
         <select
           {...register('payFrequency')}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         >
           <option value="">Select frequency</option>
           <option value="weekly">Weekly</option>

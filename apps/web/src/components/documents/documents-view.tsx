@@ -58,7 +58,7 @@ const STATUS_CONFIG = {
   pending: { icon: Clock, label: 'Pending review', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
   verified: { icon: CheckCircle, label: 'Verified', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
   rejected: { icon: XCircle, label: 'Rejected', className: 'bg-red-50 text-red-700 ring-red-200' },
-  requires_review: { icon: AlertCircle, label: 'Requires review', className: 'bg-blue-50 text-blue-700 ring-blue-200' },
+  requires_review: { icon: AlertCircle, label: 'Requires review', className: 'bg-cream text-charcoal-mid ring-[#D8D6C9]' },
 }
 
 function formatBytes(bytes: number | null) {
@@ -165,7 +165,7 @@ export function DocumentsView() {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             >
               <option value="">Select a type…</option>
               {DOCUMENT_CATEGORIES.map((cat) => (
@@ -191,7 +191,7 @@ export function DocumentsView() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={!selectedType || isUploading}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface shadow-sm hover:bg-brand-dark disabled:opacity-50"
             >
               <Upload className="h-4 w-4" />
               {isUploading ? 'Uploading…' : 'Choose file'}
@@ -216,8 +216,8 @@ export function DocumentsView() {
         </div>
       ) : documents.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-2xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
-            <FileText className="h-8 w-8 text-blue-600" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cream">
+            <FileText className="h-8 w-8 text-brand" />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-900">No documents uploaded yet</p>

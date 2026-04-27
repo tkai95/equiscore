@@ -112,7 +112,7 @@ export function DashboardOverview() {
 function ScoreDimensionBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value)
   const color =
-    pct >= 70 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-500' : 'bg-red-400'
+    pct >= 70 ? 'bg-brand' : pct >= 50 ? 'bg-sage' : pct >= 30 ? 'bg-amber-500' : 'bg-red-400'
 
   return (
     <div>

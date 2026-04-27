@@ -14,7 +14,7 @@ function formatGBP(value: number) {
 }
 
 const CATEGORY_COLOURS: Record<string, string> = {
-  housing: 'bg-blue-500',
+  housing: 'bg-brand',
   transport: 'bg-violet-500',
   groceries: 'bg-emerald-500',
   eating_out: 'bg-orange-500',
@@ -22,7 +22,7 @@ const CATEGORY_COLOURS: Record<string, string> = {
   utilities: 'bg-cyan-500',
   healthcare: 'bg-red-500',
   shopping: 'bg-amber-500',
-  subscriptions: 'bg-indigo-500',
+  subscriptions: 'bg-brand-mid',
   savings: 'bg-teal-500',
   transfers: 'bg-gray-400',
 }

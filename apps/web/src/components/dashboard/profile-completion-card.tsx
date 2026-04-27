@@ -44,12 +44,12 @@ export function ProfileCompletionCard({ score, profileStage, isLoading }: Props)
     <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-semibold text-gray-900">Profile completion</h2>
-        <span className="text-2xl font-bold text-blue-600">{completionPct}%</span>
+        <span className="text-2xl font-bold text-brand">{completionPct}%</span>
       </div>
 
       <div className="mb-6 h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
         <div
-          className="h-full rounded-full bg-blue-500 transition-all duration-500"
+          className="h-full rounded-full bg-brand transition-all duration-500"
           style={{ width: `${completionPct}%` }}
         />
       </div>
@@ -72,7 +72,7 @@ export function ProfileCompletionCard({ score, profileStage, isLoading }: Props)
               {!done && (
                 <Link
                   href={step.href}
-                  className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                  className="flex items-center gap-1 text-xs font-medium text-brand hover:text-brand-dark"
                 >
                   Start <ArrowRight className="h-3 w-3" />
                 </Link>

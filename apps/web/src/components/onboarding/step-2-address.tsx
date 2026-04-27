@@ -32,7 +32,7 @@ export function Step2Address({ form }: Props) {
         <label className="mb-1.5 block text-sm font-medium text-gray-700">UK residency status</label>
         <select
           {...register('residencyStatus')}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         >
           <option value="">Select your status</option>
           {RESIDENCY_OPTIONS.map((o) => (
@@ -51,7 +51,7 @@ export function Step2Address({ form }: Props) {
         <input
           {...register('ukMoveDate')}
           type="month"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
       </div>
 
@@ -60,7 +60,7 @@ export function Step2Address({ form }: Props) {
         <input
           {...register('addressLine1')}
           placeholder="e.g. 42 Highfield Road"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
         {errors.addressLine1 && (
           <p className="mt-1 text-xs text-red-600">{errors.addressLine1.message}</p>
@@ -74,7 +74,7 @@ export function Step2Address({ form }: Props) {
         <input
           {...register('addressLine2')}
           placeholder="Flat / apartment number"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
       </div>
 
@@ -84,7 +84,7 @@ export function Step2Address({ form }: Props) {
           <input
             {...register('city')}
             placeholder="e.g. London"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
           {errors.city && <p className="mt-1 text-xs text-red-600">{errors.city.message}</p>}
         </div>
@@ -93,7 +93,7 @@ export function Step2Address({ form }: Props) {
           <input
             {...register('postcode')}
             placeholder="e.g. E1 6AN"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm uppercase focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm uppercase focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
           {errors.postcode && <p className="mt-1 text-xs text-red-600">{errors.postcode.message}</p>}
         </div>

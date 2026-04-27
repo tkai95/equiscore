@@ -4,10 +4,10 @@ export const metadata = { title: 'Complete your profile' }
 
 export default function OnboardingPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cream">
       <div className="mx-auto max-w-2xl px-4 py-12">
         <div className="mb-8 text-center">
-          <a href="/dashboard" className="text-xl font-bold text-blue-600">
+          <a href="/dashboard" className="text-xl font-bold text-brand">
             Equiscore
           </a>
           <h1 className="mt-4 text-2xl font-bold text-gray-900">Build your trust profile</h1>

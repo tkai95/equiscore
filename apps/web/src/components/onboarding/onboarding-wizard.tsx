@@ -93,7 +93,7 @@ export function OnboardingWizard() {
               key={s.id}
               className={cn(
                 'h-1.5 flex-1 rounded-full transition-colors',
-                s.id <= step ? 'bg-blue-500' : 'bg-gray-100'
+                s.id <= step ? 'bg-brand' : 'bg-gray-100'
               )}
             />
           ))}
@@ -133,7 +133,7 @@ export function OnboardingWizard() {
           <button
             onClick={form.handleSubmit(handleNext as never)}
             disabled={isSubmitting}
-            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-brand px-6 py-2.5 text-sm font-medium text-cream-surface hover:bg-brand-dark disabled:opacity-50"
           >
             {isSubmitting ? 'Saving...' : step === 4 ? 'Complete profile' : 'Continue'}
           </button>

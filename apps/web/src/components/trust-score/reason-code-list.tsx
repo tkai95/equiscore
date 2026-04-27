@@ -29,7 +29,7 @@ export function ReasonCodeList({ reasonCodes }: { reasonCodes: ReasonCode[] }) {
 
       {neutral.length > 0 && (
         <div>
-          <h3 className="mb-3 text-sm font-semibold text-blue-700">
+          <h3 className="mb-3 text-sm font-semibold text-charcoal-mid">
             Areas where more evidence would help
           </h3>
           <div className="space-y-2">
@@ -64,7 +64,7 @@ function ReasonCodeRow({ rc }: { rc: ReasonCode }) {
       ) : rc.sentiment === 'negative' ? (
         <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
       ) : (
-        <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-400" />
+        <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-sage" />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-sm text-gray-700">{rc.message}</p>

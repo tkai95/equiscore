@@ -37,7 +37,7 @@ const SCORE_DIMENSIONS = [
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value)
   const color =
-    pct >= 70 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-500' : 'bg-red-400'
+    pct >= 70 ? 'bg-brand' : pct >= 50 ? 'bg-sage' : pct >= 30 ? 'bg-amber-500' : 'bg-red-400'
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between text-sm">
@@ -65,12 +65,12 @@ export default async function PublicProfilePage({ params }: { params: { token: s
   const negativeReasons = profile.reasonCodes.filter((r) => r.sentiment === 'negative').slice(0, 3)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-gray-200 bg-white px-6 py-4">
+      <header className="border-b border-[#D8D6C9] bg-cream-surface px-6 py-4">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-blue-600" />
+            <ShieldCheck className="h-6 w-6 text-brand" />
             <span className="text-lg font-bold text-gray-900">Equiscore</span>
           </div>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
@@ -113,7 +113,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
         {/* Score breakdown */}
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
           <div className="mb-1 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <TrendingUp className="h-4 w-4 text-brand" />
             <h2 className="font-semibold text-gray-900">Score breakdown</h2>
           </div>
           <p className="mb-6 text-sm text-gray-500">Each dimension is scored 0–100.</p>
@@ -128,7 +128,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
         {(positiveReasons.length > 0 || negativeReasons.length > 0) && (
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <div className="mb-1 flex items-center gap-2">
-              <Info className="h-4 w-4 text-blue-600" />
+              <Info className="h-4 w-4 text-brand" />
               <h2 className="font-semibold text-gray-900">Key signals</h2>
             </div>
             <p className="mb-5 text-sm text-gray-500">What shaped this applicant's score.</p>

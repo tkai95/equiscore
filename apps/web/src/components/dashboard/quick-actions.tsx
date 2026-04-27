@@ -21,9 +21,9 @@ export function QuickActions({ hasScore }: Props) {
           <Link
             key={href}
             href={href}
-            className="flex flex-col gap-2 rounded-xl border border-gray-100 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50"
+            className="flex flex-col gap-2 rounded-xl border border-gray-100 p-4 transition-colors hover:border-[#D8D6C9] hover:bg-cream"
           >
-            <Icon className="h-5 w-5 text-blue-600" />
+            <Icon className="h-5 w-5 text-brand" />
             <span className="text-sm font-medium text-gray-900">{label}</span>
             <span className="text-xs text-gray-500">{desc}</span>
           </Link>

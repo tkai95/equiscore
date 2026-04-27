@@ -20,7 +20,7 @@ export function Step1Personal({ form }: Props) {
         <input
           {...register('fullName')}
           placeholder="e.g. Amara Johnson"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
         {errors.fullName && (
           <p className="mt-1 text-xs text-red-600">{errors.fullName.message}</p>
@@ -32,7 +32,7 @@ export function Step1Personal({ form }: Props) {
         <input
           {...register('dob')}
           type="date"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
         {errors.dob && (
           <p className="mt-1 text-xs text-red-600">{errors.dob.message}</p>
@@ -44,7 +44,7 @@ export function Step1Personal({ form }: Props) {
         <input
           {...register('nationality')}
           placeholder="e.g. Nigerian, Indian, French"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
         {errors.nationality && (
           <p className="mt-1 text-xs text-red-600">{errors.nationality.message}</p>

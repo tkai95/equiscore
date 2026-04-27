@@ -76,11 +76,11 @@ function CreateLinkForm({
   const [targetName, setTargetName] = useState('')
 
   const inputClass =
-    'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20'
+    'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
   const labelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
 
   return (
-    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-5">
+    <div className="mt-4 rounded-xl border border-[#D8D6C9] bg-cream p-5">
       <h3 className="mb-4 text-sm font-semibold text-gray-900">New share link</h3>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -123,7 +123,7 @@ function CreateLinkForm({
             })
           }
           disabled={isPending}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface hover:bg-brand-dark disabled:opacity-50"
         >
           <Share2 className="h-4 w-4" />
           {isPending ? 'Creating…' : 'Create link'}
@@ -199,7 +199,7 @@ export function ShareProfileView() {
           { step: '3', text: 'They can view your verified profile — no account needed.' },
         ].map(({ step, text }) => (
           <div key={step} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-cream-surface">
               {step}
             </div>
             <p className="text-sm text-gray-600">{text}</p>
@@ -217,7 +217,7 @@ export function ShareProfileView() {
           </p>
           <a
             href="/dashboard/trust-score"
-            className="mt-4 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="mt-4 inline-block rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface hover:bg-brand-dark"
           >
             Go to Trust Score
           </a>
@@ -235,7 +235,7 @@ export function ShareProfileView() {
             {!showForm && (
               <button
                 onClick={() => setShowForm(true)}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
               >
                 <Plus className="h-4 w-4" />
                 New link
@@ -268,8 +268,8 @@ export function ShareProfileView() {
         </div>
       ) : links.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-2xl bg-white py-14 shadow-sm ring-1 ring-gray-100">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-            <Share2 className="h-7 w-7 text-blue-600" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cream">
+            <Share2 className="h-7 w-7 text-brand" />
           </div>
           <p className="text-sm text-gray-500">No share links yet.</p>
         </div>

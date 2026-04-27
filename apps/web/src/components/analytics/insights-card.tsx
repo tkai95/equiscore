@@ -25,10 +25,10 @@ const config = {
   },
   info: {
     icon: Info,
-    bg: 'bg-blue-50',
-    border: 'border-blue-100',
-    icon_colour: 'text-blue-600',
-    title_colour: 'text-blue-900',
+    bg: 'bg-cream',
+    border: 'border-[#D8D6C9]',
+    icon_colour: 'text-brand',
+    title_colour: 'text-charcoal',
   },
 }
 
@@ -49,13 +49,13 @@ export function InsightsCard({
     <div className="rounded-xl border border-gray-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-blue-600" />
+          <Sparkles className="h-4 w-4 text-brand" />
           <h2 className="text-sm font-semibold text-gray-700">AI Insights</h2>
         </div>
         {hasData && insights.length === 0 && !isLoading && !unavailable && (
           <button
             onClick={onGenerate}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-cream-surface hover:bg-brand-dark transition-colors"
           >
             Generate
           </button>
