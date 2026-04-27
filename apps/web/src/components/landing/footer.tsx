@@ -28,10 +28,10 @@ export function LandingFooter() {
   return (
     <footer className="border-t border-[#D8D6C9] bg-cream">
       <div className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-10 md:grid-cols-5">
+        <div className="grid gap-10 md:grid-cols-6">
           <div className="md:col-span-2">
             <Link href="/" className="mb-4 block">
-              <Image src="/logo.png" alt="Equiscore" width={120} height={32} />
+              <Image src="/logo.png" alt="Equiscore" width={160} height={42} className="mix-blend-multiply" />
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-charcoal-mid">
               Build a verified financial identity and share it confidently with landlords, lenders,
