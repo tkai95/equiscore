@@ -19,7 +19,7 @@ export function LandingNav() {
     <nav className="sticky top-0 z-40 border-b border-[#D8D6C9] bg-cream-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/">
-          <Image src="/logo.png" alt="Equiscore" width={180} height={48} priority />
+          <Image src="/logo.png" alt="Equiscore" width={220} height={58} priority />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -27,7 +27,7 @@ export function LandingNav() {
             <Link
               key={href}
               href={href}
-              className="text-sm text-charcoal-mid transition-colors hover:text-charcoal"
+              className="text-base font-medium text-charcoal-mid transition-colors hover:text-charcoal"
             >
               {label}
             </Link>

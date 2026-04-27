@@ -8,7 +8,6 @@ import {
   Share2,
   Users,
   Lock,
-  Eye,
   Trash2,
   CheckCircle2,
   Clock,
@@ -35,7 +34,7 @@ function TrustProfileMockup() {
   ] as const
 
   return (
-    <div className="w-full max-w-[340px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
+    <div className="w-full max-w-[460px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="flex items-center gap-2">
@@ -110,16 +109,6 @@ function TrustProfileMockup() {
         <span className="text-sm font-medium text-gray-700">Ready to share</span>
       </div>
     </div>
-  )
-}
-
-// ── Leaf decoration ──────────────────────────────────────────────────────────
-
-function Leaf({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 120 220" className={className} fill="currentColor" aria-hidden>
-      <path d="M60 0 C90 30 110 80 100 140 C90 180 70 210 60 220 C50 210 30 180 20 140 C10 80 30 30 60 0Z" />
-    </svg>
   )
 }
 
@@ -245,12 +234,7 @@ export default function LandingPage() {
           </div>
 
           {/* Right: product mockup */}
-          <div className="relative flex justify-center lg:justify-end">
-            {/* Decorative leaves */}
-            <Leaf className="absolute -right-8 -top-12 h-48 w-24 rotate-12 text-brand opacity-[0.06]" />
-            <Leaf className="absolute -bottom-8 -left-4 h-36 w-18 -rotate-12 text-sage opacity-[0.08]" />
-            <Leaf className="absolute bottom-16 -right-4 h-28 w-14 rotate-45 text-brand opacity-[0.05]" />
-
+          <div className="flex justify-center lg:justify-end">
             <TrustProfileMockup />
           </div>
         </div>
@@ -283,19 +267,23 @@ export default function LandingPage() {
           <p className="mb-14 text-center text-charcoal-mid">
             Four simple steps to build and share your credibility profile.
           </p>
-          <div className="grid gap-5 md:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2">
             {HOW_IT_WORKS.map(({ step, icon: Icon, title, desc }) => (
               <div
                 key={step}
-                className="group relative rounded-2xl border border-[#D8D6C9] bg-cream-surface p-6 transition-shadow hover:shadow-md"
+                className="group relative flex items-center gap-6 rounded-2xl border border-[#D8D6C9] bg-cream-surface p-7 transition-shadow hover:shadow-md"
               >
-                <p className="mb-4 text-4xl font-bold text-[#D8D6C9]">{step}</p>
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-cream">
-                  <Icon className="h-5 w-5 text-brand" />
+                {/* Icon — large, left */}
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-cream">
+                  <Icon className="h-10 w-10 text-brand" />
                 </div>
-                <h3 className="mb-2 font-semibold text-charcoal">{title}</h3>
-                <p className="text-sm leading-relaxed text-charcoal-mid">{desc}</p>
-                <ArrowRight className="absolute bottom-5 right-5 h-4 w-4 text-[#D8D6C9] transition-colors group-hover:text-brand" />
+                {/* Text */}
+                <div className="flex-1">
+                  <p className="mb-1 text-sm font-bold tracking-widest text-[#C8D2C3]">{step}</p>
+                  <h3 className="mb-1.5 text-lg font-bold text-charcoal">{title}</h3>
+                  <p className="text-sm leading-relaxed text-charcoal-mid">{desc}</p>
+                </div>
+                <ArrowRight className="absolute right-5 bottom-5 h-4 w-4 text-[#D8D6C9] transition-colors group-hover:text-brand" />
               </div>
             ))}
           </div>
