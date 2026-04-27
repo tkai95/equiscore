@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { Menu, X } from 'lucide-react'
 
@@ -17,8 +18,8 @@ export function LandingNav() {
   return (
     <nav className="sticky top-0 z-40 border-b border-gray-100 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-xl font-bold text-blue-600">
-          Equiscore
+        <Link href="/">
+          <Image src="/logo.png" alt="Equiscore" width={140} height={36} priority />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">

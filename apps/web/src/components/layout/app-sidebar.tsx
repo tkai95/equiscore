@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import {
@@ -32,8 +33,8 @@ export function AppSidebar() {
   return (
     <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-6 py-5">
-        <Link href="/dashboard" className="text-xl font-bold text-blue-600">
-          Equiscore
+        <Link href="/dashboard">
+          <Image src="/logo.png" alt="Equiscore" width={120} height={32} priority />
         </Link>
       </div>
 

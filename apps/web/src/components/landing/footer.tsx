@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 const columns: Record<string, { href: string; label: string }[]> = {
   Product: [
@@ -29,8 +30,8 @@ export function LandingFooter() {
       <div className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-2">
-            <Link href="/" className="mb-4 block text-xl font-bold text-blue-600">
-              Equiscore
+            <Link href="/" className="mb-4 block">
+              <Image src="/logo.png" alt="Equiscore" width={120} height={32} />
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-gray-500">
               Build a verified financial identity and share it confidently with landlords, lenders,
