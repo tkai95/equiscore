@@ -63,6 +63,11 @@ export const api = {
       apiFetch(`/scores/latest?type=${type}`, {}, token),
     history: (token: string) => apiFetch('/scores/history', {}, token),
   },
+  analytics: {
+    summary: (token: string) => apiFetch('/analytics/summary', {}, token),
+    insights: (token: string) =>
+      apiFetch('/analytics/insights', { method: 'POST' }, token),
+  },
   sharing: {
     create: (token: string, data: unknown) =>
       apiFetch('/share-links', { method: 'POST', body: JSON.stringify(data) }, token),

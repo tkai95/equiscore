@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Share2,
   Settings,
+  BarChart2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/profile', label: 'My Profile', icon: User },
   { href: '/dashboard/connections', label: 'Connections', icon: Landmark },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
   { href: '/dashboard/trust-score', label: 'My Trust Score', icon: ShieldCheck },
   { href: '/dashboard/share', label: 'Share Profile', icon: Share2 },
