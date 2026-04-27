@@ -340,8 +340,7 @@ export default function LandingPage() {
                 </div>
                 <div className="text-sm leading-snug text-charcoal-mid">{desc}</div>
               </div>
-            )
-            })}
+            ))}
           </div>
           <div className="mt-8 flex items-center justify-center gap-2 text-sm text-charcoal-mid">
             <ShieldCheck className="h-4 w-4 shrink-0" />
