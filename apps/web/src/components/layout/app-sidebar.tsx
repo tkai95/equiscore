@@ -4,67 +4,149 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
+  ShieldCheck,
+  BarChart2,
   User,
   Landmark,
   FileText,
-  ShieldCheck,
   Share2,
-  Settings,
-  BarChart2,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+const PROFILE_SUB_PATHS = [
+  '/dashboard/profile',
+  '/dashboard/connections',
+  '/dashboard/documents',
+  '/dashboard/share',
+]
+
+const PROFILE_ITEMS = [
   { href: '/dashboard/profile', label: 'My Profile', icon: User },
   { href: '/dashboard/connections', label: 'Connections', icon: Landmark },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
-  { href: '/dashboard/trust-score', label: 'My Trust Score', icon: ShieldCheck },
   { href: '/dashboard/share', label: 'Share Profile', icon: Share2 },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
 
+  const isInProfile = PROFILE_SUB_PATHS.some((p) => pathname.startsWith(p))
+  const [profileOpen, setProfileOpen] = useState(isInProfile)
+
+  // Auto-expand when navigating into a profile sub-page
+  useEffect(() => {
+    if (isInProfile) setProfileOpen(true)
+  }, [isInProfile])
+
   return (
-    <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
-      <div className="border-b border-gray-100 px-6 py-5">
+    <aside className="flex w-64 flex-col border-r border-[#D8D6C9] bg-cream-surface">
+      <div className="border-b border-[#D8D6C9] px-6 py-5">
         <Link href="/dashboard">
           <Image src="/logo.png" alt="Equiscore" width={120} height={32} priority />
         </Link>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              )}
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {label}
-            </Link>
-          )
-        })}
+        {/* Dashboard */}
+        <NavLink href="/dashboard" label="Dashboard" icon={LayoutDashboard} pathname={pathname} exact />
+
+        {/* My Trust Score */}
+        <NavLink href="/dashboard/trust-score" label="My Trust Score" icon={ShieldCheck} pathname={pathname} />
+
+        {/* Analytics */}
+        <NavLink href="/dashboard/analytics" label="Analytics" icon={BarChart2} pathname={pathname} />
+
+        {/* My Profile — expandable group */}
+        <div>
+          <button
+            onClick={() => setProfileOpen((o) => !o)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+              isInProfile
+                ? 'bg-cream text-brand'
+                : 'text-charcoal-mid hover:bg-cream hover:text-charcoal'
+            )}
+          >
+            <User className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1 text-left">My Profile</span>
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 transition-transform', profileOpen && 'rotate-180')}
+            />
+          </button>
+
+          {profileOpen && (
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-[#D8D6C9] pl-3">
+              {PROFILE_ITEMS.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href || pathname.startsWith(href + '/')
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                      isActive
+                        ? 'font-medium text-brand'
+                        : 'text-charcoal-mid hover:bg-cream hover:text-charcoal'
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </nav>
 
-      <div className="border-t border-gray-100 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <UserButton afterSignOutUrl="/" />
-          <span className="text-sm text-gray-600">Account</span>
-        </div>
+      {/* Account — Clerk UserButton handles settings, sign-out, manage account */}
+      <div className="border-t border-[#D8D6C9] px-4 py-4">
+        <UserButton
+          afterSignOutUrl="/"
+          appearance={{
+            elements: {
+              rootBox: 'w-full',
+              userButtonTrigger:
+                'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-charcoal-mid hover:bg-cream hover:text-charcoal transition-colors',
+              userButtonBox: 'flex-row-reverse gap-3',
+              userButtonOuterIdentifier: 'text-sm text-charcoal-mid',
+            },
+          }}
+          showName
+        />
       </div>
     </aside>
+  )
+}
+
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  pathname,
+  exact,
+}: {
+  href: string
+  label: string
+  icon: React.ElementType
+  pathname: string
+  exact?: boolean
+}) {
+  const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/')
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+        isActive ? 'bg-cream text-brand' : 'text-charcoal-mid hover:bg-cream hover:text-charcoal'
+      )}
+    >
+      <Icon className="h-4 w-4 flex-shrink-0" />
+      {label}
+    </Link>
   )
 }
