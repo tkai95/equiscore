@@ -78,7 +78,6 @@ function TrustProfileMockup() {
           <p className="mt-1 text-xs leading-relaxed text-gray-500">
             This profile is built from verified evidence and securely shareable.
           </p>
-          <p className="mt-2 text-xs font-medium text-gray-400">72 / 100</p>
         </div>
       </div>
 
