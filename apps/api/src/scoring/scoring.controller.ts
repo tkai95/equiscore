@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { ScoringService } from './scoring.service'
@@ -22,6 +23,7 @@ export class ScoringController {
   }
 
   @Post('recompute')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Trigger score recomputation' })
   @ApiQuery({ name: 'type', required: false, enum: ['general', 'tenant', 'lender_readiness', 'telecom'] })
   async recompute(

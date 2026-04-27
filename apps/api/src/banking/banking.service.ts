@@ -66,13 +66,45 @@ export class BankingService {
     return connection
   }
 
+  private async getFreshToken(connection: { id: string; accessToken: string | null; refreshToken: string | null; tokenExpiresAt: Date | null }): Promise<string> {
+    const BUFFER_MS = 5 * 60 * 1000
+    const isExpired = !connection.tokenExpiresAt || connection.tokenExpiresAt.getTime() - Date.now() < BUFFER_MS
+
+    if (!isExpired) {
+      return decrypt(connection.accessToken ?? '')
+    }
+
+    this.logger.log(`Refreshing expired token for connection ${connection.id}`)
+    try {
+      const currentRefreshToken = decrypt(connection.refreshToken ?? '')
+      const tokens = await this.trueLayer.refreshAccessToken(currentRefreshToken)
+      const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000)
+      await db.bankConnection.update({
+        where: { id: connection.id },
+        data: {
+          accessToken: encrypt(tokens.accessToken),
+          refreshToken: encrypt(tokens.refreshToken),
+          tokenExpiresAt: expiresAt,
+          connectionStatus: 'active',
+        },
+      })
+      return tokens.accessToken
+    } catch (err) {
+      await db.bankConnection.update({
+        where: { id: connection.id },
+        data: { connectionStatus: 'expired' },
+      })
+      throw new Error(`Token refresh failed for connection ${connection.id}: ${String(err)}`)
+    }
+  }
+
   async syncConnection(connectionId: string, accessToken?: string) {
     const connection = await db.bankConnection.findUnique({
       where: { id: connectionId },
     })
     if (!connection) return
 
-    const token = accessToken ?? decrypt(connection.accessToken ?? '')
+    const token = accessToken ?? await this.getFreshToken(connection)
     const tlAccounts = await this.trueLayer.getAccounts(token)
 
     const institutionName = tlAccounts[0]?.provider?.display_name ?? null

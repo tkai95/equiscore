@@ -121,22 +121,31 @@ export class FeatureEngineeringService {
     // ── Documents ─────────────────────────────────────────────────────────────
     features.documentCount = documents.length
     features.hasUploadedDocuments = documents.length > 0
+    // Count all submitted documents as sources — when OCR verification lands,
+    // swap the filter back to verificationStatus === 'verified' and adjust weights.
     features.verifiedSourcesCount =
       (features.openBankingConnected ? 1 : 0) +
-      documents.filter((d) => d.verificationStatus === 'verified').length
+      documents.filter((d) => d.verificationStatus !== 'rejected').length
 
     // ── Self-declared check ───────────────────────────────────────────────────
     features.selfDeclaredOnly = !features.openBankingConnected && features.documentCount === 0
 
     // ── Address confidence ────────────────────────────────────────────────────
+    const ADDRESS_DOC_TYPES = ['utility_bill', 'bank_statement', 'tenancy_agreement']
     const currentAddress = user?.addresses[0]
-    const addressVerified = documents.some(
-      (d) =>
-        ['utility_bill', 'bank_statement', 'tenancy_agreement'].includes(d.documentType) &&
-        d.verificationStatus === 'verified'
+    const addressDocVerified = documents.some(
+      (d) => ADDRESS_DOC_TYPES.includes(d.documentType) && d.verificationStatus === 'verified'
     )
+    const addressDocSubmitted = documents.some(
+      (d) => ADDRESS_DOC_TYPES.includes(d.documentType) && d.verificationStatus !== 'rejected'
+    )
+    // 0.85 = OCR-verified address doc, 0.65 = submitted/pending (onboard-and-hold phase),
+    // 0.4 = declared only, 0 = nothing provided.
     features.addressMatchConfidence =
-      currentAddress && addressVerified ? 0.85 : currentAddress ? 0.4 : 0
+      currentAddress && addressDocVerified ? 0.85
+      : currentAddress && addressDocSubmitted ? 0.65
+      : currentAddress ? 0.4
+      : 0
 
     return features
   }

@@ -4,7 +4,7 @@ export const DEFAULT_FEATURES: TrustFeatures = {
   monthsOfBankHistory: 0,
   connectedAccountsCount: 0,
   averageMonthlyIncome: 0,
-  incomeVolatility: 1,
+  incomeVolatility: 0,
   recurringSalaryDetected: false,
   recurringRentDetected: false,
   averageEndMonthBalance: 0,

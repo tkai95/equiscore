@@ -109,6 +109,30 @@ export class TrueLayerService {
     }
   }
 
+  async refreshAccessToken(refreshToken: string): Promise<TrueLayerTokens> {
+    const response = await fetch(`${this.authUrl}/connect/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: this.config.get<string>('TRUELAYER_CLIENT_ID') ?? '',
+        client_secret: this.config.get<string>('TRUELAYER_CLIENT_SECRET') ?? '',
+        refresh_token: refreshToken,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`TrueLayer token refresh failed: ${response.statusText}`)
+    }
+
+    const data = (await response.json()) as { access_token: string; refresh_token: string; expires_in: number }
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    }
+  }
+
   async getAccounts(accessToken: string): Promise<TrueLayerAccount[]> {
     const response = await fetch(`${this.baseUrl}/data/v1/accounts`, {
       headers: { Authorization: `Bearer ${accessToken}` },

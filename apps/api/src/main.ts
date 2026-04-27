@@ -22,7 +22,7 @@ async function bootstrap() {
     .filter(Boolean)
   app.enableCors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.some((o) => origin === o || origin.endsWith('.vercel.app'))) {
+      if (!origin || allowedOrigins.some((o) => origin === o)) {
         cb(null, true)
       } else {
         cb(new Error(`CORS: origin ${origin} not allowed`))
