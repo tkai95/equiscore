@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SignedIn, SignedOut } from '@clerk/nextjs'
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { ArrowRight, ShieldCheck, TrendingUp, Share2, Users } from 'lucide-react'
 
 export default function LandingPage() {
@@ -28,6 +28,7 @@ export default function LandingPage() {
               >
                 Go to dashboard
               </Link>
+              <UserButton afterSignOutUrl="/" />
             </SignedIn>
           </div>
         </div>
