@@ -11,16 +11,16 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-cream">
       <LandingNav />
 
       <section className="mx-auto max-w-3xl px-6 py-24">
-        <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">About</p>
-        <h1 className="mb-8 text-4xl font-bold leading-tight text-gray-900 lg:text-5xl">
+        <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-brand">About</p>
+        <h1 className="mb-8 text-4xl font-bold leading-tight text-charcoal lg:text-5xl">
           The UK financial system wasn&apos;t built for everyone.
         </h1>
 
-        <div className="space-y-6 text-lg leading-relaxed text-gray-600">
+        <div className="space-y-6 text-lg leading-relaxed text-charcoal-mid">
           <p>
             If you have lived in the UK for less than three years, work as a freelancer, or never
             needed to borrow money, you probably don&apos;t have much of a credit history. Not
@@ -43,9 +43,9 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-gray-50 py-24">
+      <section className="bg-cream-surface py-24">
         <div className="mx-auto max-w-3xl px-6">
-          <h2 className="mb-12 text-3xl font-bold text-gray-900">What we believe</h2>
+          <h2 className="mb-12 text-3xl font-bold text-charcoal">What we believe</h2>
           <div className="grid gap-8 sm:grid-cols-2">
             {[
               {
@@ -65,9 +65,9 @@ export default function AboutPage() {
                 body: 'Landlords and lenders see your verified profile. They never see your raw transactions.',
               },
             ].map(({ title, body }) => (
-              <div key={title} className="rounded-2xl bg-white p-6 shadow-sm">
-                <h3 className="mb-2 font-semibold text-gray-900">{title}</h3>
-                <p className="text-sm leading-relaxed text-gray-600">{body}</p>
+              <div key={title} className="rounded-2xl border border-[#D8D6C9] bg-cream p-6">
+                <h3 className="mb-2 font-semibold text-charcoal">{title}</h3>
+                <p className="text-sm leading-relaxed text-charcoal-mid">{body}</p>
               </div>
             ))}
           </div>
@@ -75,14 +75,14 @@ export default function AboutPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-6 py-24">
-        <h2 className="mb-8 text-3xl font-bold text-gray-900">The team</h2>
-        <p className="mb-10 text-lg leading-relaxed text-gray-600">
+        <h2 className="mb-8 text-3xl font-bold text-charcoal">The team</h2>
+        <p className="mb-10 text-lg leading-relaxed text-charcoal-mid">
           Equiscore is an early-stage team based in the UK. We are building in public and welcome
           feedback from users, landlords, and anyone with a stake in getting this right.
         </p>
         <Link
           href="/contact"
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"
+          className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-cream-surface hover:bg-brand-dark"
         >
           Get in touch <ArrowRight className="h-4 w-4" />
         </Link>

@@ -10,24 +10,24 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-cream">
       <LandingNav />
       <div className="mx-auto max-w-3xl px-6 py-20">
-        <h1 className="mb-2 text-4xl font-bold text-gray-900">Privacy Policy</h1>
-        <p className="mb-12 text-sm text-gray-500">Last updated: April 2025</p>
+        <h1 className="mb-2 text-4xl font-bold text-charcoal">Privacy Policy</h1>
+        <p className="mb-12 text-sm text-charcoal-mid">Last updated: April 2025</p>
 
-        <div className="prose prose-gray max-w-none space-y-10 text-gray-700">
+        <div className="prose prose-gray max-w-none space-y-10 text-charcoal-mid">
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Who we are</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Who we are</h2>
             <p>
               Equiscore Ltd operates the Equiscore platform at{' '}
-              <a href="https://equiscore.app" className="text-blue-600 hover:underline">
+              <a href="https://equiscore.app" className="text-brand hover:underline">
                 equiscore.app
               </a>
               . We are the data controller for the personal data you provide when using our service.
               For any privacy-related questions, contact us at{' '}
-              <a href="mailto:privacy@equiscore.app" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@equiscore.app" className="text-brand hover:underline">
                 privacy@equiscore.app
               </a>
               .
@@ -35,7 +35,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">What data we collect</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">What data we collect</h2>
             <p className="mb-4">We collect the following categories of personal data:</p>
             <ul className="ml-4 list-disc space-y-2">
               <li>
@@ -63,7 +63,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Why we collect it</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Why we collect it</h2>
             <p className="mb-4">
               We process your data for the following purposes and on the following legal bases under
               UK GDPR:
@@ -90,7 +90,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Who we share data with</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Who we share data with</h2>
             <p className="mb-4">
               We share your data with the following third-party processors, all of whom are bound by
               data processing agreements:
@@ -121,7 +121,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">How long we keep it</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">How long we keep it</h2>
             <p>
               We retain your account data for as long as your account is active. If you request
               deletion, we will remove your personal data within 30 days, except where we are
@@ -131,24 +131,14 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Your rights</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Your rights</h2>
             <p className="mb-4">Under UK GDPR, you have the right to:</p>
             <ul className="ml-4 list-disc space-y-2">
-              <li>
-                <strong>Access</strong> the personal data we hold about you.
-              </li>
-              <li>
-                <strong>Rectify</strong> inaccurate data.
-              </li>
-              <li>
-                <strong>Erasure</strong> of your data (right to be forgotten).
-              </li>
-              <li>
-                <strong>Portability</strong> of your data in a machine-readable format.
-              </li>
-              <li>
-                <strong>Object</strong> to processing based on legitimate interests.
-              </li>
+              <li><strong>Access</strong> the personal data we hold about you.</li>
+              <li><strong>Rectify</strong> inaccurate data.</li>
+              <li><strong>Erasure</strong> of your data (right to be forgotten).</li>
+              <li><strong>Portability</strong> of your data in a machine-readable format.</li>
+              <li><strong>Object</strong> to processing based on legitimate interests.</li>
               <li>
                 <strong>Withdraw consent</strong> for Open Banking data access or analytics at any
                 time.
@@ -156,13 +146,13 @@ export default function PrivacyPolicyPage() {
             </ul>
             <p className="mt-4">
               To exercise any of these rights, email us at{' '}
-              <a href="mailto:privacy@equiscore.app" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@equiscore.app" className="text-brand hover:underline">
                 privacy@equiscore.app
               </a>
               . You can also delete your account and data directly from your settings page. If you
               are not satisfied with our response, you have the right to lodge a complaint with the
               Information Commissioner&apos;s Office (ICO) at{' '}
-              <a href="https://ico.org.uk" className="text-blue-600 hover:underline">
+              <a href="https://ico.org.uk" className="text-brand hover:underline">
                 ico.org.uk
               </a>
               .
@@ -170,11 +160,11 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Cookies</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Cookies</h2>
             <p>
               We use cookies for essential site functionality and, with your consent, for analytics.
               See our{' '}
-              <Link href="/cookie-policy" className="text-blue-600 hover:underline">
+              <Link href="/cookie-policy" className="text-brand hover:underline">
                 cookie policy
               </Link>{' '}
               for full details.
@@ -182,7 +172,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-gray-900">Changes to this policy</h2>
+            <h2 className="mb-3 text-xl font-semibold text-charcoal">Changes to this policy</h2>
             <p>
               We may update this policy from time to time. When we make material changes, we will
               notify you by email or by displaying a notice on the platform. Continued use of

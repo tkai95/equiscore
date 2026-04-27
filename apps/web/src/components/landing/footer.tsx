@@ -26,21 +26,21 @@ const columns: Record<string, { href: string; label: string }[]> = {
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-gray-100 bg-white">
+    <footer className="border-t border-[#D8D6C9] bg-cream">
       <div className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-2">
             <Link href="/" className="mb-4 block">
               <Image src="/logo.png" alt="Equiscore" width={120} height={32} />
             </Link>
-            <p className="max-w-xs text-sm leading-relaxed text-gray-500">
+            <p className="max-w-xs text-sm leading-relaxed text-charcoal-mid">
               Build a verified financial identity and share it confidently with landlords, lenders,
               and employers.
             </p>
           </div>
           {Object.entries(columns).map(([title, items]) => (
             <div key={title}>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-[#5F6761]">
                 {title}
               </p>
               <ul className="space-y-3">
@@ -48,7 +48,7 @@ export function LandingFooter() {
                   <li key={href}>
                     <Link
                       href={href}
-                      className="text-sm text-gray-600 transition-colors hover:text-gray-900"
+                      className="text-sm text-charcoal-mid transition-colors hover:text-charcoal"
                     >
                       {label}
                     </Link>
@@ -58,11 +58,11 @@ export function LandingFooter() {
             </div>
           ))}
         </div>
-        <div className="mt-14 flex flex-col gap-3 border-t border-gray-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="mt-14 flex flex-col gap-3 border-t border-[#D8D6C9] pt-8 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-charcoal-mid">
             © {new Date().getFullYear()} Equiscore Ltd. All rights reserved.
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-[#5F6761]">
             Equiscore is not a credit reference agency. Open Banking data is processed under your
             explicit consent.
           </p>

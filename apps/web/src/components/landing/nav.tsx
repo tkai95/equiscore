@@ -16,7 +16,7 @@ export function LandingNav() {
   const [open, setOpen] = useState(false)
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-gray-100 bg-white">
+    <nav className="sticky top-0 z-40 border-b border-[#D8D6C9] bg-cream-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/">
           <Image src="/logo.png" alt="Equiscore" width={140} height={36} priority />
@@ -27,7 +27,7 @@ export function LandingNav() {
             <Link
               key={href}
               href={href}
-              className="text-sm text-gray-600 transition-colors hover:text-gray-900"
+              className="text-sm text-charcoal-mid transition-colors hover:text-charcoal"
             >
               {label}
             </Link>
@@ -36,12 +36,12 @@ export function LandingNav() {
 
         <div className="hidden items-center gap-3 md:flex">
           <SignedOut>
-            <Link href="/sign-in" className="text-sm text-gray-600 hover:text-gray-900">
+            <Link href="/sign-in" className="text-sm text-charcoal-mid hover:text-charcoal">
               Sign in
             </Link>
             <Link
               href="/sign-up"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface transition-colors hover:bg-brand-dark"
             >
               Create your profile
             </Link>
@@ -49,7 +49,7 @@ export function LandingNav() {
           <SignedIn>
             <Link
               href="/dashboard"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface transition-colors hover:bg-brand-dark"
             >
               Go to dashboard
             </Link>
@@ -63,38 +63,38 @@ export function LandingNav() {
           aria-label="Toggle menu"
         >
           {open ? (
-            <X className="h-5 w-5 text-gray-700" />
+            <X className="h-5 w-5 text-charcoal-mid" />
           ) : (
-            <Menu className="h-5 w-5 text-gray-700" />
+            <Menu className="h-5 w-5 text-charcoal-mid" />
           )}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-gray-100 bg-white px-6 py-5 md:hidden">
+        <div className="border-t border-[#D8D6C9] bg-cream-surface px-6 py-5 md:hidden">
           <div className="flex flex-col gap-5">
             {links.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                className="text-sm font-medium text-charcoal-mid hover:text-charcoal"
                 onClick={() => setOpen(false)}
               >
                 {label}
               </Link>
             ))}
-            <hr className="border-gray-100" />
+            <hr className="border-[#D8D6C9]" />
             <SignedOut>
               <Link
                 href="/sign-in"
-                className="text-sm font-medium text-gray-700"
+                className="text-sm font-medium text-charcoal-mid"
                 onClick={() => setOpen(false)}
               >
                 Sign in
               </Link>
               <Link
                 href="/sign-up"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
+                className="rounded-lg bg-brand px-4 py-2 text-center text-sm font-medium text-cream-surface hover:bg-brand-dark"
                 onClick={() => setOpen(false)}
               >
                 Create your profile
@@ -103,7 +103,7 @@ export function LandingNav() {
             <SignedIn>
               <Link
                 href="/dashboard"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
+                className="rounded-lg bg-brand px-4 py-2 text-center text-sm font-medium text-cream-surface hover:bg-brand-dark"
                 onClick={() => setOpen(false)}
               >
                 Go to dashboard

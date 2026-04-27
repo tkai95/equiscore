@@ -94,15 +94,15 @@ const faqs = [
 
 export default function FaqPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-cream">
       <LandingNav />
 
       <section className="mx-auto max-w-3xl px-6 py-24">
-        <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">FAQ</p>
-        <h1 className="mb-4 text-4xl font-bold text-gray-900">Common questions</h1>
-        <p className="mb-16 text-xl text-gray-600">
+        <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-brand">FAQ</p>
+        <h1 className="mb-4 text-4xl font-bold text-charcoal">Common questions</h1>
+        <p className="mb-16 text-xl text-charcoal-mid">
           Not finding what you need?{' '}
-          <Link href="/contact" className="text-blue-600 hover:underline">
+          <Link href="/contact" className="text-brand hover:underline">
             Get in touch.
           </Link>
         </p>
@@ -110,12 +110,12 @@ export default function FaqPage() {
         <div className="space-y-14">
           {faqs.map(({ category, items }) => (
             <div key={category}>
-              <h2 className="mb-6 text-lg font-semibold text-gray-900">{category}</h2>
+              <h2 className="mb-6 text-lg font-semibold text-charcoal">{category}</h2>
               <div className="space-y-6">
                 {items.map(({ q, a }) => (
-                  <div key={q} className="border-b border-gray-100 pb-6">
-                    <p className="mb-2 font-medium text-gray-900">{q}</p>
-                    <p className="text-sm leading-relaxed text-gray-600">{a}</p>
+                  <div key={q} className="border-b border-[#D8D6C9] pb-6">
+                    <p className="mb-2 font-medium text-charcoal">{q}</p>
+                    <p className="text-sm leading-relaxed text-charcoal-mid">{a}</p>
                   </div>
                 ))}
               </div>
