@@ -15,6 +15,9 @@ import {
   FileText,
   Home,
   User,
+  Star,
+  ChevronRight,
+  Link2,
 } from 'lucide-react'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
@@ -136,7 +139,7 @@ const testimonials = [
 ]
 
 const TIERS = [
-  { tier: 'A', label: 'Highly verified', desc: 'Strong evidence across all dimensions', bg: '#F0F7F5', border: '#C8D2C3', tierColor: '#123C35', labelColor: '#0B2F29' },
+  { tier: 'A', label: 'Highly verified', desc: 'Strong evidence across all key dimensions', bg: '#F0F7F5', border: '#123C35', tierColor: '#123C35', labelColor: '#0B2F29' },
   { tier: 'B', label: 'Verified', desc: 'Good evidence, minor gaps', bg: '#F2F7F4', border: '#C8D2C3', tierColor: '#3D6658', labelColor: '#2D4E43' },
   { tier: 'C', label: 'Partial', desc: 'Some verified evidence present', bg: '#F5F7F5', border: '#C8D2C3', tierColor: '#8FA491', labelColor: '#7A8D7C' },
   { tier: 'D', label: 'Limited', desc: 'Thin evidence profile', bg: '#FAF7F2', border: '#E3D3B3', tierColor: '#C7A66A', labelColor: '#A88B55' },
@@ -318,28 +321,45 @@ export default function LandingPage() {
       {/* Trust tiers */}
       <section className="bg-cream py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold text-charcoal">
+          <h2 className="mb-3 text-center text-5xl font-bold text-charcoal">
             Transparent trust tiers
           </h2>
-          <p className="mb-16 text-center text-charcoal-mid">
-            Your trust level is always explainable. No mystery numbers, just clear signals.
+          <p className="mb-14 text-center text-charcoal-mid">
+            Every EquiScore is explainable, built from clear evidence and easy to understand.
           </p>
-          <div className="grid gap-4 md:grid-cols-5">
-            {TIERS.map(({ tier, label, desc, bg, border, tierColor, labelColor }) => (
-              <div
-                key={tier}
-                className="rounded-xl border p-5 text-center"
-                style={{ background: bg, borderColor: border }}
-              >
-                <div className="mb-2 text-3xl font-bold" style={{ color: tierColor }}>
-                  {tier}
+          <div className="grid items-end gap-4 md:grid-cols-5">
+            {TIERS.map(({ tier, label, desc, bg, border, tierColor, labelColor }) => {
+              const isTop = tier === 'A'
+              return (
+                <div
+                  key={tier}
+                  className="relative rounded-2xl border text-center"
+                  style={{
+                    background: bg,
+                    borderColor: border,
+                    borderWidth: isTop ? 2 : 1,
+                    padding: isTop ? '2.25rem 1.25rem' : '1.5rem 1.25rem',
+                  }}
+                >
+                  {isTop && (
+                    <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#123C35]">
+                      <Star className="h-3.5 w-3.5 fill-white text-white" />
+                    </div>
+                  )}
+                  <div className="mb-2 text-7xl font-bold leading-none" style={{ color: tierColor }}>
+                    {tier}
+                  </div>
+                  <div className="mb-3 font-semibold" style={{ color: labelColor }}>
+                    {label}
+                  </div>
+                  <div className="text-sm leading-snug text-charcoal-mid">{desc}</div>
                 </div>
-                <div className="mb-1 text-sm font-semibold" style={{ color: labelColor }}>
-                  {label}
-                </div>
-                <div className="text-xs text-charcoal-mid">{desc}</div>
-              </div>
-            ))}
+              )
+            })}
+          </div>
+          <div className="mt-8 flex items-center justify-center gap-2 text-sm text-charcoal-mid">
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            <span>Higher tiers reflect stronger verified evidence, not personal worth.</span>
           </div>
         </div>
       </section>
@@ -349,14 +369,14 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
-              <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-charcoal-mid">
                 For landlords and letting agents
               </p>
-              <h2 className="mb-6 text-3xl font-bold text-charcoal">Stop chasing references.</h2>
-              <p className="mb-6 text-lg leading-relaxed text-charcoal-mid">
-                A verified Equiscore profile tells you more than a reference call ever could: income
-                consistency, payment history, and financial stability, all verified directly from
-                your applicant&apos;s bank.
+              <h2 className="mb-6 text-4xl font-bold text-charcoal">Stop chasing references.</h2>
+              <p className="mb-8 text-lg leading-relaxed text-charcoal-mid">
+                An EquiScore profile gives you a clearer view of income consistency, payment
+                behaviour, and financial stability — verified through Open Banking and shared
+                securely by the applicant.
               </p>
               <Link
                 href="/for-landlords"
@@ -365,19 +385,22 @@ export default function LandingPage() {
                 Learn how it works for landlords <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="space-y-4">
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
               {[
-                'Verified by Open Banking, not self-reported',
-                'Faster than waiting on reference calls',
-                'Raw transactions stay private',
-                'Share links expire and can be revoked',
-              ].map((point) => (
+                { icon: ShieldCheck, text: 'Verified by Open Banking, not self-reported' },
+                { icon: Clock, text: 'Faster than waiting on reference calls' },
+                { icon: Lock, text: 'Raw transactions stay private' },
+                { icon: Link2, text: 'Share links expire and can be revoked' },
+              ].map(({ icon: Icon, text }, i, arr) => (
                 <div
-                  key={point}
-                  className="flex items-center gap-3 rounded-xl border border-[#D8D6C9] bg-cream p-4"
+                  key={text}
+                  className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}
                 >
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-brand" />
-                  <span className="text-sm font-medium text-charcoal">{point}</span>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                    <Icon className="h-5 w-5 text-charcoal-mid" />
+                  </div>
+                  <span className="flex-1 font-medium text-charcoal">{text}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
                 </div>
               ))}
             </div>
