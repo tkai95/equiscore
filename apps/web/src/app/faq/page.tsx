@@ -38,7 +38,7 @@ const faqs = [
         a: "We store the data needed to calculate and display your score. You can request deletion of your account and all associated data at any time from your settings page. Deletion is processed within 30 days.",
       },
       {
-        q: 'Can I revoke Equiscore's access to my bank?',
+        q: "Can I revoke Equiscore's access to my bank?",
         a: "Yes. You can disconnect your bank at any time from the Connections page in your dashboard. You can also revoke access directly through your bank's own app or online banking.",
       },
       {

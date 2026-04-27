@@ -115,11 +115,11 @@ export default function ForLandlordsPage() {
                 a: "No. An Equiscore profile is based on Open Banking data and is separate from a credit reference agency check. You can use it alongside your usual process or as a faster first-pass filter.",
               },
               {
-                q: 'Can I see the applicant's bank transactions?',
+                q: "Can I see the applicant's bank transactions?",
                 a: "No. The profile shows verified signals derived from transaction data, not the underlying transactions themselves. Your applicant's full bank history stays private.",
               },
               {
-                q: 'What if an applicant doesn't have an Equiscore profile?',
+                q: "What if an applicant doesn't have an Equiscore profile?",
                 a: "You can ask applicants to create one. It takes about five minutes to set up. There is no cost to them during the beta period.",
               },
               {
