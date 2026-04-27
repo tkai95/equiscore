@@ -43,7 +43,7 @@ export function LandingNav() {
               href="/sign-up"
               className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface transition-colors hover:bg-brand-dark"
             >
-              Create your profile
+              Build my profile
             </Link>
           </SignedOut>
           <SignedIn>
@@ -97,7 +97,7 @@ export function LandingNav() {
                 className="rounded-lg bg-brand px-4 py-2 text-center text-sm font-medium text-cream-surface hover:bg-brand-dark"
                 onClick={() => setOpen(false)}
               >
-                Create your profile
+                Build my profile
               </Link>
             </SignedOut>
             <SignedIn>
