@@ -15,7 +15,6 @@ import {
   FileText,
   Home,
   User,
-  Star,
   ChevronRight,
   Link2,
 } from 'lucide-react'
@@ -327,34 +326,22 @@ export default function LandingPage() {
           <p className="mb-14 text-center text-charcoal-mid">
             Every EquiScore is explainable, built from clear evidence and easy to understand.
           </p>
-          <div className="grid items-end gap-4 md:grid-cols-5">
-            {TIERS.map(({ tier, label, desc, bg, border, tierColor, labelColor }) => {
-              const isTop = tier === 'A'
-              return (
-                <div
-                  key={tier}
-                  className="relative rounded-2xl border text-center"
-                  style={{
-                    background: bg,
-                    borderColor: border,
-                    borderWidth: isTop ? 2 : 1,
-                    padding: isTop ? '2.25rem 1.25rem' : '1.5rem 1.25rem',
-                  }}
-                >
-                  {isTop && (
-                    <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#123C35]">
-                      <Star className="h-3.5 w-3.5 fill-white text-white" />
-                    </div>
-                  )}
-                  <div className="mb-2 text-7xl font-bold leading-none" style={{ color: tierColor }}>
-                    {tier}
-                  </div>
-                  <div className="mb-3 font-semibold" style={{ color: labelColor }}>
-                    {label}
-                  </div>
-                  <div className="text-sm leading-snug text-charcoal-mid">{desc}</div>
+          <div className="grid gap-4 md:grid-cols-5">
+            {TIERS.map(({ tier, label, desc, bg, border, tierColor, labelColor }) => (
+              <div
+                key={tier}
+                className="rounded-2xl border p-6 text-center"
+                style={{ background: bg, borderColor: border }}
+              >
+                <div className="mb-2 text-7xl font-bold leading-none" style={{ color: tierColor }}>
+                  {tier}
                 </div>
-              )
+                <div className="mb-3 font-semibold" style={{ color: labelColor }}>
+                  {label}
+                </div>
+                <div className="text-sm leading-snug text-charcoal-mid">{desc}</div>
+              </div>
+            )
             })}
           </div>
           <div className="mt-8 flex items-center justify-center gap-2 text-sm text-charcoal-mid">
