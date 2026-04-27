@@ -16,7 +16,7 @@ import {
   Home,
   User,
   ChevronRight,
-  Link2,
+  ExternalLink,
 } from 'lucide-react'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
@@ -376,7 +376,7 @@ export default function LandingPage() {
                 { icon: ShieldCheck, text: 'Verified by Open Banking, not self-reported' },
                 { icon: Clock, text: 'Faster than waiting on reference calls' },
                 { icon: Lock, text: 'Raw transactions stay private' },
-                { icon: Link2, text: 'Share links expire and can be revoked' },
+                { icon: ExternalLink, text: 'Share links expire and can be revoked' },
               ].map(({ icon: Icon, text }, i, arr) => (
                 <div
                   key={text}
