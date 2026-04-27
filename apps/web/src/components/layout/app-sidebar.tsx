@@ -46,7 +46,7 @@ export function AppSidebar() {
     <aside className="flex w-64 flex-col border-r border-[#D8D6C9] bg-cream-surface">
       <div className="border-b border-[#D8D6C9] px-6 py-5">
         <Link href="/dashboard">
-          <Image src="/logo.png" alt="Equiscore" width={120} height={32} priority />
+          <Image src="/logo.png" alt="Equiscore" width={160} height={42} priority className="mix-blend-multiply" />
         </Link>
       </div>
 

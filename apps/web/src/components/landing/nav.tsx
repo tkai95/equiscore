@@ -19,7 +19,7 @@ export function LandingNav() {
     <nav className="sticky top-0 z-40 border-b border-[#D8D6C9] bg-cream-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/">
-          <Image src="/logo.png" alt="Equiscore" width={140} height={36} priority />
+          <Image src="/logo.png" alt="Equiscore" width={180} height={48} priority className="mix-blend-multiply" />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
