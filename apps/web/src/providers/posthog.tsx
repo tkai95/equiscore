@@ -5,6 +5,7 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
 import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
+import { isPublicSite } from '@/lib/site'
 
 function PageViewTracker() {
   const pathname = usePathname()
@@ -60,7 +61,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <PageViewTracker />
       </Suspense>
-      <UserIdentifier />
+      {!isPublicSite && <UserIdentifier />}
       {children}
     </PHProvider>
   )

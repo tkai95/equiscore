@@ -1,6 +1,8 @@
 import { Bell } from 'lucide-react'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#F7F6F2]">

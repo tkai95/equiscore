@@ -1,5 +1,6 @@
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Complete your profile' }
 
 export default function OnboardingPage() {

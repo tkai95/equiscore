@@ -1,8 +1,19 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { SignedIn, SignedOut } from '@clerk/nextjs'
+import dynamic from 'next/dynamic'
 import { isPublicSite } from '@/lib/site'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
+
+const DevHeroCTAs = dynamic(
+  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevHeroCTAs),
+  { ssr: false },
+)
+
+const DevBottomCTA = dynamic(
+  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevBottomCTA),
+  { ssr: false },
+)
+
 import {
   ArrowRight,
   ShieldCheck,
@@ -222,30 +233,7 @@ export default function LandingPage() {
                   </Link>
                 </>
               ) : (
-                <>
-                  <SignedOut>
-                    <Link
-                      href="/sign-up"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
-                    >
-                      Build my profile
-                    </Link>
-                    <Link
-                      href="/#how-it-works"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8D6C9] bg-cream-surface px-6 py-3.5 text-base font-semibold text-charcoal transition-colors hover:bg-cream"
-                    >
-                      See how it works <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </SignedOut>
-                  <SignedIn>
-                    <Link
-                      href="/dashboard"
-                      className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
-                    >
-                      View my dashboard <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </SignedIn>
-                </>
+                <DevHeroCTAs />
               )}
             </div>
           </div>
@@ -453,22 +441,7 @@ export default function LandingPage() {
                 Your profile takes about five minutes to set up.
               </h2>
               <p className="mb-8 text-sage-light">Free during beta. No payment card required.</p>
-              <SignedOut>
-                <Link
-                  href="/sign-up"
-                  className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
-                >
-                  Build my profile <ArrowRight className="h-5 w-5" />
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
-                >
-                  Go to my dashboard <ArrowRight className="h-5 w-5" />
-                </Link>
-              </SignedIn>
+              <DevBottomCTA />
             </>
           )}
         </div>

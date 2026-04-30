@@ -3,10 +3,20 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import dynamic from 'next/dynamic'
 import { Menu, X } from 'lucide-react'
 import { isPublicSite } from '@/lib/site'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
+
+const DevNavCTAs = dynamic(
+  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevNavCTAs),
+  { ssr: false },
+)
+
+const DevNavMobileCTAs = dynamic(
+  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevNavMobileCTAs),
+  { ssr: false },
+)
 
 const links = [
   { href: '/#how-it-works', label: 'How it works' },
@@ -41,28 +51,7 @@ export function LandingNav() {
           {isPublicSite ? (
             <RegisterInterestButton label="Register your interest" variant="ghost" />
           ) : (
-            <>
-              <SignedOut>
-                <Link href="/sign-in" className="text-sm text-charcoal-mid hover:text-charcoal">
-                  Sign in
-                </Link>
-                <Link
-                  href="/sign-up"
-                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface transition-colors hover:bg-brand-dark"
-                >
-                  Build my profile
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <Link
-                  href="/dashboard"
-                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface transition-colors hover:bg-brand-dark"
-                >
-                  Go to dashboard
-                </Link>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </>
+            <DevNavCTAs />
           )}
         </div>
 
@@ -96,33 +85,7 @@ export function LandingNav() {
             {isPublicSite ? (
               <RegisterInterestButton label="Register your interest" variant="ghost" />
             ) : (
-              <>
-                <SignedOut>
-                  <Link
-                    href="/sign-in"
-                    className="text-sm font-medium text-charcoal-mid"
-                    onClick={() => setOpen(false)}
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    href="/sign-up"
-                    className="rounded-lg bg-brand px-4 py-2 text-center text-sm font-medium text-cream-surface hover:bg-brand-dark"
-                    onClick={() => setOpen(false)}
-                  >
-                    Build my profile
-                  </Link>
-                </SignedOut>
-                <SignedIn>
-                  <Link
-                    href="/dashboard"
-                    className="rounded-lg bg-brand px-4 py-2 text-center text-sm font-medium text-cream-surface hover:bg-brand-dark"
-                    onClick={() => setOpen(false)}
-                  >
-                    Go to dashboard
-                  </Link>
-                </SignedIn>
-              </>
+              <DevNavMobileCTAs onClose={() => setOpen(false)} />
             )}
           </div>
         </div>
