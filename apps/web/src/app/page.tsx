@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { SignedIn, SignedOut } from '@clerk/nextjs'
+import { isPublicSite } from '@/lib/site'
+import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
 import {
   ArrowRight,
   ShieldCheck,
@@ -209,28 +211,42 @@ export default function LandingPage() {
               platforms.
             </p>
             <div className="flex flex-col gap-4 sm:flex-row">
-              <SignedOut>
-                <Link
-                  href="/sign-up"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
-                >
-                  Build my profile
-                </Link>
-                <Link
-                  href="/#how-it-works"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8D6C9] bg-cream-surface px-6 py-3.5 text-base font-semibold text-charcoal transition-colors hover:bg-cream"
-                >
-                  See how it works <ArrowRight className="h-4 w-4" />
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
-                >
-                  View my dashboard <ArrowRight className="h-5 w-5" />
-                </Link>
-              </SignedIn>
+              {isPublicSite ? (
+                <>
+                  <RegisterInterestButton label="Join early access" variant="primary" />
+                  <Link
+                    href="/#how-it-works"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8D6C9] bg-cream-surface px-6 py-3.5 text-base font-semibold text-charcoal transition-colors hover:bg-cream"
+                  >
+                    See how it works <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <SignedOut>
+                    <Link
+                      href="/sign-up"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
+                    >
+                      Build my profile
+                    </Link>
+                    <Link
+                      href="/#how-it-works"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8D6C9] bg-cream-surface px-6 py-3.5 text-base font-semibold text-charcoal transition-colors hover:bg-cream"
+                    >
+                      See how it works <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </SignedOut>
+                  <SignedIn>
+                    <Link
+                      href="/dashboard"
+                      className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-base font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
+                    >
+                      View my dashboard <ArrowRight className="h-5 w-5" />
+                    </Link>
+                  </SignedIn>
+                </>
+              )}
             </div>
           </div>
 
@@ -418,26 +434,43 @@ export default function LandingPage() {
       {/* Final CTA */}
       <section className="bg-brand py-24 text-center">
         <div className="mx-auto max-w-2xl px-6">
-          <h2 className="mb-4 text-3xl font-bold text-cream-surface lg:text-4xl">
-            Your profile takes about five minutes to set up.
-          </h2>
-          <p className="mb-8 text-sage-light">Free during beta. No payment card required.</p>
-          <SignedOut>
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
-            >
-              Build my profile <ArrowRight className="h-5 w-5" />
-            </Link>
-          </SignedOut>
-          <SignedIn>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
-            >
-              Go to my dashboard <ArrowRight className="h-5 w-5" />
-            </Link>
-          </SignedIn>
+          {isPublicSite ? (
+            <>
+              <h2 className="mb-4 text-3xl font-bold text-cream-surface lg:text-4xl">
+                Be the first to know when we launch.
+              </h2>
+              <p className="mb-8 text-sage-light">
+                Join the early access list. We&apos;ll reach out based on your use case.
+              </p>
+              <RegisterInterestButton
+                label="Join early access"
+                className="bg-cream-surface px-8 py-4 text-base text-brand shadow-sm hover:bg-cream"
+              />
+            </>
+          ) : (
+            <>
+              <h2 className="mb-4 text-3xl font-bold text-cream-surface lg:text-4xl">
+                Your profile takes about five minutes to set up.
+              </h2>
+              <p className="mb-8 text-sage-light">Free during beta. No payment card required.</p>
+              <SignedOut>
+                <Link
+                  href="/sign-up"
+                  className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
+                >
+                  Build my profile <ArrowRight className="h-5 w-5" />
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 rounded-xl bg-cream-surface px-8 py-4 text-base font-semibold text-brand shadow-sm hover:bg-cream"
+                >
+                  Go to my dashboard <ArrowRight className="h-5 w-5" />
+                </Link>
+              </SignedIn>
+            </>
+          )}
         </div>
       </section>
 

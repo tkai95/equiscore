@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { Providers } from '@/providers'
 import { CookieBanner } from '@/components/landing/cookie-banner'
 import { Analytics } from '@/components/landing/analytics'
+import { isPublicSite } from '@/lib/site'
 import '@/styles/globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -34,6 +35,18 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
+  const inner = (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.variable}>
+        <Providers>{children}</Providers>
+        <CookieBanner />
+        {gaId && <Analytics gaId={gaId} />}
+      </body>
+    </html>
+  )
+
+  if (isPublicSite) return inner
+
   return (
     <ClerkProvider
       signInUrl="/sign-in"
@@ -41,13 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       afterSignInUrl="/dashboard"
       afterSignUpUrl="/onboarding"
     >
-      <html lang="en" suppressHydrationWarning>
-        <body className={inter.variable}>
-          <Providers>{children}</Providers>
-          <CookieBanner />
-          {gaId && <Analytics gaId={gaId} />}
-        </body>
-      </html>
+      {inner}
     </ClerkProvider>
   )
 }
