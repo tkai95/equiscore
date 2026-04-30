@@ -19,7 +19,7 @@ type ProfileType = 'individual' | 'business'
 
 interface IndividualData {
   email: string
-  useCase: string
+  useCase: string[]
   currentCountry: string
   lastCountry: string
   problem: string
@@ -154,7 +154,7 @@ function StepHeader({
 }) {
   return (
     <div className="mb-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between pr-8">
         <StepDots total={total} current={step} />
         <span className="text-xs text-charcoal-mid">
           {step} of {total}
@@ -318,7 +318,7 @@ const TOTAL_STEPS = 5
 
 const INITIAL_IND: IndividualData = {
   email: '',
-  useCase: '',
+  useCase: [],
   currentCountry: '',
   lastCountry: '',
   problem: '',
@@ -408,7 +408,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
   function canProceed(): boolean {
     if (profileType === 'individual') {
       if (step === 1) return !!indData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(indData.email)
-      if (step === 2) return !!indData.useCase
+      if (step === 2) return indData.useCase.length > 0
       if (step === 3) return !!indData.currentCountry
       return true
     }
@@ -497,14 +497,22 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
               step={step}
               total={TOTAL_STEPS}
               title="What would you mainly use EquiScore for?"
+              subtitle="Select all that apply."
             />
             <div className="flex flex-col gap-2">
               {INDIVIDUAL_USE_CASES.map((opt) => (
-                <SelectOption
+                <MultiSelectOption
                   key={opt}
                   label={opt}
-                  selected={indData.useCase === opt}
-                  onClick={() => setIndData({ ...indData, useCase: opt })}
+                  selected={indData.useCase.includes(opt)}
+                  onClick={() =>
+                    setIndData({
+                      ...indData,
+                      useCase: indData.useCase.includes(opt)
+                        ? indData.useCase.filter((u) => u !== opt)
+                        : [...indData.useCase, opt],
+                    })
+                  }
                 />
               ))}
             </div>

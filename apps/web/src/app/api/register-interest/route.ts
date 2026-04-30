@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     }
 
     if (profileType === 'individual') {
-      if (useCase) contact.useCase = useCase
+      if (useCase?.length) contact.useCase = Array.isArray(useCase) ? useCase.join(', ') : useCase
       if (currentCountry) contact.currentCountry = currentCountry
       if (lastCountry) contact.lastCountry = lastCountry
       if (problem) contact.problemStatement = problem
