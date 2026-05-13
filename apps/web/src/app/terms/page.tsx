@@ -10,16 +10,16 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-cream">
-      <LandingNav />
+    <div className="min-h-screen bg-ink">
+      <LandingNav dark />
       <div className="mx-auto max-w-3xl px-6 py-20">
-        <h1 className="mb-2 text-4xl font-bold text-charcoal">Terms of Service</h1>
-        <p className="mb-12 text-sm text-charcoal-mid">Last updated: April 2025</p>
+        <h1 className="mb-2 text-4xl font-bold text-cream">Terms of Service</h1>
+        <p className="mb-12 text-sm text-cream">Last updated: April 2025</p>
 
-        <div className="prose prose-gray max-w-none space-y-10 text-charcoal-mid">
+        <div className="prose prose-invert max-w-none space-y-10 text-cream">
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Acceptance of terms</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Acceptance of terms</h2>
             <p>
               By creating an account or using the Equiscore platform at equiscore.app, you agree to
               these Terms of Service. If you do not agree, you must not use the platform. These
@@ -28,7 +28,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">What Equiscore provides</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">What Equiscore provides</h2>
             <p>
               Equiscore is a financial identity platform that helps individuals build a verified
               trust profile using Open Banking data. The platform allows you to connect your bank
@@ -44,13 +44,13 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Your account</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Your account</h2>
             <p>
               You must be at least 18 years old and resident in the United Kingdom to use Equiscore.
               You are responsible for keeping your account credentials secure and for all activity
               that takes place under your account. If you suspect unauthorised access, contact us
               immediately at{' '}
-              <a href="mailto:hello@equiscore.app" className="text-brand hover:underline">
+              <a href="mailto:hello@equiscore.app" className="text-teal hover:underline">
                 hello@equiscore.app
               </a>
               .
@@ -58,7 +58,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Open Banking consent</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Open Banking consent</h2>
             <p>
               Connecting your bank account requires your explicit consent. By granting this consent,
               you authorise Equiscore to access your account information via TrueLayer, an FCA
@@ -68,7 +68,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Acceptable use</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Acceptable use</h2>
             <p className="mb-3">You agree not to:</p>
             <ul className="ml-4 list-disc space-y-2">
               <li>Provide false or misleading information about yourself.</li>
@@ -80,7 +80,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Sharing your profile</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Sharing your profile</h2>
             <p>
               When you generate a share link, you are choosing to share your verified profile with a
               specific recipient. You are responsible for deciding who receives that link.
@@ -90,7 +90,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">
+            <h2 className="mb-3 text-xl font-semibold text-cream">
               Disclaimer and limitation of liability
             </h2>
             <p>
@@ -107,13 +107,13 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Termination</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Termination</h2>
             <p>
               You may close your account at any time from your settings page. We may suspend or
               terminate your account if we believe you have violated these terms or if we are
               required to do so by law. On termination, your data will be handled in accordance with
               our{' '}
-              <Link href="/privacy-policy" className="text-brand hover:underline">
+              <Link href="/privacy-policy" className="text-teal hover:underline">
                 Privacy Policy
               </Link>
               .
@@ -121,7 +121,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Governing law</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Governing law</h2>
             <p>
               These terms are governed by the laws of England and Wales. Any disputes arising under
               these terms will be subject to the exclusive jurisdiction of the courts of England and
@@ -130,7 +130,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Changes to these terms</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Changes to these terms</h2>
             <p>
               We may update these terms from time to time. We will notify you of material changes
               by email or via a notice on the platform. Continued use of Equiscore after changes
@@ -139,10 +139,10 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-charcoal">Contact</h2>
+            <h2 className="mb-3 text-xl font-semibold text-cream">Contact</h2>
             <p>
               Questions about these terms? Email us at{' '}
-              <a href="mailto:hello@equiscore.app" className="text-brand hover:underline">
+              <a href="mailto:hello@equiscore.app" className="text-teal hover:underline">
                 hello@equiscore.app
               </a>
               .
@@ -152,6 +152,6 @@ export default function TermsPage() {
         </div>
       </div>
       <LandingFooter />
-    </main>
+    </div>
   )
 }

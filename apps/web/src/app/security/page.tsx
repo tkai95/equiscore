@@ -43,18 +43,18 @@ const pillars = [
 
 export default function SecurityPage() {
   return (
-    <main className="min-h-screen bg-cream">
-      <LandingNav />
+    <div className="min-h-screen bg-ink">
+      <LandingNav dark />
 
       <section className="mx-auto max-w-6xl px-6 py-24">
         <div className="mb-16 max-w-2xl">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-brand">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-teal">
             Security
           </p>
-          <h1 className="mb-6 text-4xl font-bold text-charcoal lg:text-5xl">
+          <h1 className="mb-6 text-4xl font-bold text-cream lg:text-5xl">
             Your data is handled with care.
           </h1>
-          <p className="text-xl leading-relaxed text-charcoal-mid">
+          <p className="text-xl leading-relaxed text-cream">
             We built Equiscore around bank-level data access. That means our security standards
             have to match. Here is how we protect your information.
           </p>
@@ -62,22 +62,22 @@ export default function SecurityPage() {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {pillars.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="rounded-2xl border border-[#D8D6C9] bg-cream-surface p-6">
-              <Icon className="mb-4 h-6 w-6 text-brand" />
-              <h3 className="mb-3 font-semibold text-charcoal">{title}</h3>
-              <p className="text-sm leading-relaxed text-charcoal-mid">{body}</p>
+            <div key={title} className="rounded-2xl border border-ink-border bg-ink-mid p-6">
+              <Icon className="mb-4 h-6 w-6 text-teal" />
+              <h3 className="mb-3 font-semibold text-cream">{title}</h3>
+              <p className="text-sm leading-relaxed text-cream">{body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="bg-cream-surface py-16">
+      <section className="bg-ink-mid py-16">
         <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="mb-4 text-2xl font-bold text-charcoal">Found a security issue?</h2>
-          <p className="mb-6 text-charcoal-mid">
+          <h2 className="mb-4 text-2xl font-bold text-cream">Found a security issue?</h2>
+          <p className="mb-6 text-cream">
             If you believe you have discovered a security vulnerability, please report it
             responsibly by emailing{' '}
-            <a href="mailto:security@equiscore.app" className="text-brand hover:underline">
+            <a href="mailto:security@equiscore.app" className="text-teal hover:underline">
               security@equiscore.app
             </a>
             . We take all reports seriously and will respond within 48 hours.
@@ -86,6 +86,6 @@ export default function SecurityPage() {
       </section>
 
       <LandingFooter />
-    </main>
+    </div>
   )
 }

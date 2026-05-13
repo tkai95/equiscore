@@ -59,6 +59,17 @@ export default {
           D: '#C7A66A',
           E: '#A96E52',
         },
+        teal: {
+          DEFAULT: '#00C896',
+          dark: '#009E78',
+          light: '#33D4A8',
+        },
+        ink: {
+          DEFAULT: '#090E0C',
+          mid: '#0F1A16',
+          light: '#162620',
+          border: '#1E3529',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

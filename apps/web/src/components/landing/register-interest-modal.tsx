@@ -130,10 +130,10 @@ function StepDots({ total, current }: { total: number; current: number }) {
           className={cn(
             'h-1.5 rounded-full transition-all duration-200',
             i === current - 1
-              ? 'w-4 bg-brand'
+              ? 'w-4 bg-teal'
               : i < current - 1
-                ? 'w-1.5 bg-brand/40'
-                : 'w-1.5 bg-[#D8D6C9]',
+                ? 'w-1.5 bg-teal/40'
+                : 'w-1.5 bg-ink-border',
           )}
         />
       ))}
@@ -156,12 +156,12 @@ function StepHeader({
     <div className="mb-6">
       <div className="mb-4 flex items-center justify-between pr-8">
         <StepDots total={total} current={step} />
-        <span className="text-xs text-charcoal-mid">
+        <span className="text-xs text-cream/50">
           {step} of {total}
         </span>
       </div>
-      <h2 className="text-xl font-bold text-charcoal">{title}</h2>
-      {subtitle && <p className="mt-1.5 text-sm text-charcoal-mid">{subtitle}</p>}
+      <h2 className="text-xl font-bold text-cream">{title}</h2>
+      {subtitle && <p className="mt-1.5 text-sm text-cream/60">{subtitle}</p>}
     </div>
   )
 }
@@ -182,12 +182,12 @@ function SelectOption({
       className={cn(
         'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all',
         selected
-          ? 'border-brand bg-brand/5 text-brand'
-          : 'border-[#D8D6C9] bg-cream-surface text-charcoal hover:border-brand/30 hover:bg-cream',
+          ? 'border-teal bg-teal/10 text-teal'
+          : 'border-ink-border bg-ink text-cream hover:border-teal/30 hover:bg-teal/5',
       )}
     >
       {label}
-      {selected && <Check className="h-4 w-4 shrink-0 text-brand" />}
+      {selected && <Check className="h-4 w-4 shrink-0 text-teal" />}
     </button>
   )
 }
@@ -208,18 +208,18 @@ function MultiSelectOption({
       className={cn(
         'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all',
         selected
-          ? 'border-brand bg-brand/5 text-brand'
-          : 'border-[#D8D6C9] bg-cream-surface text-charcoal hover:border-brand/30 hover:bg-cream',
+          ? 'border-teal bg-teal/10 text-teal'
+          : 'border-ink-border bg-ink text-cream hover:border-teal/30 hover:bg-teal/5',
       )}
     >
       {label}
       <div
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-          selected ? 'border-brand bg-brand' : 'border-[#D8D6C9] bg-transparent',
+          selected ? 'border-teal bg-teal' : 'border-ink-border bg-transparent',
         )}
       >
-        {selected && <Check className="h-2.5 w-2.5 text-cream-surface" />}
+        {selected && <Check className="h-2.5 w-2.5 text-ink" />}
       </div>
     </button>
   )
@@ -238,11 +238,11 @@ function CountrySelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full appearance-none rounded-xl border border-[#D8D6C9] bg-cream-surface px-4 py-3 text-sm text-charcoal outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/10"
+      className="w-full appearance-none rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
     >
       <option value="">{allowEmpty ? 'Select a country (optional)' : 'Select a country'}</option>
       {COUNTRIES.map((c) => (
-        <option key={c} value={c}>
+        <option key={c} value={c} className="bg-ink text-cream">
           {c}
         </option>
       ))}
@@ -269,14 +269,14 @@ function ConsentCheckbox({
           onClick={() => onChange(!checked)}
           className={cn(
             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
-            checked ? 'border-brand bg-brand' : 'border-[#D8D6C9] bg-cream-surface hover:border-brand/40',
+            checked ? 'border-teal bg-teal' : 'border-ink-border bg-ink hover:border-teal/40',
           )}
         >
-          {checked && <Check className="h-3 w-3 text-cream-surface" />}
+          {checked && <Check className="h-3 w-3 text-ink" />}
         </button>
-        <span className="text-sm text-charcoal-mid">{label}</span>
+        <span className="text-sm text-cream/70">{label}</span>
       </label>
-      <p className="pl-8 text-xs text-charcoal-mid/60">You can unsubscribe at any time.</p>
+      <p className="pl-8 text-xs text-cream/40">You can unsubscribe at any time.</p>
     </div>
   )
 }
@@ -296,16 +296,16 @@ function ProfileTypeCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full flex-col items-start gap-4 rounded-2xl border border-[#D8D6C9] bg-cream-surface p-6 text-left transition-all hover:border-brand/40 hover:shadow-sm"
+      className="group flex w-full flex-col items-start gap-4 rounded-2xl border border-ink-border bg-ink p-6 text-left transition-all hover:border-teal/30 hover:bg-teal/5"
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cream transition-colors group-hover:bg-brand/10">
-        <Icon className="h-5 w-5 text-brand" />
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal/20 bg-teal/10 transition-colors group-hover:bg-teal/20">
+        <Icon className="h-5 w-5 text-teal" />
       </div>
       <div className="flex-1">
-        <p className="font-semibold text-charcoal">{title}</p>
-        <p className="mt-1 text-sm text-charcoal-mid">{desc}</p>
+        <p className="font-semibold text-cream">{title}</p>
+        <p className="mt-1 text-sm text-cream/60">{desc}</p>
       </div>
-      <div className="flex items-center gap-1 text-sm font-medium text-brand">
+      <div className="flex items-center gap-1 text-sm font-medium text-teal">
         Continue <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
       </div>
     </button>
@@ -427,8 +427,8 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
       return (
         <div>
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-charcoal">Who are you joining as?</h2>
-            <p className="mt-2 text-sm text-charcoal-mid">
+            <h2 className="text-2xl font-bold text-cream">Who are you joining as?</h2>
+            <p className="mt-2 text-sm text-cream/60">
               We&apos;ll ask a few short questions based on your answer.
             </p>
           </div>
@@ -454,17 +454,17 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
     if (isSuccess) {
       return (
         <div className="flex flex-col items-center py-6 text-center">
-          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
-            <CheckCircle2 className="h-8 w-8 text-brand" />
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-teal/20 bg-teal/10">
+            <CheckCircle2 className="h-8 w-8 text-teal" />
           </div>
-          <h2 className="mb-3 text-2xl font-bold text-charcoal">You&apos;re on the list.</h2>
-          <p className="mb-8 max-w-xs text-sm leading-relaxed text-charcoal-mid">
+          <h2 className="mb-3 text-2xl font-bold text-cream">You&apos;re on the list.</h2>
+          <p className="mb-8 max-w-xs text-sm leading-relaxed text-cream/60">
             We&apos;ll let you know when EquiScore is live. We may also invite selected users to
             early access based on their use case and country corridor.
           </p>
           <button
             onClick={handleClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand px-8 py-3 text-sm font-semibold text-cream-surface transition-colors hover:bg-brand-dark"
+            className="inline-flex items-center gap-2 rounded-xl bg-teal px-8 py-3 text-sm font-semibold text-ink shadow-[0_0_24px_rgba(0,200,150,0.3)] transition-all hover:bg-teal-dark"
           >
             Done
           </button>
@@ -484,7 +484,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
               onChange={(e) => setIndData({ ...indData, email: e.target.value })}
               placeholder="you@example.com"
               autoFocus
-              className="w-full rounded-xl border border-[#D8D6C9] bg-cream-surface px-4 py-3 text-sm text-charcoal placeholder:text-charcoal-mid/50 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/10"
+              className="w-full rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
           </div>
         )
@@ -562,9 +562,9 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
             <textarea
               value={indData.problem}
               onChange={(e) => setIndData({ ...indData, problem: e.target.value })}
-              placeholder="e.g. &ldquo;I moved to the UK recently and my credit file does not reflect my income or rent history.&rdquo;"
+              placeholder="e.g. I moved to the UK recently and my credit file does not reflect my income or rent history."
               rows={4}
-              className="w-full resize-none rounded-xl border border-[#D8D6C9] bg-cream-surface px-4 py-3 text-sm text-charcoal placeholder:text-charcoal-mid/50 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/10"
+              className="w-full resize-none rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
             <ConsentCheckbox
               checked={indData.consent}
@@ -588,7 +588,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
               onChange={(e) => setBizData({ ...bizData, email: e.target.value })}
               placeholder="you@company.com"
               autoFocus
-              className="w-full rounded-xl border border-[#D8D6C9] bg-cream-surface px-4 py-3 text-sm text-charcoal placeholder:text-charcoal-mid/50 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/10"
+              className="w-full rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
           </div>
         )
@@ -681,9 +681,9 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
             <textarea
               value={bizData.problem}
               onChange={(e) => setBizData({ ...bizData, problem: e.target.value })}
-              placeholder="e.g. &ldquo;We struggle to assess applicants who have recently moved to the UK and have limited local credit history.&rdquo;"
+              placeholder="e.g. We struggle to assess applicants who have recently moved to the UK and have limited local credit history."
               rows={4}
-              className="w-full resize-none rounded-xl border border-[#D8D6C9] bg-cream-surface px-4 py-3 text-sm text-charcoal placeholder:text-charcoal-mid/50 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/10"
+              className="w-full resize-none rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
             <ConsentCheckbox
               checked={bizData.consent}
@@ -705,17 +705,17 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-charcoal/40 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/70 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           onEscapeKeyDown={handleClose}
           onPointerDownOutside={step === 0 || isSuccess ? handleClose : undefined}
-          className="fixed bottom-0 left-0 right-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-2xl bg-cream px-6 pb-8 pt-6 shadow-xl focus:outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:max-h-[88vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:px-8 sm:pt-8 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95"
+          className="fixed bottom-0 left-0 right-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-2xl border border-ink-border bg-ink-mid px-6 pb-8 pt-6 shadow-[0_-8px_40px_rgba(0,0,0,0.6)] focus:outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:max-h-[88vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:px-8 sm:pt-8 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95"
         >
           {/* Close button */}
           {!isSuccess && (
             <Dialog.Close asChild>
               <button
-                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full text-charcoal-mid transition-colors hover:bg-cream-surface hover:text-charcoal"
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full text-cream/40 transition-colors hover:bg-ink hover:text-cream"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -728,11 +728,11 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
 
           {/* Navigation footer */}
           {step > 0 && !isSuccess && (
-            <div className="mt-8 flex items-center justify-between border-t border-[#D8D6C9] pt-5">
+            <div className="mt-8 flex items-center justify-between border-t border-ink-border pt-5">
               <button
                 type="button"
                 onClick={back}
-                className="flex items-center gap-1.5 text-sm text-charcoal-mid transition-colors hover:text-charcoal"
+                className="flex items-center gap-1.5 text-sm text-cream/50 transition-colors hover:text-cream"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back
@@ -743,7 +743,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
                   type="button"
                   onClick={submit}
                   disabled={submitting || !canProceed()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-cream-surface transition-colors hover:bg-brand-dark disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal px-6 py-2.5 text-sm font-semibold text-ink shadow-[0_0_16px_rgba(0,200,150,0.25)] transition-all hover:bg-teal-dark disabled:opacity-40"
                 >
                   {submitting ? 'Submitting...' : submitLabel}
                   {!submitting && <ArrowRight className="h-4 w-4" />}
@@ -753,7 +753,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
                   type="button"
                   onClick={next}
                   disabled={!canProceed()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-cream-surface transition-colors hover:bg-brand-dark disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal px-6 py-2.5 text-sm font-semibold text-ink shadow-[0_0_16px_rgba(0,200,150,0.25)] transition-all hover:bg-teal-dark disabled:opacity-40"
                 >
                   Continue <ArrowRight className="h-4 w-4" />
                 </button>
@@ -762,7 +762,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
           )}
 
           {submitError && (
-            <p className="mt-4 text-center text-sm text-red-600">{submitError}</p>
+            <p className="mt-4 text-center text-sm text-red-400">{submitError}</p>
           )}
         </Dialog.Content>
       </Dialog.Portal>
@@ -775,7 +775,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
 interface RegisterInterestButtonProps {
   label?: string
   className?: string
-  variant?: 'primary' | 'secondary' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline-light'
 }
 
 export function RegisterInterestButton({
@@ -793,11 +793,13 @@ export function RegisterInterestButton({
         className={cn(
           'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors',
           variant === 'primary' &&
-            'bg-brand px-6 py-3.5 text-base text-cream-surface shadow-sm hover:bg-brand-dark',
+            'bg-teal px-6 py-3.5 text-base font-semibold text-ink shadow-[0_0_24px_rgba(0,200,150,0.3)] transition-all hover:bg-teal-dark hover:shadow-[0_0_32px_rgba(0,200,150,0.4)]',
           variant === 'secondary' &&
-            'border border-[#D8D6C9] bg-cream-surface px-6 py-3.5 text-base text-charcoal hover:bg-cream',
+            'border border-cream/20 px-6 py-3.5 text-base text-cream hover:border-cream/40',
           variant === 'ghost' &&
-            'rounded-lg bg-brand px-4 py-2 text-sm text-cream-surface hover:bg-brand-dark',
+            'rounded-lg bg-teal px-4 py-2 text-sm text-ink hover:bg-teal-dark',
+          variant === 'outline-light' &&
+            'border border-teal/30 bg-teal/10 px-6 py-3.5 text-base text-teal hover:bg-teal/20',
           className,
         )}
       >
