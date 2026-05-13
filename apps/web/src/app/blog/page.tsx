@@ -130,20 +130,20 @@ export default function BlogPage() {
       {/* ── Featured article ─────────────────────────────────────── */}
       <section className="bg-ink py-12">
         <div className="mx-auto max-w-6xl px-6">
-          <Link href={`/blog/${POSTS[0].slug}`} className="group block">
+          <Link href={`/blog/${POSTS[0]!.slug}`} className="group block">
             <div className="rounded-2xl border border-ink-border bg-ink-mid p-8 transition-colors duration-200 hover:border-teal/30 md:p-12">
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <span className="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">
-                  {POSTS[0].category}
+                  {POSTS[0]!.category}
                 </span>
-                <span className="text-xs text-cream/40">{POSTS[0].date}</span>
-                <span className="text-xs text-cream/40">{POSTS[0].readTime}</span>
+                <span className="text-xs text-cream/40">{POSTS[0]!.date}</span>
+                <span className="text-xs text-cream/40">{POSTS[0]!.readTime}</span>
               </div>
               <h2 className="mb-4 text-2xl font-bold leading-snug text-cream group-hover:text-teal md:text-3xl">
-                {POSTS[0].title}
+                {POSTS[0]!.title}
               </h2>
               <p className="mb-6 max-w-2xl leading-relaxed text-cream/70">
-                {POSTS[0].excerpt}
+                {POSTS[0]!.excerpt}
               </p>
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-teal">
                 Read article <ArrowRight className="h-4 w-4" />
