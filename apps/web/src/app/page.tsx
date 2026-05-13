@@ -196,7 +196,7 @@ export default function LandingPage() {
       <section className="bg-ink py-24">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="mb-5 text-center text-4xl font-bold leading-tight tracking-tight text-cream lg:text-5xl">
-            The credit system wasn't built for everyone.
+            The financial system wasn't built for everyone.
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-center leading-relaxed text-cream">
             Traditional credit files, fraud systems and income checks often miss the context behind real people's financial lives. Equiscore is being built to help turn that context into verified evidence.
