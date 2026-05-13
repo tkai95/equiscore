@@ -143,12 +143,40 @@ export default function CifasFraudMarkersPage() {
           </p>
 
           <p className="leading-relaxed text-cream">
-            CIFAS markers have no equivalent. The database does not distinguish between a person involved in organised fraud as a willing participant and a nineteen-year-old who was duped into receiving a transfer. Both receive a six-year marker. Neither has any formal mechanism to demonstrate rehabilitation. The system has no concept of rehabilitation.
+            CIFAS markers have no equivalent. The database does not distinguish between a person involved in organised fraud as a willing participant and a nineteen-year-old who was duped into receiving a transfer. Both receive a six-year marker. The system has no built-in concept of rehabilitation or graduated consequence.
           </p>
 
           <p className="leading-relaxed text-cream">
-            You can challenge a marker through CIFAS's own complaints process. If they do not uphold your challenge, you can escalate to the Information Commissioner's Office (ICO) or pursue the matter through the courts. These routes exist in principle. In practice, they are difficult, slow, and require documentation most people do not have. The burden of proof rests entirely on the person who was flagged.
+            There are routes to challenge a marker, but they are fragmented, slow and difficult to navigate. The process requires completing a Subject Access Request (SAR) to understand what data is held; contacting the organisation that filed the marker to dispute it directly with them; obtaining their final response before escalating to CIFAS; and, if still unresolved, taking the matter to the Information Commissioner's Office (ICO) or the Financial Ombudsman Service (FOS). The FOS handles complaints involving fraud markers where financial businesses have shared information with fraud prevention agencies.
           </p>
+
+          <p className="leading-relaxed text-cream">
+            Most people navigate this without professional support, carrying the burden of gathering evidence, understanding technical filing categories, and escalating through institutions with no incentive to make it easy. The burden of proof rests entirely on the person who was flagged.
+          </p>
+
+          {/* Recovery pathway */}
+          <div className="rounded-2xl border border-teal/20 bg-ink-mid p-8 my-8">
+            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-teal">CIFAS recovery pathway</p>
+            <p className="mb-7 text-sm text-cream">The steps most people need to work through, in order.</p>
+            <div className="space-y-3">
+              {[
+                { n: '1', title: 'Check your CIFAS file', body: 'Submit a Subject Access Request (SAR) to CIFAS to see exactly what is recorded, who filed it, and under which category. You can do this via cifas.org.uk.' },
+                { n: '2', title: 'Understand the marker', body: 'Identify the filing organisation, the marker category (Misuse of Facility, Facility Takeover, etc.) and the date it was recorded. This determines which challenge route applies.' },
+                { n: '3', title: 'Contact the filing organisation', body: 'Raise the dispute directly with the bank, lender or other institution that placed the marker. You need their final response before you can escalate to CIFAS.' },
+                { n: '4', title: 'Escalate if needed', body: 'If the filing organisation does not resolve your complaint, escalate to CIFAS. If still unresolved, you can take the matter to the ICO or the Financial Ombudsman Service.' },
+                { n: '5', title: 'Build your Trust Portfolio', body: 'While working through the challenge process, build verified evidence of your current financial behaviour with Equiscore. This is separate from the marker and shows who you are today.' },
+                { n: '6', title: 'Share your Rehabilitation Dossier', body: 'Use your Trust Portfolio alongside your challenge correspondence to support applications with banks, landlords or advisers. Some providers will weigh current verified evidence alongside the historical record.' },
+              ].map(({ n, title, body }) => (
+                <div key={n} className="flex items-start gap-4 rounded-xl border border-ink-border bg-ink p-5">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal/10 text-xs font-bold text-teal">{n}</div>
+                  <div>
+                    <p className="mb-1 font-semibold text-cream">{title}</p>
+                    <p className="text-sm leading-relaxed text-cream">{body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <h2 className="text-2xl font-bold text-cream pt-4">What the Financial Ombudsman found</h2>
 

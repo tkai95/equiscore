@@ -224,7 +224,7 @@ export default function PrivacySecurityPage() {
 
           <div className="mt-8 rounded-xl border border-teal/20 bg-teal/5 px-6 py-5">
             <p className="text-sm text-teal">
-              To exercise any of your rights, contact us at privacy@equiscore.co.uk. We will respond within the timeframes required under UK GDPR.
+              To exercise any of your rights, contact us at privacy@equiscore.app. We will respond within the timeframes required under UK GDPR.
             </p>
           </div>
         </div>
