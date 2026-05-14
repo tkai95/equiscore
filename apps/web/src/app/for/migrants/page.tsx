@@ -216,6 +216,56 @@ export default function MigrantsPage() {
               </div>
             ))}
           </div>
+
+          <div className="mt-10 rounded-xl border border-teal/20 bg-teal/5 px-6 py-6">
+            <p className="mb-2 text-sm font-semibold text-teal">How it works in practice</p>
+            <p className="text-sm leading-relaxed text-cream">
+              Maria moved to the UK in January for a new job. She has no UK credit file. In her first week she connects her bank account through open banking, uploads her employment contract as supporting evidence, and adds three months of rent payments from her shared house. By the time she is ready to apply for her own flat in April, she has a Trust Portfolio showing consistent income, zero missed payments, and a verified identity. She shares it with the landlord alongside her application. The landlord can see her financial behaviour. She gets the flat.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Practical questions ──────────────────────────────────── */}
+      <section className="bg-ink py-20">
+        <div className="mx-auto max-w-3xl px-6">
+          <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-teal">Common questions</p>
+          <h2 className="mb-14 text-center text-3xl font-bold text-cream">
+            What migrants actually ask us
+          </h2>
+          <div className="space-y-4">
+            {[
+              {
+                q: 'Can this help me rent before I have a UK credit history?',
+                a: 'Yes. This is the most common reason migrants use Equiscore. A Trust Portfolio shows a landlord your income, payment behaviour and financial stability even when a credit check returns nothing useful. Some landlords will accept it alongside their standard referencing process.',
+              },
+              {
+                q: 'Can it help me open a UK bank account?',
+                a: 'A Trust Portfolio can provide supporting evidence for banks and fintechs who use alternative data in their onboarding decisions. It does not guarantee an account, but it gives institutions something to look at beyond the absence of a UK credit file.',
+              },
+              {
+                q: 'Does it work if I have only been in the UK for a few months?',
+                a: 'Yes. You can start building your Trust Portfolio from your first day in the UK. The earlier you connect your bank account, the longer your verified history becomes. A shorter history means a lower data coverage score initially, but that improves with every month.',
+              },
+              {
+                q: 'Can I include evidence from before I arrived in the UK?',
+                a: 'Currently, Equiscore builds your profile from UK bank data and documents you upload, such as employment contracts and tenancy agreements. We are developing ways to incorporate overseas evidence. For now, the profile captures UK-based financial behaviour from the point you connect.',
+              },
+              {
+                q: 'Do landlords and banks actually accept a Trust Portfolio?',
+                a: 'We are building a partner network of landlords, letting agents, banks and fintechs who have committed to reviewing Trust Portfolios as part of their process. The number of accepting partners is growing. Some institutions will also review a Trust Portfolio on request even without a formal partnership.',
+              },
+              {
+                q: 'What if my visa status causes issues with bank applications?',
+                a: 'Equiscore does not change how banks handle visa-related compliance. What it does is give you verified financial evidence to present alongside any application, which can help a bank or landlord make a more complete assessment of your situation.',
+              },
+            ].map(({ q, a }) => (
+              <div key={q} className="rounded-xl border border-ink-border bg-ink-mid p-6">
+                <p className="mb-3 font-semibold text-cream">{q}</p>
+                <p className="text-sm leading-relaxed text-cream">{a}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

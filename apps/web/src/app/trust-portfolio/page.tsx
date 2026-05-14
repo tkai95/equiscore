@@ -63,6 +63,59 @@ export default function TrustPortfolioPage() {
         </p>
       </section>
 
+      {/* ── What it is and is not ────────────────────────────────────────── */}
+      <section className="bg-ink py-20">
+        <div className="mx-auto max-w-4xl px-6">
+          <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-teal">Understanding your Trust Portfolio</p>
+          <h2 className="mb-4 text-center text-3xl font-bold text-cream">
+            What it is. What it is not.
+          </h2>
+          <p className="mx-auto mb-14 max-w-xl text-center leading-relaxed text-cream">
+            Because we produce a score, it is important to be clear about what that score represents and what it does not claim to do.
+          </p>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="rounded-2xl border border-teal/20 bg-teal/5 p-7">
+              <p className="mb-5 text-xs font-bold uppercase tracking-widest text-teal">It is</p>
+              <ul className="space-y-5">
+                {[
+                  { title: 'A summary of verified evidence strength', body: 'The score reflects how complete and consistent your verified financial behaviour is. It represents what we can see, not a judgment on your character.' },
+                  { title: 'A portable evidence profile', body: 'You build it once and share it with whoever needs it, on your terms. It works across rental applications, bank onboarding, lending decisions and more.' },
+                  { title: 'User-controlled', body: 'Nothing is shared with any institution unless you explicitly generate and send a link. There is no background sharing.' },
+                  { title: 'A supplement to existing checks', body: 'It gives landlords, lenders and banks additional context they could not otherwise see. It works alongside their process, not instead of it.' },
+                ].map(({ title, body }) => (
+                  <li key={title} className="flex items-start gap-3">
+                    <span className="mt-1 shrink-0 text-sm font-bold text-teal">✓</span>
+                    <div>
+                      <p className="mb-1 font-semibold text-cream">{title}</p>
+                      <p className="text-sm leading-relaxed text-cream">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-ink-border bg-ink-mid p-7">
+              <p className="mb-5 text-xs font-bold uppercase tracking-widest text-cream/50">It is not</p>
+              <ul className="space-y-5">
+                {[
+                  { title: 'A credit bureau score', body: 'We are not a credit reference agency. We do not supply data to credit bureaus, draw on bureau data to produce your score, or appear on your credit file.' },
+                  { title: 'A guarantee of approval', body: 'Institutions make their own decisions. Your Trust Portfolio gives them better evidence. It does not bind them to a particular outcome.' },
+                  { title: 'A replacement for existing checks', body: 'We work alongside your landlord or lender\'s existing process. We do not expect institutions to rely on a Trust Portfolio as their only decision input.' },
+                  { title: 'Automatically shared with anyone', body: 'Your score updates as you add evidence, but nothing is sent to any institution without a deliberate action from you. Private by default, always.' },
+                ].map(({ title, body }) => (
+                  <li key={title} className="flex items-start gap-3">
+                    <span className="mt-1 shrink-0 text-sm font-bold text-cream/30">✕</span>
+                    <div>
+                      <p className="mb-1 font-semibold text-cream">{title}</p>
+                      <p className="text-sm leading-relaxed text-cream">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Trust Score grades ───────────────────────────────────── */}
       <section className="bg-ink py-20">
         <div className="mx-auto max-w-4xl px-6">

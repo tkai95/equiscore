@@ -155,6 +155,25 @@ export default function HowItWorksPage() {
               You can disconnect your open banking connection at any time from within your account. If you disconnect, your existing verified data stays in your portfolio. Future updates will require you to reconnect.
             </p>
           </div>
+
+          <div className="mt-8 rounded-2xl border border-ink-border bg-ink-mid p-8">
+            <p className="mb-5 text-xs font-bold uppercase tracking-widest text-teal">What we never do</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                'Move money or initiate payments from your account',
+                'See your bank login credentials or passwords',
+                'Sell your personal data to any third party',
+                'Show raw transactions to landlords, lenders or anyone else',
+                'Share your profile unless you actively generate and send a link',
+                'Store data beyond what is needed to build and maintain your Trust Portfolio',
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-3 rounded-lg border border-ink-border bg-ink px-4 py-3">
+                  <span className="mt-0.5 text-sm font-bold text-cream/30">✕</span>
+                  <p className="text-sm text-cream">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

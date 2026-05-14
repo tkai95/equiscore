@@ -165,6 +165,50 @@ export default function SharingPage() {
             The shared view is a structured summary. Institutions get a clear, verified picture. They do not get access to your raw financial data.
           </p>
 
+          {/* Mock recipient view */}
+          <div className="mb-8 rounded-2xl border border-ink-border bg-ink-mid p-8">
+            <p className="mb-5 text-xs font-bold uppercase tracking-widest text-cream/50">What a landlord or lender actually sees</p>
+            <div className="rounded-xl border border-ink-border bg-ink p-6">
+              <div className="mb-5 flex items-center justify-between border-b border-ink-border pb-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-teal">Equiscore</p>
+                  <p className="text-sm font-semibold text-cream">Shared Trust Portfolio</p>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-full border border-teal/20 bg-teal/10 px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+                  <span className="text-xs font-semibold text-teal">Verified</span>
+                </div>
+              </div>
+              <div className="mb-5 flex items-center gap-5">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-teal text-2xl font-bold text-cream">B</div>
+                <div>
+                  <p className="text-lg font-bold text-cream">Trust Score: B — Good</p>
+                  <p className="text-sm text-cream">Portfolio strength: 82%</p>
+                </div>
+              </div>
+              <div className="mb-5 space-y-2">
+                {['Open Banking', 'Income Stability', 'Identity', 'Rent & Bills'].map((m) => (
+                  <div key={m} className="flex items-center justify-between rounded-lg border border-ink-border bg-ink-mid px-4 py-2.5 text-sm">
+                    <span className="text-cream">{m}</span>
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-teal">
+                      <span className="text-teal">✓</span> Verified
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mb-5 rounded-lg border border-ink-border bg-ink-mid px-4 py-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-cream/50">Income</p>
+                <p className="text-sm text-cream">Range: £2,800–£3,200 / month</p>
+                <p className="text-sm text-cream">Stability: Consistent over 14 months</p>
+              </div>
+              <p className="text-xs text-cream/40">Shared by applicant · Expires in 7 days · Last verified 14 May 2025</p>
+              <div className="mt-4 border-t border-ink-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-cream/30">Not visible in this view</p>
+                <p className="mt-1 text-xs text-cream/30">Individual transactions · Account numbers · Bank login details · Data from other recipients</p>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-ink-border bg-ink-mid p-8">
             <div className="grid gap-3 sm:grid-cols-2">
               {WHAT_THEY_SEE.map(({ visible, item }) => (

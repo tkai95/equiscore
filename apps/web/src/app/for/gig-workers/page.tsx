@@ -244,6 +244,44 @@ export default function GigWorkersPage() {
         </div>
       </section>
 
+      {/* ── Platform and gig workers ─────────────────────────────── */}
+      <section className="bg-ink py-20">
+        <div className="mx-auto max-w-4xl px-6">
+          <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-teal">For gig and platform workers</p>
+          <h2 className="mb-6 text-center text-3xl font-bold text-cream">
+            Your income is real, even if it comes from five platforms.
+          </h2>
+          <p className="mx-auto mb-10 max-w-xl text-center leading-relaxed text-cream">
+            Gig workers face a slightly different version of this problem. Your income does not come from a single employer. It comes from Uber, Deliveroo, Amazon Flex, TaskRabbit, Bolt, or a combination of platforms that shifts month to month. Each one pays into your account. None of them provides an employer reference.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {[
+              {
+                title: 'Multiple income streams in one verified picture',
+                body: 'Equiscore analyses your bank account as a whole. Platform payments from Uber, Deliveroo or any other service appear as income. We do not require each platform to be named or verified separately. The pattern of money arriving in your account is what matters.',
+              },
+              {
+                title: 'Stable average earnings, not just last month',
+                body: 'Gig income is variable by nature. A single month\'s figure can look low even when your annual average is strong. We assess your income over a longer window, so seasonal dips and quiet weeks do not misrepresent the overall picture.',
+              },
+              {
+                title: 'No employer reference required',
+                body: 'Platform workers have no employer to call. Equiscore replaces the employer reference with verified bank data. Your income history speaks for itself without needing a third party to vouch for you.',
+              },
+              {
+                title: 'Cashflow shown in context',
+                body: 'Variable cashflow can look alarming on a bank statement without context. Your Trust Portfolio presents your income pattern as a trend, not as individual transactions. A landlord or lender can see that your earnings are consistent over time, even when they vary week to week.',
+              },
+            ].map(({ title, body }) => (
+              <div key={title} className="rounded-xl border border-ink-border bg-ink-mid p-6">
+                <h3 className="mb-2 font-semibold text-cream">{title}</h3>
+                <p className="text-sm leading-relaxed text-cream">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── How Equiscore helps ───────────────────────────────────── */}
       <section className="bg-ink py-20">
         <div className="mx-auto max-w-4xl px-6">

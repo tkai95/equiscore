@@ -148,7 +148,7 @@ export default function LandlordsPage() {
               </Link>
             )}
             <Link
-              href="/how-it-works/open-banking"
+              href="/blog/open-banking-explained"
               className="inline-flex items-center gap-2 rounded-xl border border-cream/15 px-8 py-4 text-base font-semibold text-cream transition-colors hover:border-cream/30"
             >
               How open banking works <ArrowRight className="h-4 w-4" />
@@ -216,6 +216,26 @@ export default function LandlordsPage() {
           <p className="mt-5 text-right text-xs text-cream/40">
             Figures from public sources including Experian, Citizens Advice and RICS. Used for illustrative purposes.
           </p>
+        </div>
+      </section>
+
+      {/* ── ROI callout ───────────────────────────────────────────────── */}
+      <section className="bg-ink py-12">
+        <div className="mx-auto max-w-4xl px-6">
+          <div className="rounded-2xl border border-teal/20 bg-teal/5 px-8 py-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <p className="mb-2 text-lg font-bold text-cream">One avoided void period can be worth more than a year of better referencing.</p>
+                <p className="text-sm leading-relaxed text-cream">
+                  The average UK void period costs landlords several weeks of lost rent plus re-letting fees. A more accurate picture of applicant reliability at the referencing stage reduces that risk. Good tenants that a blunt credit check would have turned away often turn out to be the most consistent payers.
+                </p>
+              </div>
+              <div className="shrink-0 rounded-xl border border-teal/20 bg-ink px-6 py-4 text-center">
+                <p className="text-3xl font-bold text-teal">3–4 weeks</p>
+                <p className="text-sm text-cream">average void period cost</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
