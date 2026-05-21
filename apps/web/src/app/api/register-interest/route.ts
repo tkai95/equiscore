@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Register interest error:', err)
+    console.error('Register interest error:', JSON.stringify(err, Object.getOwnPropertyNames(err as object)))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
