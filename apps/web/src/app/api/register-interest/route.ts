@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server'
 import { Pool } from 'pg'
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-})
+let pool: Pool | null = null
+
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
+  }
+  return pool
+}
 
 export async function POST(req: Request) {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ error: 'DATABASE_URL is not set' }, { status: 503 })
+  }
   try {
     const body = await req.json()
     const { email, profileType, useCase, currentCountry, lastCountry, orgType, intendedUse, applicantVolume, problem, consent } = body
@@ -15,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    await pool.query(
+    await getPool().query(
       `INSERT INTO waitlist_entries
         (id, email, profile_type, use_case, current_country, last_country, org_type, intended_use, applicant_volume, problem_statement, consent)
        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
