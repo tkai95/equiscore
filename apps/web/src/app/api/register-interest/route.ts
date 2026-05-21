@@ -13,14 +13,6 @@ function getPool() {
   return pool
 }
 
-export async function GET() {
-  return NextResponse.json({
-    hasDbUrl: !!process.env.DATABASE_URL,
-    dbUrlPrefix: process.env.DATABASE_URL?.slice(0, 20) ?? 'not set',
-    nodeEnv: process.env.NODE_ENV,
-  })
-}
-
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ error: 'DATABASE_URL is not set' }, { status: 503 })
@@ -63,8 +55,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error('Register interest error:', msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    console.error('Register interest error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
