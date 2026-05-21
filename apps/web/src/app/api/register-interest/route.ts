@@ -13,6 +13,14 @@ function getPool() {
   return pool
 }
 
+export async function GET() {
+  return NextResponse.json({
+    hasDbUrl: !!process.env.DATABASE_URL,
+    dbUrlPrefix: process.env.DATABASE_URL?.slice(0, 20) ?? 'not set',
+    nodeEnv: process.env.NODE_ENV,
+  })
+}
+
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ error: 'DATABASE_URL is not set' }, { status: 503 })
