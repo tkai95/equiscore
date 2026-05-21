@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db } from '@equiscore/database'
+import { Pool } from 'pg'
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 export async function POST(req: Request) {
   try {
@@ -10,36 +12,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    await db.waitlistEntry.upsert({
-      where: { email },
-      update: {
-        profileType,
-        useCase: Array.isArray(useCase) ? useCase.join(', ') : (useCase ?? null),
-        currentCountry: currentCountry ?? null,
-        lastCountry: lastCountry ?? null,
-        orgType: orgType ?? null,
-        intendedUse: Array.isArray(intendedUse) ? intendedUse.join(', ') : (intendedUse ?? null),
-        applicantVolume: applicantVolume ?? null,
-        problemStatement: problem ?? null,
-        consent: consent ?? false,
-      },
-      create: {
+    await pool.query(
+      `INSERT INTO waitlist_entries
+        (id, email, profile_type, use_case, current_country, last_country, org_type, intended_use, applicant_volume, problem_statement, consent)
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (email) DO UPDATE SET
+        profile_type     = EXCLUDED.profile_type,
+        use_case         = EXCLUDED.use_case,
+        current_country  = EXCLUDED.current_country,
+        last_country     = EXCLUDED.last_country,
+        org_type         = EXCLUDED.org_type,
+        intended_use     = EXCLUDED.intended_use,
+        applicant_volume = EXCLUDED.applicant_volume,
+        problem_statement = EXCLUDED.problem_statement,
+        consent          = EXCLUDED.consent`,
+      [
         email,
         profileType,
-        useCase: Array.isArray(useCase) ? useCase.join(', ') : (useCase ?? null),
-        currentCountry: currentCountry ?? null,
-        lastCountry: lastCountry ?? null,
-        orgType: orgType ?? null,
-        intendedUse: Array.isArray(intendedUse) ? intendedUse.join(', ') : (intendedUse ?? null),
-        applicantVolume: applicantVolume ?? null,
-        problemStatement: problem ?? null,
-        consent: consent ?? false,
-      },
-    })
+        Array.isArray(useCase) ? useCase.join(', ') : (useCase ?? null),
+        currentCountry ?? null,
+        lastCountry ?? null,
+        orgType ?? null,
+        Array.isArray(intendedUse) ? intendedUse.join(', ') : (intendedUse ?? null),
+        applicantVolume ?? null,
+        problem ?? null,
+        consent ?? false,
+      ],
+    )
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Register interest error:', JSON.stringify(err, Object.getOwnPropertyNames(err as object)))
+    console.error('Register interest error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
