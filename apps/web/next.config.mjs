@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@equiscore/shared'],
+  transpilePackages: ['@equiscore/shared', '@equiscore/database'],
   async rewrites() {
     return [
       {
