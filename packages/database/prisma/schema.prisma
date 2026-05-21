@@ -469,6 +469,25 @@ model SharedProfile {
   @@map("shared_profiles")
 }
 
+// ─── Waitlist ─────────────────────────────────────────────────────────────────
+
+model WaitlistEntry {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  profileType      String   @map("profile_type") // "individual" | "business"
+  useCase          String?  @map("use_case")
+  currentCountry   String?  @map("current_country")
+  lastCountry      String?  @map("last_country")
+  orgType          String?  @map("org_type")
+  intendedUse      String?  @map("intended_use")
+  applicantVolume  String?  @map("applicant_volume")
+  problemStatement String?  @map("problem_statement")
+  consent          Boolean  @default(false)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("waitlist_entries")
+}
+
 // ─── Audit Events ─────────────────────────────────────────────────────────────
 
 model AuditEvent {

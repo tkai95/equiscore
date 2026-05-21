@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
+import { useState } from 'react'
 import { isPublicSite } from '@/lib/site'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
 import {
@@ -11,12 +12,11 @@ import {
   Lock,
   ShieldCheck,
   Briefcase,
-  Landmark,
-  Link2,
-  FileText,
-  Send,
   Globe,
   User,
+  AlertTriangle,
+  TrendingUp,
+  Building2,
 } from 'lucide-react'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
@@ -112,31 +112,57 @@ const STATS = [
 const HOW_IT_WORKS = [
   {
     n: '1',
-    icon: Link2,
-    title: 'Create your profile',
-    desc: 'Sign up and tell us about yourself. Takes just a few minutes.',
+    title: 'Choose your situation',
+    desc: 'Tell Equiscore what is blocking you: a closed account, no UK history, variable income or a partner review need.',
   },
   {
     n: '2',
-    icon: FileText,
-    title: 'Add your evidence',
-    desc: 'Connect your bank and upload supporting documents securely.',
+    title: 'Add verified evidence',
+    desc: 'Connect Open Banking, verify identity and add supporting documents or context where needed.',
   },
   {
     n: '3',
-    icon: ShieldCheck,
-    title: 'Get your Trust Score',
-    desc: 'We analyse your evidence and build your verified Trust Portfolio.',
+    title: 'Build your Trust Portfolio',
+    desc: 'Equiscore organises the evidence into modules like income stability, rent and bills, identity and affordability signals.',
   },
   {
     n: '4',
-    icon: Send,
-    title: 'Share your profile',
-    desc: 'Share with landlords, lenders and providers you trust.',
+    title: 'Share on your terms',
+    desc: 'Create a secure link, choose what to show, set an expiry date and revoke access whenever you need.',
+  },
+]
+
+const ACCESS_TABS = ['Bank account', 'Renting', 'Utilities', 'Phone contract', 'Credit & lending']
+
+const WHO_WE_HELP = [
+  {
+    icon: AlertTriangle,
+    title: 'Account closed or flagged',
+    tags: ['Closed account', 'CIFAS concern', 'Banking access'],
+    desc: 'Build a Rehabilitation Portfolio that brings together verified identity, financial behaviour, income patterns and supporting evidence so your story is not reduced to a marker or closed account.',
+  },
+  {
+    icon: Globe,
+    title: 'New to the UK',
+    tags: ['New arrival', 'No UK file', 'Renting'],
+    desc: 'Use verified evidence to show who you are financially from day one, even before the UK credit system has enough history to understand you.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Self-employed or variable income',
+    tags: ['Gig work', 'Freelance', 'Multiple incomes'],
+    desc: 'Turn variable income into a clear, verified picture of affordability, stability and financial behaviour.',
+  },
+  {
+    icon: Building2,
+    title: 'Bank, landlord or partner',
+    tags: ['False declines', 'Tenant checks', 'Better evidence'],
+    desc: 'Use Equiscore as a consent-led evidence layer before declining people the traditional system struggles to assess.',
   },
 ]
 
 export default function LandingPage() {
+  const [activeTab, setActiveTab] = useState('Bank account')
   return (
     <main className="min-h-screen bg-ink">
 
@@ -238,6 +264,78 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── What is blocking you ──────────────────────────────────── */}
+      <section className="bg-ink py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="mb-4 text-center text-4xl font-bold leading-tight tracking-tight text-cream lg:text-5xl">
+            What is blocking you?
+          </h2>
+          <p className="mx-auto mb-10 max-w-2xl text-center leading-relaxed text-cream">
+            The financial system was not built for everyone. Equiscore helps people build a verified evidence profile when traditional checks do not show the full picture.
+          </p>
+
+          {/* Tab filter */}
+          <div className="mb-8 rounded-2xl border border-ink-border bg-ink-mid px-6 py-5">
+            <p className="mb-4 text-sm font-semibold text-cream">What are you trying to access?</p>
+            <div className="flex flex-wrap gap-2">
+              {ACCESS_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'bg-teal text-ink'
+                      : 'border border-ink-border text-cream/60 hover:border-teal/30 hover:text-cream'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Situation cards */}
+          <div className="mb-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {WHO_WE_HELP.map(({ icon: Icon, title, tags, desc }) => (
+              <div key={title} className="flex flex-col rounded-2xl border border-ink-border bg-ink-mid p-6">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full border border-teal/20 bg-teal/10">
+                  <Icon className="h-5 w-5 text-teal" />
+                </div>
+                <h3 className="mb-3 text-base font-bold text-cream">{title}</h3>
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-teal/10 px-2.5 py-0.5 text-xs font-medium text-teal">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm leading-relaxed text-cream">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom banner */}
+          <div className="flex flex-col items-center justify-between gap-5 rounded-2xl border border-teal/20 bg-ink-mid px-8 py-6 sm:flex-row">
+            <div>
+              <p className="mb-1 font-bold text-cream">Start with your situation. Build the evidence profile that fits.</p>
+              <p className="text-sm text-cream/60">Join the early access list and tell us what you are trying to unlock.</p>
+            </div>
+            {isPublicSite ? (
+              <div className="shrink-0">
+                <RegisterInterestButton label="Join the waitlist" variant="primary" />
+              </div>
+            ) : (
+              <Link
+                href="/sign-up"
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-teal px-6 py-3 text-sm font-semibold text-ink hover:bg-teal-dark"
+              >
+                Join the waitlist <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* ── One trust layer ────────────────────────────────────────── */}
       <section className="bg-ink py-24">
         <div className="mx-auto max-w-6xl px-6">
@@ -258,33 +356,45 @@ export default function LandingPage() {
       <section className="bg-ink pb-24" id="how-it-works">
         <div className="mx-auto max-w-6xl px-6">
           <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-teal">Simple process</p>
-          <h2 className="mb-16 text-center text-3xl font-bold text-cream">How it works</h2>
+          <h2 className="mb-14 text-center text-3xl font-bold text-cream">How it works</h2>
 
-          <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-0">
-            {HOW_IT_WORKS.map(({ n, icon: Icon, title, desc }, idx) => (
-              <div key={n} className="contents">
-                <div className="group relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-ink-border bg-ink-mid p-7 transition-colors duration-200 hover:border-teal/30">
-                  <span className="pointer-events-none absolute right-4 top-3 select-none text-7xl font-black leading-none text-cream/[0.04]">
-                    {n}
-                  </span>
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-teal/20 bg-teal/10 transition-colors duration-200 group-hover:border-teal/40 group-hover:bg-teal/15">
-                    <Icon className="h-6 w-6 text-teal" />
-                  </div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-teal/60">Step {n}</p>
-                  <h3 className="mb-2 text-base font-bold text-cream">{title}</h3>
-                  <p className="text-sm leading-relaxed text-cream">{desc}</p>
-                </div>
+          <div className="grid gap-8 lg:grid-cols-[5fr_6fr] lg:items-stretch">
 
-                {idx < HOW_IT_WORKS.length - 1 && (
-                  <div className="hidden shrink-0 items-center px-2 md:flex">
-                    <div className="flex items-center gap-0.5">
-                      <div className="h-px w-5 border-t border-dashed border-teal/25" />
-                      <ArrowRight className="h-4 w-4 text-teal/30" />
-                    </div>
-                  </div>
-                )}
+            {/* Left column — explainer box with trust profile image */}
+            <div className="flex flex-col rounded-2xl border border-ink-border bg-ink-mid p-7">
+              <h3 className="mb-3 text-xl font-bold leading-tight text-cream">
+                Not a credit score. A clearer evidence layer.
+              </h3>
+              <p className="mb-6 text-sm leading-relaxed text-cream">
+                Equiscore does not promise approval or replace existing checks. It helps people package verified evidence into a controlled profile that can support better decisions.
+              </p>
+              <div className="relative min-h-[260px] flex-1 overflow-hidden rounded-xl">
+                <Image
+                  src="/trust_profile.png"
+                  alt="Sample Equiscore Trust Portfolio"
+                  fill
+                  className="object-contain object-top"
+                />
               </div>
-            ))}
+            </div>
+
+            {/* Right column — steps */}
+            <div className="flex flex-col overflow-hidden rounded-2xl border border-ink-border bg-ink-mid">
+              {HOW_IT_WORKS.map(({ n, title, desc }, idx) => (
+                <div
+                  key={n}
+                  className={`flex flex-1 gap-5 px-7 py-7 ${idx < HOW_IT_WORKS.length - 1 ? 'border-b border-ink-border' : ''}`}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal/30 bg-teal/10 text-sm font-bold text-teal">
+                    {n}
+                  </div>
+                  <div>
+                    <h3 className="mb-1.5 font-bold text-cream">{title}</h3>
+                    <p className="text-sm leading-relaxed text-cream">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
