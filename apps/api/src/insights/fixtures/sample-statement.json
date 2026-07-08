@@ -1,0 +1,1862 @@
+{
+  "source": "statement_upload",
+  "accountHolderName": "Amara Okafor",
+  "profileName": "Amara Okafor",
+  "transactions": [
+    {
+      "date": "2025-04-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 1702
+    },
+    {
+      "date": "2025-04-03",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 602
+    },
+    {
+      "date": "2025-04-03",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 557
+    },
+    {
+      "date": "2025-04-03",
+      "amount": 35.84,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 521.16
+    },
+    {
+      "date": "2025-04-04",
+      "amount": 66.85,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 454.31
+    },
+    {
+      "date": "2025-04-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": -25.69
+    },
+    {
+      "date": "2025-04-08",
+      "amount": 83.68,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": -109.37
+    },
+    {
+      "date": "2025-04-12",
+      "amount": 106.51,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": -215.88
+    },
+    {
+      "date": "2025-04-12",
+      "amount": 39.94,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": -255.82
+    },
+    {
+      "date": "2025-04-13",
+      "amount": 160.77,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": -95.05
+    },
+    {
+      "date": "2025-04-16",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": -137.05
+    },
+    {
+      "date": "2025-04-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": -165.05
+    },
+    {
+      "date": "2025-04-17",
+      "amount": 80.96,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": -246.01
+    },
+    {
+      "date": "2025-04-20",
+      "amount": 36.27,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": -282.28
+    },
+    {
+      "date": "2025-04-21",
+      "amount": 38.32,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": -320.6
+    },
+    {
+      "date": "2025-04-23",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": -331.59
+    },
+    {
+      "date": "2025-04-24",
+      "amount": 89.93,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": -421.52
+    },
+    {
+      "date": "2025-04-24",
+      "amount": 40.21,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": -461.73
+    },
+    {
+      "date": "2025-04-28",
+      "amount": 2746.48,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 2284.75
+    },
+    {
+      "date": "2025-05-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2136.75
+    },
+    {
+      "date": "2025-05-02",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2091.75
+    },
+    {
+      "date": "2025-05-03",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 991.75
+    },
+    {
+      "date": "2025-05-03",
+      "amount": 35.07,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 956.68
+    },
+    {
+      "date": "2025-05-05",
+      "amount": 98.58,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 858.1
+    },
+    {
+      "date": "2025-05-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 378.1
+    },
+    {
+      "date": "2025-05-07",
+      "amount": 88.7,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 289.4
+    },
+    {
+      "date": "2025-05-11",
+      "amount": 82.7,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 206.7
+    },
+    {
+      "date": "2025-05-12",
+      "amount": 44.52,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 162.18
+    },
+    {
+      "date": "2025-05-14",
+      "amount": 216.41,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 378.59
+    },
+    {
+      "date": "2025-05-16",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 336.59
+    },
+    {
+      "date": "2025-05-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 308.59
+    },
+    {
+      "date": "2025-05-17",
+      "amount": 43.81,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 264.78
+    },
+    {
+      "date": "2025-05-19",
+      "amount": 81.06,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 183.72
+    },
+    {
+      "date": "2025-05-21",
+      "amount": 44.32,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 139.4
+    },
+    {
+      "date": "2025-05-21",
+      "amount": 40.6,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 98.8
+    },
+    {
+      "date": "2025-05-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 87.81
+    },
+    {
+      "date": "2025-05-26",
+      "amount": 93.89,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": -6.08
+    },
+    {
+      "date": "2025-05-28",
+      "amount": 2734.27,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 2728.19
+    },
+    {
+      "date": "2025-06-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2580.19
+    },
+    {
+      "date": "2025-06-03",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 1480.19
+    },
+    {
+      "date": "2025-06-03",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 1435.19
+    },
+    {
+      "date": "2025-06-03",
+      "amount": 47.41,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1387.78
+    },
+    {
+      "date": "2025-06-05",
+      "amount": 95.04,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1292.74
+    },
+    {
+      "date": "2025-06-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 812.74
+    },
+    {
+      "date": "2025-06-08",
+      "amount": 82.19,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 730.55
+    },
+    {
+      "date": "2025-06-11",
+      "amount": 92.56,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 637.99
+    },
+    {
+      "date": "2025-06-12",
+      "amount": 47.02,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 590.97
+    },
+    {
+      "date": "2025-06-15",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 548.97
+    },
+    {
+      "date": "2025-06-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 520.97
+    },
+    {
+      "date": "2025-06-17",
+      "amount": 86.1,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 434.87
+    },
+    {
+      "date": "2025-06-18",
+      "amount": 37.31,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 397.56
+    },
+    {
+      "date": "2025-06-21",
+      "amount": 42.97,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 354.59
+    },
+    {
+      "date": "2025-06-21",
+      "amount": 54.82,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 299.77
+    },
+    {
+      "date": "2025-06-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 288.78
+    },
+    {
+      "date": "2025-06-26",
+      "amount": 103.78,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 185
+    },
+    {
+      "date": "2025-06-27",
+      "amount": 2760.31,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 2945.31
+    },
+    {
+      "date": "2025-07-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2797.31
+    },
+    {
+      "date": "2025-07-02",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2752.31
+    },
+    {
+      "date": "2025-07-03",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 1652.31
+    },
+    {
+      "date": "2025-07-03",
+      "amount": 94.66,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1557.65
+    },
+    {
+      "date": "2025-07-03",
+      "amount": 38.9,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1518.75
+    },
+    {
+      "date": "2025-07-06",
+      "amount": 90.19,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 1428.56
+    },
+    {
+      "date": "2025-07-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 948.56
+    },
+    {
+      "date": "2025-07-12",
+      "amount": 93.71,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 854.85
+    },
+    {
+      "date": "2025-07-12",
+      "amount": 46.17,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 808.68
+    },
+    {
+      "date": "2025-07-15",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 766.68
+    },
+    {
+      "date": "2025-07-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 738.68
+    },
+    {
+      "date": "2025-07-17",
+      "amount": 178.53,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 917.21
+    },
+    {
+      "date": "2025-07-17",
+      "amount": 36.72,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 880.49
+    },
+    {
+      "date": "2025-07-19",
+      "amount": 100.81,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 779.68
+    },
+    {
+      "date": "2025-07-21",
+      "amount": 32.3,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 747.38
+    },
+    {
+      "date": "2025-07-21",
+      "amount": 37.86,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 709.52
+    },
+    {
+      "date": "2025-07-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 698.53
+    },
+    {
+      "date": "2025-07-26",
+      "amount": 97.14,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 601.39
+    },
+    {
+      "date": "2025-07-28",
+      "amount": 2764.94,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 3366.33
+    },
+    {
+      "date": "2025-08-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 3218.33
+    },
+    {
+      "date": "2025-08-02",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 2118.33
+    },
+    {
+      "date": "2025-08-03",
+      "amount": 49.05,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2069.28
+    },
+    {
+      "date": "2025-08-04",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2024.28
+    },
+    {
+      "date": "2025-08-04",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 1544.28
+    },
+    {
+      "date": "2025-08-04",
+      "amount": 97.7,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1446.58
+    },
+    {
+      "date": "2025-08-07",
+      "amount": 84.37,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 1362.21
+    },
+    {
+      "date": "2025-08-10",
+      "amount": 86.58,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1275.63
+    },
+    {
+      "date": "2025-08-12",
+      "amount": 49.27,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1226.36
+    },
+    {
+      "date": "2025-08-14",
+      "amount": 208.68,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 1435.04
+    },
+    {
+      "date": "2025-08-14",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 1393.04
+    },
+    {
+      "date": "2025-08-15",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 1365.04
+    },
+    {
+      "date": "2025-08-17",
+      "amount": 116.21,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1248.83
+    },
+    {
+      "date": "2025-08-18",
+      "amount": 46.1,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 1202.73
+    },
+    {
+      "date": "2025-08-21",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 1191.74
+    },
+    {
+      "date": "2025-08-21",
+      "amount": 30.7,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1161.04
+    },
+    {
+      "date": "2025-08-25",
+      "amount": 80.66,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1080.38
+    },
+    {
+      "date": "2025-08-26",
+      "amount": 32.88,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 1047.5
+    },
+    {
+      "date": "2025-08-27",
+      "amount": 2743.52,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 3791.02
+    },
+    {
+      "date": "2025-09-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 2691.02
+    },
+    {
+      "date": "2025-09-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2543.02
+    },
+    {
+      "date": "2025-09-02",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2498.02
+    },
+    {
+      "date": "2025-09-03",
+      "amount": 36.77,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2461.25
+    },
+    {
+      "date": "2025-09-04",
+      "amount": 85.05,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2376.2
+    },
+    {
+      "date": "2025-09-05",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 1896.2
+    },
+    {
+      "date": "2025-09-07",
+      "amount": 87.21,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 1808.99
+    },
+    {
+      "date": "2025-09-12",
+      "amount": 110.16,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1698.83
+    },
+    {
+      "date": "2025-09-12",
+      "amount": 42.84,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1655.99
+    },
+    {
+      "date": "2025-09-15",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 1627.99
+    },
+    {
+      "date": "2025-09-16",
+      "amount": 52.14,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 1575.85
+    },
+    {
+      "date": "2025-09-17",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 1533.85
+    },
+    {
+      "date": "2025-09-18",
+      "amount": 65.47,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1468.38
+    },
+    {
+      "date": "2025-09-21",
+      "amount": 42.95,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1425.43
+    },
+    {
+      "date": "2025-09-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 1414.44
+    },
+    {
+      "date": "2025-09-25",
+      "amount": 109.85,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1304.59
+    },
+    {
+      "date": "2025-09-26",
+      "amount": 28.77,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 1275.82
+    },
+    {
+      "date": "2025-09-28",
+      "amount": 2749.74,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 4025.56
+    },
+    {
+      "date": "2025-10-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 2925.56
+    },
+    {
+      "date": "2025-10-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2777.56
+    },
+    {
+      "date": "2025-10-02",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2732.56
+    },
+    {
+      "date": "2025-10-03",
+      "amount": 35.82,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2696.74
+    },
+    {
+      "date": "2025-10-04",
+      "amount": 65.54,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2631.2
+    },
+    {
+      "date": "2025-10-05",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 2151.2
+    },
+    {
+      "date": "2025-10-07",
+      "amount": 87.67,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 2063.53
+    },
+    {
+      "date": "2025-10-12",
+      "amount": 136.47,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 2200
+    },
+    {
+      "date": "2025-10-12",
+      "amount": 66.82,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2133.18
+    },
+    {
+      "date": "2025-10-12",
+      "amount": 47.4,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2085.78
+    },
+    {
+      "date": "2025-10-14",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 2057.78
+    },
+    {
+      "date": "2025-10-16",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 2015.78
+    },
+    {
+      "date": "2025-10-17",
+      "amount": 61.78,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 1954
+    },
+    {
+      "date": "2025-10-19",
+      "amount": 85.2,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1868.8
+    },
+    {
+      "date": "2025-10-21",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 1857.81
+    },
+    {
+      "date": "2025-10-21",
+      "amount": 41.48,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1816.33
+    },
+    {
+      "date": "2025-10-26",
+      "amount": 115.24,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1701.09
+    },
+    {
+      "date": "2025-10-27",
+      "amount": 52.3,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 1648.79
+    },
+    {
+      "date": "2025-10-28",
+      "amount": 2776.13,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 4424.92
+    },
+    {
+      "date": "2025-11-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 3324.92
+    },
+    {
+      "date": "2025-11-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 3176.92
+    },
+    {
+      "date": "2025-11-03",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 3131.92
+    },
+    {
+      "date": "2025-11-03",
+      "amount": 39.15,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 3092.77
+    },
+    {
+      "date": "2025-11-04",
+      "amount": 89.35,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 3003.42
+    },
+    {
+      "date": "2025-11-04",
+      "amount": 90.63,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2912.79
+    },
+    {
+      "date": "2025-11-05",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 2432.79
+    },
+    {
+      "date": "2025-11-10",
+      "amount": 92.34,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2340.45
+    },
+    {
+      "date": "2025-11-12",
+      "amount": 42.11,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2298.34
+    },
+    {
+      "date": "2025-11-14",
+      "amount": 151.33,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 2449.67
+    },
+    {
+      "date": "2025-11-14",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 2407.67
+    },
+    {
+      "date": "2025-11-14",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 2379.67
+    },
+    {
+      "date": "2025-11-17",
+      "amount": 40.52,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 2339.15
+    },
+    {
+      "date": "2025-11-18",
+      "amount": 89.41,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2249.74
+    },
+    {
+      "date": "2025-11-21",
+      "amount": 49.48,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2200.26
+    },
+    {
+      "date": "2025-11-23",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 2189.27
+    },
+    {
+      "date": "2025-11-25",
+      "amount": 52.77,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 2136.5
+    },
+    {
+      "date": "2025-11-26",
+      "amount": 66.73,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2069.77
+    },
+    {
+      "date": "2025-11-27",
+      "amount": 2771.48,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 4841.25
+    },
+    {
+      "date": "2025-12-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 3741.25
+    },
+    {
+      "date": "2025-12-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 3593.25
+    },
+    {
+      "date": "2025-12-03",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 3548.25
+    },
+    {
+      "date": "2025-12-03",
+      "amount": 37.05,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 3511.2
+    },
+    {
+      "date": "2025-12-04",
+      "amount": 89.31,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 3421.89
+    },
+    {
+      "date": "2025-12-05",
+      "amount": 87.1,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 3334.79
+    },
+    {
+      "date": "2025-12-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 2854.79
+    },
+    {
+      "date": "2025-12-10",
+      "amount": 74.98,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2779.81
+    },
+    {
+      "date": "2025-12-12",
+      "amount": 42.53,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2737.28
+    },
+    {
+      "date": "2025-12-14",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 2709.28
+    },
+    {
+      "date": "2025-12-17",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 2667.28
+    },
+    {
+      "date": "2025-12-17",
+      "amount": 111.82,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2555.46
+    },
+    {
+      "date": "2025-12-19",
+      "amount": 48.69,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 2506.77
+    },
+    {
+      "date": "2025-12-21",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 2495.78
+    },
+    {
+      "date": "2025-12-21",
+      "amount": 38.88,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2456.9
+    },
+    {
+      "date": "2025-12-21",
+      "amount": 46.17,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 2410.73
+    },
+    {
+      "date": "2025-12-24",
+      "amount": 101.43,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2309.3
+    },
+    {
+      "date": "2025-12-28",
+      "amount": 2741.73,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 5051.03
+    },
+    {
+      "date": "2026-01-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 4903.03
+    },
+    {
+      "date": "2026-01-02",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 3803.03
+    },
+    {
+      "date": "2026-01-03",
+      "amount": 34.37,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 3768.66
+    },
+    {
+      "date": "2026-01-04",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 3723.66
+    },
+    {
+      "date": "2026-01-04",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 3243.66
+    },
+    {
+      "date": "2026-01-05",
+      "amount": 68.94,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 3174.72
+    },
+    {
+      "date": "2026-01-08",
+      "amount": 85.51,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 3089.21
+    },
+    {
+      "date": "2026-01-12",
+      "amount": 83.43,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 3005.78
+    },
+    {
+      "date": "2026-01-12",
+      "amount": 31.67,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2974.11
+    },
+    {
+      "date": "2026-01-14",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 2932.11
+    },
+    {
+      "date": "2026-01-14",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 2904.11
+    },
+    {
+      "date": "2026-01-17",
+      "amount": 118.14,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 3022.25
+    },
+    {
+      "date": "2026-01-17",
+      "amount": 116.34,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2905.91
+    },
+    {
+      "date": "2026-01-20",
+      "amount": 80.71,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 2825.2
+    },
+    {
+      "date": "2026-01-21",
+      "amount": 31.78,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 2793.42
+    },
+    {
+      "date": "2026-01-23",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 2782.43
+    },
+    {
+      "date": "2026-01-24",
+      "amount": 108.4,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 2674.03
+    },
+    {
+      "date": "2026-01-26",
+      "amount": 15.7,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 2658.33
+    },
+    {
+      "date": "2026-01-28",
+      "amount": 2783.4,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 5441.73
+    },
+    {
+      "date": "2026-02-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 4341.73
+    },
+    {
+      "date": "2026-02-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 4193.73
+    },
+    {
+      "date": "2026-02-03",
+      "amount": 45,
+      "direction": "credit",
+      "description": "PUREGYM DD RETURNED UNPAID",
+      "balance": 4238.73
+    },
+    {
+      "date": "2026-02-03",
+      "amount": 46.43,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 4192.3
+    },
+    {
+      "date": "2026-02-04",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 3712.3
+    },
+    {
+      "date": "2026-02-04",
+      "amount": 89.26,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 3623.04
+    },
+    {
+      "date": "2026-02-07",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 3578.04
+    },
+    {
+      "date": "2026-02-08",
+      "amount": 90.87,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 3487.17
+    },
+    {
+      "date": "2026-02-12",
+      "amount": 89.45,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 3397.72
+    },
+    {
+      "date": "2026-02-12",
+      "amount": 38.74,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 3358.98
+    },
+    {
+      "date": "2026-02-12",
+      "amount": 2600,
+      "direction": "debit",
+      "description": "TRANSFER TO J OKAFOR",
+      "balance": 758.98
+    },
+    {
+      "date": "2026-02-16",
+      "amount": 227.65,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 986.63
+    },
+    {
+      "date": "2026-02-16",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 944.63
+    },
+    {
+      "date": "2026-02-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 916.63
+    },
+    {
+      "date": "2026-02-17",
+      "amount": 58.56,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 858.07
+    },
+    {
+      "date": "2026-02-18",
+      "amount": 97.23,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 760.84
+    },
+    {
+      "date": "2026-02-21",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 749.85
+    },
+    {
+      "date": "2026-02-21",
+      "amount": 43.19,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 706.66
+    },
+    {
+      "date": "2026-02-21",
+      "amount": 27.6,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 679.06
+    },
+    {
+      "date": "2026-02-26",
+      "amount": 114.42,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 564.64
+    },
+    {
+      "date": "2026-02-28",
+      "amount": 2782.15,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 3346.79
+    },
+    {
+      "date": "2026-03-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 2246.79
+    },
+    {
+      "date": "2026-03-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 2098.79
+    },
+    {
+      "date": "2026-03-03",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 2053.79
+    },
+    {
+      "date": "2026-03-03",
+      "amount": 82.54,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1971.25
+    },
+    {
+      "date": "2026-03-03",
+      "amount": 38.86,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1932.39
+    },
+    {
+      "date": "2026-03-03",
+      "amount": 900,
+      "direction": "debit",
+      "description": "WISE PAYMENT REF 4471",
+      "balance": 1032.39
+    },
+    {
+      "date": "2026-03-04",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 552.39
+    },
+    {
+      "date": "2026-03-08",
+      "amount": 84.48,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 467.91
+    },
+    {
+      "date": "2026-03-12",
+      "amount": 78.82,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 389.09
+    },
+    {
+      "date": "2026-03-12",
+      "amount": 32.6,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 356.49
+    },
+    {
+      "date": "2026-03-16",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 314.49
+    },
+    {
+      "date": "2026-03-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 286.49
+    },
+    {
+      "date": "2026-03-17",
+      "amount": 68.57,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 217.92
+    },
+    {
+      "date": "2026-03-19",
+      "amount": 38.34,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 179.58
+    },
+    {
+      "date": "2026-03-21",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 168.59
+    },
+    {
+      "date": "2026-03-21",
+      "amount": 39.5,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 129.09
+    },
+    {
+      "date": "2026-03-23",
+      "amount": 53.53,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 75.56
+    },
+    {
+      "date": "2026-03-24",
+      "amount": 92.99,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": -17.43
+    },
+    {
+      "date": "2026-03-27",
+      "amount": 2757.44,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 2740.01
+    },
+    {
+      "date": "2026-04-01",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 1640.01
+    },
+    {
+      "date": "2026-04-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 1492.01
+    },
+    {
+      "date": "2026-04-03",
+      "amount": 79.73,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1412.28
+    },
+    {
+      "date": "2026-04-03",
+      "amount": 47.98,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1364.3
+    },
+    {
+      "date": "2026-04-04",
+      "amount": 87.82,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 1276.48
+    },
+    {
+      "date": "2026-04-04",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 1231.48
+    },
+    {
+      "date": "2026-04-06",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 751.48
+    },
+    {
+      "date": "2026-04-10",
+      "amount": 98.81,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 652.67
+    },
+    {
+      "date": "2026-04-12",
+      "amount": 32.85,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 619.82
+    },
+    {
+      "date": "2026-04-14",
+      "amount": 231.3,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 851.12
+    },
+    {
+      "date": "2026-04-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 823.12
+    },
+    {
+      "date": "2026-04-17",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 781.12
+    },
+    {
+      "date": "2026-04-18",
+      "amount": 92.46,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 688.66
+    },
+    {
+      "date": "2026-04-19",
+      "amount": 40.89,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 647.77
+    },
+    {
+      "date": "2026-04-21",
+      "amount": 33.66,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 614.11
+    },
+    {
+      "date": "2026-04-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 603.12
+    },
+    {
+      "date": "2026-04-24",
+      "amount": 71.62,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 531.5
+    },
+    {
+      "date": "2026-04-25",
+      "amount": 23.2,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 508.3
+    },
+    {
+      "date": "2026-04-28",
+      "amount": 2732.57,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 3240.87
+    },
+    {
+      "date": "2026-05-01",
+      "amount": 148,
+      "direction": "debit",
+      "description": "CAMDEN COUNCIL TAX DD",
+      "balance": 3092.87
+    },
+    {
+      "date": "2026-05-03",
+      "amount": 1100,
+      "direction": "debit",
+      "description": "OPENRENT LTD REF 88213",
+      "balance": 1992.87
+    },
+    {
+      "date": "2026-05-03",
+      "amount": 38.77,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1954.1
+    },
+    {
+      "date": "2026-05-04",
+      "amount": 45,
+      "direction": "debit",
+      "description": "PUREGYM LTD DD",
+      "balance": 1909.1
+    },
+    {
+      "date": "2026-05-04",
+      "amount": 480,
+      "direction": "debit",
+      "description": "TRANSFER TO J SMITH",
+      "balance": 1429.1
+    },
+    {
+      "date": "2026-05-05",
+      "amount": 100.74,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1328.36
+    },
+    {
+      "date": "2026-05-07",
+      "amount": 88.02,
+      "direction": "debit",
+      "description": "BRITISH GAS ENERGY DD",
+      "balance": 1240.34
+    },
+    {
+      "date": "2026-05-11",
+      "amount": 114.26,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1126.08
+    },
+    {
+      "date": "2026-05-12",
+      "amount": 31.8,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 1094.28
+    },
+    {
+      "date": "2026-05-14",
+      "amount": 42,
+      "direction": "debit",
+      "description": "THAMES WATER DD",
+      "balance": 1052.28
+    },
+    {
+      "date": "2026-05-16",
+      "amount": 125.39,
+      "direction": "credit",
+      "description": "UBER EATS PAYOUT",
+      "balance": 1177.67
+    },
+    {
+      "date": "2026-05-16",
+      "amount": 28,
+      "direction": "debit",
+      "description": "VODAFONE LTD DD",
+      "balance": 1149.67
+    },
+    {
+      "date": "2026-05-19",
+      "amount": 116.66,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 1033.01
+    },
+    {
+      "date": "2026-05-19",
+      "amount": 74.14,
+      "direction": "debit",
+      "description": "ATM WITHDRAWAL LINK",
+      "balance": 958.87
+    },
+    {
+      "date": "2026-05-21",
+      "amount": 43.49,
+      "direction": "debit",
+      "description": "TFL TRAVEL CHARGE",
+      "balance": 915.38
+    },
+    {
+      "date": "2026-05-22",
+      "amount": 10.99,
+      "direction": "debit",
+      "description": "NETFLIX.COM",
+      "balance": 904.39
+    },
+    {
+      "date": "2026-05-24",
+      "amount": 98.75,
+      "direction": "debit",
+      "description": "TESCO STORES 3411",
+      "balance": 805.64
+    },
+    {
+      "date": "2026-05-24",
+      "amount": 54.65,
+      "direction": "debit",
+      "description": "PRET A MANGER",
+      "balance": 750.99
+    },
+    {
+      "date": "2026-05-28",
+      "amount": 2751.26,
+      "direction": "credit",
+      "description": "BACS CREDIT BRIGHT CARE LTD",
+      "balance": 3502.25
+    }
+  ]
+}

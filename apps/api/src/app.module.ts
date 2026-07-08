@@ -11,6 +11,7 @@ import { ScoringModule } from './scoring/scoring.module'
 import { SharingModule } from './sharing/sharing.module'
 import { AuditModule } from './audit/audit.module'
 import { AnalyticsModule } from './analytics/analytics.module'
+import { InsightsModule } from './insights/insights.module'
 
 @Module({
   controllers: [HealthController],
@@ -25,6 +26,7 @@ import { AnalyticsModule } from './analytics/analytics.module'
     SharingModule,
     AuditModule,
     AnalyticsModule,
+    InsightsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
