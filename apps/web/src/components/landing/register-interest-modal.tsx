@@ -23,7 +23,6 @@ interface IndividualData {
   currentCountry: string
   lastCountry: string
   problem: string
-  consent: boolean
 }
 
 interface BusinessData {
@@ -32,7 +31,6 @@ interface BusinessData {
   intendedUse: string[]
   applicantVolume: string
   problem: string
-  consent: boolean
 }
 
 // ── Static options ───────────────────────────────────────────────────────────
@@ -250,34 +248,25 @@ function CountrySelect({
   )
 }
 
-function ConsentCheckbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-  label: string
-}) {
+// Consent is captured by the act of submitting, not a checkbox: the notice sits
+// directly above the submit button so clicking it is a clear affirmative action.
+// Pre-ticked boxes are not valid consent under UK GDPR (see Planet49, C-673/17).
+function ConsentNotice({ submitLabel }: { submitLabel: string }) {
   return (
-    <div className="mt-6 space-y-2">
-      <label className="flex cursor-pointer items-start gap-3">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={checked}
-          onClick={() => onChange(!checked)}
-          className={cn(
-            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
-            checked ? 'border-teal bg-teal' : 'border-ink-border bg-ink hover:border-teal/40',
-          )}
-        >
-          {checked && <Check className="h-3 w-3 text-ink" />}
-        </button>
-        <span className="text-sm text-cream/70">{label}</span>
-      </label>
-      <p className="pl-8 text-xs text-cream/40">You can unsubscribe at any time.</p>
-    </div>
+    <p className="mt-5 text-xs leading-relaxed text-cream/45">
+      By clicking &ldquo;{submitLabel}&rdquo;, you agree that EquiScore can email you about
+      launch and early access. We will not share your address, and you can unsubscribe from
+      any email. See our{' '}
+      <a
+        href="/privacy-policy"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-cream/60 underline underline-offset-2 transition-colors hover:text-teal"
+      >
+        privacy policy
+      </a>
+      .
+    </p>
   )
 }
 
@@ -322,7 +311,6 @@ const INITIAL_IND: IndividualData = {
   currentCountry: '',
   lastCountry: '',
   problem: '',
-  consent: false,
 }
 
 const INITIAL_BIZ: BusinessData = {
@@ -331,7 +319,6 @@ const INITIAL_BIZ: BusinessData = {
   intendedUse: [],
   applicantVolume: '',
   problem: '',
-  consent: false,
 }
 
 interface RegisterInterestModalProps {
@@ -385,10 +372,12 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
     setSubmitting(true)
     setSubmitError('')
     try {
+      // Submitting the form IS the affirmative consent action — see ConsentNotice,
+      // which is shown directly above the submit button on the final step.
       const payload =
         profileType === 'individual'
-          ? { profileType, ...indData }
-          : { profileType, ...bizData }
+          ? { profileType, ...indData, consent: true }
+          : { profileType, ...bizData, consent: true }
 
       const res = await fetch('/api/register-interest', {
         method: 'POST',
@@ -566,11 +555,6 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
               rows={4}
               className="w-full resize-none rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
-            <ConsentCheckbox
-              checked={indData.consent}
-              onChange={(v) => setIndData({ ...indData, consent: v })}
-              label="Notify me when EquiScore is live and about early access updates."
-            />
           </div>
         )
       }
@@ -685,11 +669,6 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
               rows={4}
               className="w-full resize-none rounded-xl border border-ink-border bg-ink px-4 py-3 text-sm text-cream placeholder:text-cream/30 outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/10"
             />
-            <ConsentCheckbox
-              checked={bizData.consent}
-              onChange={(v) => setBizData({ ...bizData, consent: v })}
-              label="Notify me when EquiScore is live and about pilot opportunities."
-            />
           </div>
         )
       }
@@ -726,9 +705,17 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
           {/* Content */}
           <div className="min-h-[280px]">{renderContent()}</div>
 
+          {/* Consent notice — must sit immediately above the submit button */}
+          {isLastStep && !isSuccess && <ConsentNotice submitLabel={submitLabel} />}
+
           {/* Navigation footer */}
           {step > 0 && !isSuccess && (
-            <div className="mt-8 flex items-center justify-between border-t border-ink-border pt-5">
+            <div
+              className={cn(
+                'flex items-center justify-between border-t border-ink-border pt-5',
+                isLastStep ? 'mt-5' : 'mt-8',
+              )}
+            >
               <button
                 type="button"
                 onClick={back}

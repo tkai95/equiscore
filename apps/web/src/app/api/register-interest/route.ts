@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         Array.isArray(intendedUse) ? intendedUse.join(', ') : (intendedUse ?? null),
         applicantVolume ?? null,
         problem ?? null,
-        consent ?? false,
+        consent === true,
       ],
     )
 
