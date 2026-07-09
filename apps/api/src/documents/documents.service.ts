@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
@@ -34,19 +34,35 @@ export class DocumentsService {
   }
 
   async getUploadPresignedUrl(userId: string, documentType: DocumentType, mimeType: string) {
+    // Fail loud and specific if document storage isn't configured, rather than
+    // surfacing an opaque 500. These are separate from DATABASE_URL and must be
+    // set on the API host (Railway) for uploads to work.
+    const required = ['SUPABASE_PROJECT_REF', 'SUPABASE_S3_ACCESS_KEY_ID', 'SUPABASE_S3_SECRET_ACCESS_KEY']
+    const missing = required.filter((k) => !this.config.get<string>(k))
+    if (missing.length > 0) {
+      this.logger.error(`Document storage not configured — missing env: ${missing.join(', ')}`)
+      throw new ServiceUnavailableException('Document uploads are not available right now.')
+    }
+
     const key = `users/${userId}/documents/${documentType}/${Date.now()}`
 
-    const { url, fields } = await createPresignedPost(this.s3, {
-      Bucket: this.bucket,
-      Key: key,
-      Conditions: [
-        ['content-length-range', 0, 10 * 1024 * 1024], // 10 MB max
-        ['eq', '$Content-Type', mimeType],
-      ],
-      Expires: 300,
-    })
-
-    return { uploadUrl: url, fields, key }
+    try {
+      const { url, fields } = await createPresignedPost(this.s3, {
+        Bucket: this.bucket,
+        Key: key,
+        Conditions: [
+          ['content-length-range', 0, 10 * 1024 * 1024], // 10 MB max
+          ['eq', '$Content-Type', mimeType],
+        ],
+        Expires: 300,
+      })
+      return { uploadUrl: url, fields, key }
+    } catch (err) {
+      // Surfaces the real cause (bad bucket, region, credentials) into the log
+      // while returning a clean message to the client.
+      this.logger.error(`Presigned upload URL generation failed for bucket "${this.bucket}": ${String(err)}`)
+      throw new ServiceUnavailableException('Could not prepare the upload. Please try again shortly.')
+    }
   }
 
   async confirmUpload(

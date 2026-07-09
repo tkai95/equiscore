@@ -7,7 +7,8 @@ import { ScoreRing } from './score-ring'
 import { TierBadge } from './tier-badge'
 import { ReasonCodeList } from './reason-code-list'
 import { SubScoreGrid } from './sub-score-grid'
-import { RefreshCw, AlertTriangle, Clock } from 'lucide-react'
+import Link from 'next/link'
+import { RefreshCw, AlertTriangle, Clock, Landmark, Upload } from 'lucide-react'
 import { formatDate, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
@@ -153,14 +154,27 @@ export function TrustScoreView() {
 
       {!score && !recompute.isPending && (
         <div className="rounded-2xl border border-[#D8D6C9] bg-cream p-8 text-center">
-          <p className="mb-4 text-gray-700">
-            You don&apos;t have a trust score yet. Click &quot;Generate score&quot; to create your
-            first profile assessment.
+          <p className="mb-1 font-semibold text-gray-900">Add your financial data to get a score</p>
+          <p className="mx-auto mb-6 max-w-md text-sm text-gray-600">
+            Your Trust Score is built from real financial evidence. Connect a bank via open banking,
+            or upload a bank statement — then generate your score.
           </p>
-          <p className="text-sm text-gray-500">
-            The more information you&apos;ve added, the more accurate and confident your score will
-            be.
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/dashboard/connections"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark"
+            >
+              <Landmark className="h-4 w-4" />
+              Connect a bank
+            </Link>
+            <Link
+              href="/dashboard/connections"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <Upload className="h-4 w-4" />
+              Upload a statement
+            </Link>
+          </div>
         </div>
       )}
 

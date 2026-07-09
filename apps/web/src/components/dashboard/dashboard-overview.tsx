@@ -411,13 +411,13 @@ export function DashboardOverview() {
                 <span className="text-4xl font-bold text-gray-200">?</span>
               </div>
               <p className="text-sm text-gray-500">
-                Complete your profile to generate your Equiscore
+                Connect a bank or upload a statement to generate your Equiscore
               </p>
               <Link
-                href="/dashboard/trust-score"
+                href="/dashboard/connections"
                 className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-dark"
               >
-                Get started <ArrowRight className="h-3.5 w-3.5" />
+                Add your bank data <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           )}
