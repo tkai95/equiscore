@@ -48,12 +48,22 @@ export function computeTrustScore(input: ScoringInput): Omit<TrustScore, 'id'> {
     financialStability: financial.score,
   }
 
-  const overallScore = Math.round(
+  const rawScore = Math.round(
     Object.entries(subScores).reduce((acc, [key, value]) => {
       const weight = weights[key as keyof TrustSubScores] / 100
       return acc + value * weight
     }, 0)
   )
+
+  // A profile cannot read as "verified and reliable" when its foundation is
+  // weak: unconfirmed identity or thin verification caps the tier at C, however
+  // strong the finances look. Strong affordability must not buy a B while the
+  // name doesn't match the bank. The improvement engine tells the user exactly
+  // how to lift the cap (verify identity / connect Open Banking / add a doc).
+  const C_CEILING = 64
+  const foundationWeak =
+    subScores.verificationStrength < 50 || subScores.identityConfidence < 50
+  const overallScore = foundationWeak ? Math.min(rawScore, C_CEILING) : rawScore
 
   const overallTier = deriveTier(overallScore)
 
@@ -74,6 +84,17 @@ export function computeTrustScore(input: ScoringInput): Omit<TrustScore, 'id'> {
     seen.add(rc.code)
     return true
   })
+
+  if (foundationWeak && rawScore > overallScore) {
+    reasonCodes.unshift({
+      code: 'FOUNDATION_CAP',
+      dimension: 'verificationStrength',
+      sentiment: 'negative',
+      message:
+        'Your score is currently held at Tier C until your identity and evidence are verified. Your finances are strong — verifying unlocks a higher tier.',
+      weight: 100,
+    })
+  }
 
   const fraudRisk = deriveFraudRisk(features)
 

@@ -10,12 +10,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // its account footer) stays put.
     <div className="flex h-screen overflow-hidden bg-[#F7F6F2]">
       <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center justify-end gap-3 border-b border-[#D8D6C9] bg-[#F7F6F2] px-8">
-          <ImportJobsChip />
-        </header>
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      <main className="min-w-0 flex-1 overflow-y-auto p-8">{children}</main>
+
+      {/* Import-completion chip floats top-right; it renders nothing when idle. */}
+      <div className="fixed right-5 top-4 z-30">
+        <ImportJobsChip />
       </div>
+
       <ChatWidget />
     </div>
   )
