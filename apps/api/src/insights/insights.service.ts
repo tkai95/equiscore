@@ -15,6 +15,32 @@ import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
 import type { PreviewProfileDto } from './insights.dto'
 
+const GAMBLING =
+  /\b(bet365|paddy ?power|william ?hill|ladbrokes|betfair|sky ?bet|coral|betfred|betway|888|pokerstars|draftkings|casino|poker|gambl|lottery|lotto)\b/i
+
+// The one tool the assistant can call to pull exact transaction evidence.
+const TRANSACTION_TOOL: Anthropic.Tool = {
+  name: 'get_transactions',
+  description:
+    "Retrieve the user's ACTUAL transactions for exact evidence. Use this whenever the question needs specific underlying data — a particular month, a category (e.g. gambling), a merchant, the biggest/smallest payments, or explaining one transaction. For general questions answerable from the snapshot (score, totals, affordability, why a tier), do NOT call this.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      month: { type: 'string', description: 'Filter to a single calendar month, format YYYY-MM' },
+      category: {
+        type: 'string',
+        description:
+          'Spending category: rent, groceries, utilities, mobile_internet, council_tax, transport, subscriptions, discretionary, gambling, family_support, loan_credit, cash, healthcare, education — or "income" for money in.',
+      },
+      search: { type: 'string', description: 'Match merchant or description text (e.g. a merchant name)' },
+      direction: { type: 'string', enum: ['credit', 'debit'] },
+      minAmount: { type: 'number', description: 'Only transactions at or above this amount' },
+      sort: { type: 'string', enum: ['amount', 'date'], description: 'amount = largest first; date = newest first' },
+      limit: { type: 'number', description: 'Max transactions to return (default 20, max 50)' },
+    },
+  },
+}
+
 @Injectable()
 export class InsightsService implements OnModuleInit {
   private readonly logger = new Logger(InsightsService.name)
@@ -428,7 +454,7 @@ export class InsightsService implements OnModuleInit {
     onToken: (t: string) => void
   ): Promise<void> {
     const system = this.chatSystem(await this.buildChatContext(userId))
-    await this.streamAssistant(system, history.slice(-8), message, onToken)
+    await this.streamAssistant(userId, system, history.slice(-8), message, onToken)
     this.audit.log(userId, 'insight.chat', { chars: message.length, stream: true })
   }
 
@@ -436,7 +462,8 @@ export class InsightsService implements OnModuleInit {
     return `You are the EquiScore assistant. EquiScore turns someone's bank data into a shareable Trust Profile — a score out of 100 and a tier from A (best) to E — that proves their financial reliability to landlords and lenders, alongside deep insight into their income, spending, affordability, and payment reliability.
 
 RULES:
-- Answer using ONLY the data provided below about THIS user. Be specific with figures and always use £. Never invent numbers — if the data does not contain the answer, say so plainly.
+- Answer general questions (score, tier, why a tier, totals, affordability, how-to) from the SNAPSHOT below. Be specific with figures and always use £. Never invent numbers.
+- For questions that need exact underlying evidence — a specific month, a category like gambling, a merchant, the biggest/smallest payments, or explaining one transaction — call the get_transactions tool to fetch the real transactions, then answer from what it returns. Do not guess at specifics the snapshot doesn't contain.
 - Be warm, concise, and genuinely helpful. Format with Markdown: short paragraphs, **bold** for key figures, and bullet lists where it helps. Do not use headings larger than bold.
 - When you recommend an action, include a Markdown link to the exact page so they can act in one click. Paths: Dashboard [/dashboard], My Trust Score [/dashboard/trust-score], Analytics [/dashboard/analytics], Connections (connect a bank or upload a statement) [/dashboard/connections], Documents (upload ID / proof of address) [/dashboard/documents], Share Profile [/dashboard/share], My Profile [/dashboard/profile]. For example: "[Upload your documents](/dashboard/documents)".
 
@@ -559,75 +586,237 @@ ${context}`
   }
 
   private async streamAssistant(
+    userId: string,
     system: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
     message: string,
     onToken: (t: string) => void
   ): Promise<void> {
-    const messages = [...history, { role: 'user' as const, content: message }]
-
+    // GLM is the default; Anthropic is the fallback. Both support the
+    // transaction tool (GLM via OpenAI-compatible function calling).
     const glmKey = process.env['GLM_API_KEY']
     if (glmKey) {
-      try {
-        const baseUrl = process.env['GLM_BASE_URL'] ?? 'https://api.z.ai/api/paas/v4'
-        const model = process.env['GLM_MODEL'] ?? 'glm-5.2'
-        const res = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
-          body: JSON.stringify({
-            model,
-            max_tokens: 900,
-            stream: true,
-            messages: [{ role: 'system', content: system }, ...messages],
-          }),
-        })
-        if (res.ok && res.body) {
-          const reader = res.body.getReader()
-          const decoder = new TextDecoder()
-          let buf = ''
-          for (;;) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buf += decoder.decode(value, { stream: true })
-            const lines = buf.split('\n')
-            buf = lines.pop() ?? ''
-            for (const line of lines) {
-              const t = line.trim()
-              if (!t.startsWith('data:')) continue
-              const data = t.slice(5).trim()
-              if (data === '[DONE]') return
-              try {
-                const j = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
-                const delta = j.choices?.[0]?.delta?.content
-                if (delta) onToken(delta)
-              } catch {
-                /* keepalive or partial frame — ignore */
-              }
-            }
-          }
-          return
-        }
-        this.logger.warn(`GLM stream failed: ${res.status}`)
-      } catch (err) {
-        this.logger.warn(`GLM stream error: ${err instanceof Error ? err.message : err}`)
-      }
+      await this.streamWithGlm(glmKey, userId, system, history, message, onToken)
+      return
     }
-
     const anthropicKey = process.env['ANTHROPIC_API_KEY']
     if (anthropicKey) {
-      const client = new Anthropic({ apiKey: anthropicKey })
+      await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken)
+      return
+    }
+    onToken('The assistant is not available right now. Please try again later.')
+  }
+
+  private async streamWithAnthropic(
+    apiKey: string,
+    userId: string,
+    system: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    message: string,
+    onToken: (t: string) => void
+  ): Promise<void> {
+    const client = new Anthropic({ apiKey })
+    const messages: Anthropic.MessageParam[] = [
+      ...history.map((h) => ({ role: h.role, content: h.content })),
+      { role: 'user', content: message },
+    ]
+
+    // Bounded tool loop: the model may pull transaction evidence, then answer.
+    for (let step = 0; step < 3; step++) {
       const stream = client.messages.stream({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 900,
+        max_tokens: 1024,
         system,
+        tools: [TRANSACTION_TOOL],
         messages,
       })
       stream.on('text', (t) => onToken(t))
-      await stream.finalMessage()
-      return
+      const final = await stream.finalMessage()
+
+      const toolUses = final.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+      )
+      if (toolUses.length === 0) return
+
+      messages.push({ role: 'assistant', content: final.content })
+      const results: Anthropic.ToolResultBlockParam[] = []
+      for (const tu of toolUses) {
+        const out = await this.runChatTool(userId, tu.name, tu.input as Record<string, unknown>)
+        results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out) })
+      }
+      messages.push({ role: 'user', content: results })
+    }
+  }
+
+  private async streamWithGlm(
+    glmKey: string,
+    userId: string,
+    system: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    message: string,
+    onToken: (t: string) => void
+  ): Promise<void> {
+    const baseUrl = process.env['GLM_BASE_URL'] ?? 'https://api.z.ai/api/paas/v4'
+    const model = process.env['GLM_MODEL'] ?? 'glm-5.2'
+    const tools = [
+      {
+        type: 'function',
+        function: {
+          name: TRANSACTION_TOOL.name,
+          description: TRANSACTION_TOOL.description,
+          parameters: TRANSACTION_TOOL.input_schema,
+        },
+      },
+    ]
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: system },
+      ...history,
+      { role: 'user', content: message },
+    ]
+
+    try {
+      for (let step = 0; step < 3; step++) {
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
+          body: JSON.stringify({ model, max_tokens: 1024, stream: true, tools, messages }),
+        })
+        if (!res.ok || !res.body) {
+          this.logger.warn(`GLM stream failed: ${res.status}`)
+          onToken('The assistant is not available right now. Please try again later.')
+          return
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+        // Accumulate any streamed tool call(s) by index.
+        const toolCalls: Record<number, { id: string; name: string; args: string }> = {}
+        let streamDone = false
+        while (!streamDone) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() ?? ''
+          for (const line of lines) {
+            const t = line.trim()
+            if (!t.startsWith('data:')) continue
+            const data = t.slice(5).trim()
+            if (data === '[DONE]') {
+              streamDone = true
+              break
+            }
+            try {
+              const j = JSON.parse(data) as {
+                choices?: Array<{
+                  delta?: {
+                    content?: string
+                    tool_calls?: Array<{
+                      index?: number
+                      id?: string
+                      function?: { name?: string; arguments?: string }
+                    }>
+                  }
+                }>
+              }
+              const delta = j.choices?.[0]?.delta
+              if (delta?.content) onToken(delta.content)
+              for (const tc of delta?.tool_calls ?? []) {
+                const idx = tc.index ?? 0
+                const e = toolCalls[idx] ?? { id: '', name: '', args: '' }
+                if (tc.id) e.id = tc.id
+                if (tc.function?.name) e.name = tc.function.name
+                if (tc.function?.arguments) e.args += tc.function.arguments
+                toolCalls[idx] = e
+              }
+            } catch {
+              /* keepalive or partial frame — ignore */
+            }
+          }
+        }
+
+        const calls = Object.values(toolCalls).filter((c) => c.name)
+        if (calls.length === 0) return // model answered directly (already streamed)
+
+        messages.push({
+          role: 'assistant',
+          content: null,
+          tool_calls: calls.map((c) => ({
+            id: c.id,
+            type: 'function',
+            function: { name: c.name, arguments: c.args || '{}' },
+          })),
+        })
+        for (const c of calls) {
+          let input: Record<string, unknown> = {}
+          try {
+            input = JSON.parse(c.args || '{}')
+          } catch {
+            /* leave empty */
+          }
+          const out = await this.runChatTool(userId, c.name, input)
+          messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(out) })
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`GLM stream error: ${err instanceof Error ? err.message : err}`)
+      // If nothing was streamed yet, fall back to Anthropic (also tool-capable).
+      const anthropicKey = process.env['ANTHROPIC_API_KEY']
+      if (anthropicKey) {
+        await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken)
+      } else {
+        onToken('The assistant is not available right now. Please try again later.')
+      }
+    }
+  }
+
+  private async runChatTool(
+    userId: string,
+    name: string,
+    input: Record<string, unknown>
+  ): Promise<unknown> {
+    if (name === 'get_transactions') return this.queryTransactions(userId, input)
+    return { error: `Unknown tool: ${name}` }
+  }
+
+  /** Exact-evidence transaction lookup for the assistant's tool. */
+  private async queryTransactions(userId: string, f: Record<string, unknown>) {
+    const txns = await this.loadNormalizedTxns(userId)
+    let rows = txns
+
+    if (typeof f['month'] === 'string') rows = rows.filter((t) => monthKey(toDate(t.date)) === f['month'])
+    if (f['direction'] === 'credit' || f['direction'] === 'debit')
+      rows = rows.filter((t) => t.direction === f['direction'])
+    if (typeof f['minAmount'] === 'number') rows = rows.filter((t) => t.amount >= (f['minAmount'] as number))
+    if (typeof f['search'] === 'string') {
+      const s = (f['search'] as string).toLowerCase()
+      rows = rows.filter(
+        (t) =>
+          (t.description ?? '').toLowerCase().includes(s) || (t.merchantName ?? '').toLowerCase().includes(s)
+      )
+    }
+    if (typeof f['category'] === 'string') {
+      const cat = (f['category'] as string).toLowerCase()
+      if (cat === 'gambling') rows = rows.filter((t) => GAMBLING.test(t.description ?? t.merchantName ?? ''))
+      else if (cat === 'income') rows = rows.filter((t) => t.direction === 'credit')
+      else rows = rows.filter((t) => t.direction === 'debit' && resolveCategory(t, classify(t)).key === cat)
     }
 
-    onToken('The assistant is not available right now. Please try again later.')
+    if (f['sort'] === 'amount') rows = [...rows].sort((a, b) => b.amount - a.amount)
+    else rows = [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+
+    const limit = Math.min(typeof f['limit'] === 'number' ? (f['limit'] as number) : 20, 50)
+    return {
+      count: rows.length,
+      total: round2(rows.reduce((s, t) => s + t.amount, 0)),
+      transactions: rows.slice(0, limit).map((t) => ({
+        date: t.date,
+        amount: round2(t.amount),
+        direction: t.direction,
+        description: (t.merchantName || t.description || '').trim(),
+      })),
+    }
   }
 
   /** Build a profile from whatever transactions the user already has stored. */
