@@ -9,6 +9,7 @@ import { MonthlyFlowChart } from './monthly-flow-chart'
 import { CategoryBreakdown } from './category-breakdown'
 import { TopMerchants } from './top-merchants'
 import { InsightsCard } from './insights-card'
+import { InsightProfileView } from './insight-profile-view'
 
 interface Stats {
   avgMonthlyIncome: number
@@ -133,20 +134,15 @@ export function AnalyticsOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Your financial picture from connected bank accounts
+          What your bank data says about your income, spending, and reliability — from open banking
+          or an uploaded statement.
         </p>
       </div>
 
-      {/* AI Insights */}
-      <InsightsCard
-        insights={insightsMutation.data?.insights ?? []}
-        isLoading={insightsMutation.isPending}
-        unavailable={insightsMutation.data?.unavailable}
-        hasData={!noData && !!summary}
-        onGenerate={() => insightsMutation.mutate()}
-      />
+      {/* Deterministic insight profile — the primary, explainable view */}
+      <InsightProfileView />
 
       {/* Stats row */}
       {summaryQuery.isLoading ? (
@@ -245,6 +241,15 @@ export function AnalyticsOverview() {
               )}
             </div>
           </div>
+
+          {/* Optional AI narrative — supplementary to the deterministic profile above */}
+          <InsightsCard
+            insights={insightsMutation.data?.insights ?? []}
+            isLoading={insightsMutation.isPending}
+            unavailable={insightsMutation.data?.unavailable}
+            hasData
+            onGenerate={() => insightsMutation.mutate()}
+          />
         </>
       )}
     </div>

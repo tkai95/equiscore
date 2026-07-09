@@ -84,6 +84,7 @@ export const api = {
       apiFetch('/analytics/insights', { method: 'POST' }, token),
   },
   insights: {
+    getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
     importCsv: (token: string, csv: string) =>
       apiFetch<{
         connectionId: string
