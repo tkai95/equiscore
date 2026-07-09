@@ -71,9 +71,28 @@ interface InsightProfile {
   subScores: Array<{ key: string; label: string; score: number; rating: Rating }>
   transactionClarity: number
   overall: { score: number; tier: string; label: string; limitingFactors: string[] }
+  affordability: {
+    monthlyIncome: number
+    essentialOutgoings: number
+    discretionarySpend: number
+    currentRent: number | null
+    debtRepayments: number
+    fixedCommitments: number
+    disposableIncome: number
+    surplusAfterAll: number
+    ratios: { rentToIncome: number | null; debtToIncome: number; commitmentsToIncome: number; essentialsToIncome: number }
+    maxAffordableRent: number
+    headroomForNewRent: number
+    stressTest: { incomeDropPct: number; surplusUnderStress: number; stillPositive: boolean; essentialsCovered: boolean }
+    incomeIsVariable: boolean
+    rating: AffordabilityRating
+    notes: string[]
+  }
   summary: string
   source: Source
 }
+
+type AffordabilityRating = 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
 
 type ScoreStatus =
   | 'current'
@@ -140,7 +159,12 @@ const STATUS_BADGE: Record<ScoreStatus, { label: string; className: string }> = 
   insufficient_evidence: { label: 'Insufficient evidence', className: 'bg-gray-100 text-gray-600 ring-gray-200' },
 }
 
-// Plain-English "how this was calculated" copy for each key indicator.
+const AFFORDABILITY_RATING: Record<AffordabilityRating, { label: string; badge: string }> = {
+  comfortable: { label: 'Comfortable', badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  manageable: { label: 'Manageable', badge: 'bg-teal-50 text-teal-700 ring-teal-200' },
+  stretched: { label: 'Stretched', badge: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  at_risk: { label: 'At risk', badge: 'bg-red-50 text-red-700 ring-red-200' },
+}
 
 const ordinal = (n: number) => {
   const v = n % 100
@@ -221,6 +245,8 @@ export function InsightProfileView() {
 
   const income = profile.income
   const expenses = profile.expenses
+  const aff = profile.affordability
+  const affStyle = AFFORDABILITY_RATING[aff.rating]
   const evidence = EVIDENCE_BY_SOURCE[profile.source] ?? EVIDENCE_BY_SOURCE.statement_upload
   const status = score?.status
   const badge = status ? STATUS_BADGE[status] : null
@@ -341,6 +367,103 @@ export function InsightProfileView() {
             </ul>
           )}
         </Card>
+      </div>
+
+      {/* ── Affordability ─────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-lg font-semibold text-gray-900">Affordability</h2>
+            <InfoTooltip label="How affordability is calculated">
+              Worked out from take-home income and real monthly outgoings: what is left after
+              essential costs, how rent compares to income, and whether a 20% income drop could be
+              absorbed.
+            </InfoTooltip>
+          </div>
+          <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium ring-1', affStyle.badge)}>
+            {affStyle.label}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-gray-500">
+          Based on take-home income of {formatCurrency(aff.monthlyIncome)}/month
+          {aff.incomeIsVariable && ' (income varies month to month)'}
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg bg-gray-50 px-4 py-3">
+            <p className="text-sm text-gray-500">Disposable after essentials</p>
+            <p className="mt-0.5 text-2xl font-semibold tabular-nums text-gray-900">
+              {formatCurrency(aff.disposableIncome)}
+              <span className="text-sm font-normal text-gray-400">/mo</span>
+            </p>
+          </div>
+          <div className="rounded-lg bg-gray-50 px-4 py-3">
+            <p className="text-sm text-gray-500">Surplus after all spending</p>
+            <p
+              className={cn(
+                'mt-0.5 text-2xl font-semibold tabular-nums',
+                aff.surplusAfterAll >= 0 ? 'text-emerald-600' : 'text-rose-600'
+              )}
+            >
+              {aff.surplusAfterAll >= 0 ? '+' : ''}
+              {formatCurrency(aff.surplusAfterAll)}
+              <span className="text-sm font-normal text-gray-400">/mo</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {aff.ratios.rentToIncome !== null && (
+            <RatioBar label="Rent to income" value={aff.ratios.rentToIncome} good={0.35} warn={0.45} />
+          )}
+          <RatioBar label="Essential costs to income" value={aff.ratios.essentialsToIncome} good={0.6} warn={0.8} />
+          {aff.debtRepayments > 0 && (
+            <RatioBar label="Debt repayments to income" value={aff.ratios.debtToIncome} good={0.1} warn={0.2} />
+          )}
+        </div>
+
+        <div className="mt-5 rounded-lg bg-brand/5 px-4 py-3 ring-1 ring-brand/10">
+          <p className="text-sm text-gray-600">Estimated maximum sustainable rent</p>
+          <p className="mt-0.5 text-xl font-semibold text-brand">
+            {formatCurrency(aff.maxAffordableRent)}
+            <span className="text-sm font-normal text-gray-400">/month</span>
+          </p>
+          {aff.currentRent !== null && (
+            <p className="mt-1 text-sm text-gray-500">
+              {aff.headroomForNewRent > 0
+                ? `About ${formatCurrency(aff.headroomForNewRent)}/month of headroom above the current ${formatCurrency(aff.currentRent)} rent.`
+                : `Currently paying ${formatCurrency(aff.currentRent)}, at or near the sustainable ceiling.`}
+            </p>
+          )}
+        </div>
+
+        <div
+          className={cn(
+            'mt-4 flex items-start gap-2 rounded-lg px-4 py-3 text-sm ring-1',
+            aff.stressTest.stillPositive
+              ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+              : 'bg-amber-50 text-amber-900 ring-amber-100'
+          )}
+        >
+          {aff.stressTest.stillPositive ? (
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          <div>
+            <span className="font-medium">Stress test: </span>
+            if income dropped {aff.stressTest.incomeDropPct}%, {stressMessage(aff.stressTest)}
+          </div>
+        </div>
+
+        <ul className="mt-4 space-y-1.5">
+          {aff.notes.map((n) => (
+            <li key={n} className="flex items-start gap-2 text-sm text-gray-600">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+              {n}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* ── 3. Follow-up questions ────────────────────────────────────────── */}
@@ -605,6 +728,39 @@ export function InsightProfileView() {
       <BreakdownDrawer spec={drawer} onClose={() => setDrawer(null)} />
     </div>
   )
+}
+
+function RatioBar({
+  label,
+  value,
+  good,
+  warn,
+}: {
+  label: string
+  value: number
+  good: number
+  warn: number
+}) {
+  const pct = Math.min(100, Math.round(value * 100))
+  const color = value <= good ? 'bg-emerald-500' : value <= warn ? 'bg-amber-500' : 'bg-rose-500'
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-gray-700">{label}</span>
+        <span className="font-medium tabular-nums text-gray-900">{pct}%</span>
+      </div>
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+        <div className={cn('h-full rounded-full', color)} style={{ width: `${Math.max(2, pct)}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function stressMessage(s: { surplusUnderStress: number; stillPositive: boolean; essentialsCovered: boolean }): string {
+  const gbp = formatCurrency(Math.abs(s.surplusUnderStress))
+  if (s.stillPositive) return `there would still be about ${gbp}/month spare.`
+  if (s.essentialsCovered) return `the monthly surplus would be gone, but essential costs would still be covered.`
+  return `essential costs would no longer be fully covered.`
 }
 
 function Field({ label, value }: { label: string; value: string }) {

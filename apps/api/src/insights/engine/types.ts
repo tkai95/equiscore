@@ -199,6 +199,43 @@ export interface OverallScore {
   limitingFactors: string[]
 }
 
+export type AffordabilityRating = 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
+
+/**
+ * Deterministic affordability read from take-home income and real outgoings.
+ * All figures are monthly. Income is net (what actually lands in the account),
+ * so thresholds are calibrated to take-home, not gross.
+ */
+export interface AffordabilityProfile {
+  monthlyIncome: number // net / take-home
+  essentialOutgoings: number // essential spend incl. rent
+  discretionarySpend: number
+  currentRent: number | null
+  debtRepayments: number // loan/credit repayments
+  fixedCommitments: number // all recurring commitments
+  disposableIncome: number // income − essentials
+  surplusAfterAll: number // income − all spend
+  ratios: {
+    rentToIncome: number | null // 0–1
+    debtToIncome: number // 0–1
+    commitmentsToIncome: number // 0–1
+    essentialsToIncome: number // 0–1
+  }
+  /** Highest rent this income could sustainably carry (conservative estimate). */
+  maxAffordableRent: number
+  /** How much more rent they could take on beyond what they pay now. */
+  headroomForNewRent: number
+  stressTest: {
+    incomeDropPct: number
+    surplusUnderStress: number
+    stillPositive: boolean
+    essentialsCovered: boolean
+  }
+  incomeIsVariable: boolean
+  rating: AffordabilityRating
+  notes: string[]
+}
+
 /** One calendar month of cashflow, for trend/best-month/surplus diagnostics. */
 export interface MonthlyPoint {
   month: string // "YYYY-MM"
@@ -226,6 +263,8 @@ export interface InsightProfile {
   overall: OverallScore
   /** Per-month cashflow series (oldest → newest). */
   monthly: MonthlyPoint[]
+  /** Deterministic affordability read (ratios, max affordable rent, stress test). */
+  affordability: AffordabilityProfile
   /** Plain-English, deterministic summary of the whole profile. */
   summary: string
   source: ProfileContext['source']

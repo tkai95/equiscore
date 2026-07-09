@@ -14,6 +14,7 @@ import { detectRecurringStreams } from './recurrence'
 import { analyzeIncome } from './income'
 import { analyzeExpenses, resolveCategory } from './expenses'
 import { analyzeCommitments } from './commitments'
+import { analyzeAffordability } from './affordability'
 import { detectRisk } from './risk'
 import { checkBalanceContinuity } from './integrity'
 import { generateQuestions } from './questions'
@@ -65,6 +66,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   })
 
   const monthly = computeMonthly(txns)
+  const affordability = analyzeAffordability(income, expenses, commitments, paymentBehaviour)
   const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
 
   return {
@@ -82,6 +84,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     transactionClarity: round2(transactionClarity),
     overall,
     monthly,
+    affordability,
     summary,
     source: ctx.source,
   }
