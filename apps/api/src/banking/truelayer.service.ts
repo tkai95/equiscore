@@ -202,6 +202,30 @@ export class TrueLayerService {
     return data.results?.[0] ?? null
   }
 
+  /**
+   * Revoke the customer's consent at TrueLayer, ending our access to their bank.
+   *
+   * Deleting our local copy of the data is not enough — the consent itself has
+   * to be withdrawn at the provider. Returns false rather than throwing so a
+   * disconnect always completes locally, even if the token is already dead.
+   */
+  async revokeConnection(accessToken: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/data/v1/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) {
+        this.logger.warn(`TrueLayer consent revocation failed: ${res.status} ${res.statusText}`)
+        return false
+      }
+      return true
+    } catch (err) {
+      this.logger.warn(`TrueLayer consent revocation errored: ${String(err)}`)
+      return false
+    }
+  }
+
   async getBalance(accessToken: string, accountId: string): Promise<number | null> {
     const response = await fetch(
       `${this.baseUrl}/data/v1/accounts/${accountId}/balance`,

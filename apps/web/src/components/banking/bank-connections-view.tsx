@@ -1,10 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { Landmark, RefreshCw, CheckCircle, AlertCircle, CreditCard, Building2, PiggyBank, Briefcase, ChevronRight } from 'lucide-react'
+import {
+  Landmark,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  CreditCard,
+  Building2,
+  PiggyBank,
+  Briefcase,
+  ChevronRight,
+  Unlink,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BankAccount {
@@ -17,10 +29,20 @@ interface BankAccount {
   currentBalance: number | null
   syncedAt: string | null
   bankConnection: {
+    id: string
+    providerName: string
     institutionName: string | null
     connectionStatus: string
     lastSyncedAt: string | null
   }
+}
+
+interface ConnectionGroup {
+  id: string
+  label: string
+  connectionStatus: string
+  lastSyncedAt: string | null
+  accounts: BankAccount[]
 }
 
 const ACCOUNT_TYPE_LABELS: Record<BankAccount['accountType'], string> = {
@@ -47,6 +69,31 @@ function formatDate(iso: string | null) {
   return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
 }
 
+/**
+ * Consent and access tokens live on the connection, not the account, so a bank
+ * is connected and disconnected as a whole. Grouping makes that obvious rather
+ * than offering a per-account control that would quietly remove its siblings.
+ */
+function groupByConnection(accounts: BankAccount[]): ConnectionGroup[] {
+  const groups = new Map<string, ConnectionGroup>()
+  for (const account of accounts) {
+    const c = account.bankConnection
+    const existing = groups.get(c.id)
+    if (existing) {
+      existing.accounts.push(account)
+      continue
+    }
+    groups.set(c.id, {
+      id: c.id,
+      label: c.institutionName ?? 'Connected bank',
+      connectionStatus: c.connectionStatus,
+      lastSyncedAt: c.lastSyncedAt,
+      accounts: [account],
+    })
+  }
+  return [...groups.values()]
+}
+
 interface Props {
   bankConnected: boolean
   bankError: boolean
@@ -55,6 +102,7 @@ interface Props {
 export function BankConnectionsView({ bankConnected, bankError }: Props) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['bank-accounts'],
@@ -82,6 +130,21 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
     },
   })
 
+  const disconnectMutation = useMutation({
+    mutationFn: async (connectionId: string) => {
+      const token = await getToken()
+      return api.banking.disconnect(token!, connectionId)
+    },
+    onSuccess: () => {
+      setConfirmingId(null)
+      // Removing bank data changes the score and every view derived from it.
+      for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts']]) {
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+    },
+  })
+
+  const connections = groupByConnection(accounts)
   const hasAccounts = accounts.length > 0
 
   return (
@@ -116,56 +179,132 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
           Something went wrong connecting your bank. Please try again.
         </div>
       )}
+      {disconnectMutation.isError && (
+        <div className="flex items-center gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+          We couldn&apos;t disconnect that bank. Please try again.
+        </div>
+      )}
 
-      {/* Accounts list */}
+      {/* Connections, grouped by bank */}
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(2)].map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+            <div key={i} className="h-40 animate-pulse rounded-2xl bg-gray-100" />
           ))}
         </div>
       ) : hasAccounts ? (
-        <div className="space-y-3">
-          {accounts.map((account) => {
-            const Icon = ACCOUNT_TYPE_ICONS[account.accountType]
+        <div className="space-y-5">
+          {connections.map((connection) => {
+            const isConfirming = confirmingId === connection.id
+            const isDisconnecting =
+              disconnectMutation.isPending && disconnectMutation.variables === connection.id
+
             return (
-              <Link
-                key={account.id}
-                href={`/dashboard/connections/${account.id}`}
-                className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md hover:ring-gray-200"
+              <div
+                key={connection.id}
+                className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cream">
-                  <Icon className="h-5 w-5 text-brand" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-gray-900">{account.accountName}</p>
-                  <p className="text-sm text-gray-500">
-                    {ACCOUNT_TYPE_LABELS[account.accountType]}
-                    {account.bankConnection.institutionName
-                      ? ` · ${account.bankConnection.institutionName}`
-                      : ''}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-400">
-                    Last synced: {formatDate(account.bankConnection.lastSyncedAt)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-gray-900">
-                    {formatBalance(account.currentBalance, account.currency)}
-                  </p>
+                {/* Bank header */}
+                <div className="flex items-center gap-4 border-b border-gray-100 px-5 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cream">
+                    <Landmark className="h-5 w-5 text-brand" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-gray-900">{connection.label}</p>
+                    <p className="text-xs text-gray-400">
+                      {connection.accounts.length}{' '}
+                      {connection.accounts.length === 1 ? 'account' : 'accounts'} · Last synced:{' '}
+                      {formatDate(connection.lastSyncedAt)}
+                    </p>
+                  </div>
                   <span
                     className={cn(
-                      'mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                      account.bankConnection.connectionStatus === 'active'
+                      'rounded-full px-2 py-0.5 text-xs font-medium',
+                      connection.connectionStatus === 'active'
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-amber-100 text-amber-700'
                     )}
                   >
-                    {account.bankConnection.connectionStatus}
+                    {connection.connectionStatus}
                   </span>
+                  {!isConfirming && (
+                    <button
+                      onClick={() => setConfirmingId(connection.id)}
+                      disabled={isDisconnecting}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Unlink className="h-4 w-4" />
+                      Disconnect
+                    </button>
+                  )}
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-              </Link>
+
+                {/* Confirmation */}
+                {isConfirming && (
+                  <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+                    <div className="flex gap-3">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-red-900">
+                          Disconnect {connection.label}?
+                        </p>
+                        <p className="mt-1 text-sm text-red-800">
+                          This withdraws Equiscore&apos;s access to your bank and permanently deletes{' '}
+                          {connection.accounts.length}{' '}
+                          {connection.accounts.length === 1 ? 'account' : 'accounts'} and their
+                          transaction history. Your trust score will be recalculated without this
+                          data, and is likely to fall.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            onClick={() => disconnectMutation.mutate(connection.id)}
+                            disabled={isDisconnecting}
+                            className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {isDisconnecting ? 'Disconnecting…' : 'Yes, disconnect'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            disabled={isDisconnecting}
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Accounts within this bank */}
+                <div className="divide-y divide-gray-50">
+                  {connection.accounts.map((account) => {
+                    const Icon = ACCOUNT_TYPE_ICONS[account.accountType]
+                    return (
+                      <Link
+                        key={account.id}
+                        href={`/dashboard/connections/${account.id}`}
+                        className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cream">
+                          <Icon className="h-4 w-4 text-brand" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-gray-900">{account.accountName}</p>
+                          <p className="text-sm text-gray-500">
+                            {ACCOUNT_TYPE_LABELS[account.accountType]}
+                          </p>
+                        </div>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {formatBalance(account.currentBalance, account.currency)}
+                        </p>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
             )
           })}
         </div>

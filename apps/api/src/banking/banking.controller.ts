@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Param, Post, Query, Redirect, UseGuards } from '@nestjs/common'
+import { Controller, Delete, Get, Logger, Param, Post, Query, Redirect, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -70,5 +70,17 @@ export class BankingController {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     const synced = await this.bankingService.syncAllForUser(dbUser.id)
     return { synced }
+  }
+
+  @Delete('connections/:connectionId')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disconnect a bank: revoke consent and delete its accounts and transactions' })
+  async disconnect(
+    @CurrentUser() user: RequestUser,
+    @Param('connectionId') connectionId: string,
+  ) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.bankingService.disconnect(dbUser.id, connectionId)
   }
 }

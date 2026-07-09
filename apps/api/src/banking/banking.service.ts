@@ -266,10 +266,66 @@ export class BankingService {
       },
       include: {
         bankConnection: {
-          select: { institutionName: true, connectionStatus: true, lastSyncedAt: true },
+          select: {
+            id: true,
+            providerName: true,
+            institutionName: true,
+            connectionStatus: true,
+            lastSyncedAt: true,
+          },
         },
       },
     })
+  }
+
+  /**
+   * Disconnect a bank: withdraw consent at the provider, then delete everything
+   * we hold for it.
+   *
+   * Consent is revoked *before* the row is dropped, because the tokens needed to
+   * revoke it live on that row. Revocation is best-effort — if the token has
+   * already expired there is nothing left to revoke, and the customer's right to
+   * have their data deleted must not depend on a third party being reachable.
+   *
+   * Deleting the connection cascades to its accounts, transactions, direct
+   * debits and standing orders (see schema.prisma).
+   */
+  async disconnect(userId: string, connectionId: string) {
+    const connection = await db.bankConnection.findFirst({
+      where: { id: connectionId, userId },
+      include: { _count: { select: { bankAccounts: true } } },
+    })
+    if (!connection) throw new NotFoundException('Bank connection not found')
+
+    let consentRevoked = false
+    try {
+      const token = await this.getFreshToken(connection)
+      consentRevoked = await this.trueLayer.revokeConnection(token)
+    } catch (err) {
+      this.logger.warn(`Could not revoke consent for connection ${connectionId}: ${String(err)}`)
+    }
+
+    await db.bankConnection.delete({ where: { id: connectionId } })
+
+    this.audit.log(userId, 'bank.disconnected', {
+      connectionId,
+      institutionName: connection.institutionName,
+      accountsRemoved: connection._count.bankAccounts,
+      consentRevoked,
+    })
+
+    // Removing bank data changes the score — recompute so the profile stays truthful.
+    try {
+      await this.scoringService.recompute(userId)
+    } catch (err) {
+      this.logger.warn(`Score recompute failed after disconnect: ${String(err)}`)
+    }
+
+    return {
+      disconnected: true,
+      consentRevoked,
+      accountsRemoved: connection._count.bankAccounts,
+    }
   }
 
   async getAccountTransactions(userId: string, accountId: string) {

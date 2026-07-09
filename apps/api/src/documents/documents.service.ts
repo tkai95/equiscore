@@ -1,19 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import type { DocumentType } from '@equiscore/shared'
 import { AuditService } from '../audit/audit.service'
+import { ScoringService } from '../scoring/scoring.service'
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name)
   private s3: S3Client
   private bucket: string
 
   constructor(
     private readonly config: ConfigService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly scoringService: ScoringService
   ) {
     const projectRef = config.get<string>('SUPABASE_PROJECT_REF') ?? ''
     this.bucket = config.get<string>('SUPABASE_STORAGE_BUCKET') ?? 'equiscore-documents'
@@ -82,6 +85,9 @@ export class DocumentsService {
       mimeType,
     })
 
+    // Adding evidence changes the score — recompute so the profile stays truthful.
+    await this.recomputeQuietly(userId, 'document upload')
+
     return doc
   }
 
@@ -109,6 +115,22 @@ export class DocumentsService {
       documentType: doc.documentType,
     })
 
+    // Removing evidence must never leave a score that still counts it.
+    await this.recomputeQuietly(userId, 'document deletion')
+
     return deleted
+  }
+
+  /**
+   * Any change to the evidence a user holds invalidates their current score.
+   * Recompute is best-effort: a scoring failure must not roll back the user's
+   * upload or, more importantly, their deletion.
+   */
+  private async recomputeQuietly(userId: string, reason: string): Promise<void> {
+    try {
+      await this.scoringService.recompute(userId)
+    } catch (err) {
+      this.logger.warn(`Score recompute failed after ${reason}: ${String(err)}`)
+    }
   }
 }

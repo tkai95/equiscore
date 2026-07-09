@@ -412,9 +412,28 @@ model TrustScore {
   overallTier             TrustTier     @map("overall_tier")
   fraudRisk               FraudRisk     @map("fraud_risk")
   reasonCodes             Json          @map("reason_codes")
-  computedAt              DateTime      @default(now()) @map("computed_at")
+
+  // ── Freshness ───────────────────────────────────────────────────────────────
+  // A score is an attestation about evidence up to a point in time. Validity is
+  // anchored to the latest date the *evidence* covers, never to when it was
+  // uploaded or computed — an old statement uploaded today buys no freshness.
+  financialDataAsOf DateTime? @map("financial_data_as_of")
+  validUntil        DateTime? @map("valid_until")
+
+  // Which evidence sources backed this score, and their status at computation.
+  // Lets a recipient view detect a score whose evidence has since disappeared.
+  evidenceManifest Json? @map("evidence_manifest")
+
+  // Non-raw feature summary, written at computation time. This is what allows a
+  // historical score to stay explainable after its raw evidence is deleted —
+  // it cannot be reconstructed later, so it must be captured here.
+  featureSnapshot Json? @map("feature_snapshot")
+
+  computedAt DateTime @default(now()) @map("computed_at")
 
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Retained as the snapshot that was current when the link was created (audit).
+  // Recipient views resolve the applicant's *latest* score, never this one.
   sharedProfiles SharedProfile[]
 
   @@index([userId, computedAt])

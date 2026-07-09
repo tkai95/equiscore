@@ -42,6 +42,12 @@ export const api = {
       apiFetch(`/open-banking/accounts/${accountId}/transactions`, {}, token),
     sync: (token: string) =>
       apiFetch<{ synced: number }>('/open-banking/sync', { method: 'POST' }, token),
+    disconnect: (token: string, connectionId: string) =>
+      apiFetch<{ disconnected: boolean; consentRevoked: boolean; accountsRemoved: number }>(
+        `/open-banking/connections/${connectionId}`,
+        { method: 'DELETE' },
+        token
+      ),
   },
   documents: {
     list: (token: string) => apiFetch('/documents', {}, token),

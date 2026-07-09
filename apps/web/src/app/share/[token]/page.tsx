@@ -3,10 +3,20 @@ import { api } from '@/lib/api'
 import { formatDate, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
-import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react'
+import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle, Clock } from 'lucide-react'
+
+type ScoreDisplayStatus =
+  | 'current'
+  | 'expiring_soon'
+  | 'expired'
+  | 'evidence_withdrawn'
+  | 'insufficient_evidence'
 
 interface PublicProfile {
   applicantName: string | null
+  status: ScoreDisplayStatus
+  isCurrent: boolean
+  statusMessage: string
   trustTier: TrustTier
   overallScore: number
   verificationStrength: number
@@ -23,7 +33,24 @@ interface PublicProfile {
     weight: number
   }>
   computedAt: string
+  financialDataAsOf: string | null
+  validUntil: string | null
   expiresAt: string
+}
+
+/**
+ * Each state is worded so an expired or withdrawn profile never reads as
+ * suspicious. Old evidence is simply old; withdrawing consent is a right.
+ */
+const STATUS_BADGE: Record<ScoreDisplayStatus, { label: string; className: string }> = {
+  current: { label: 'Current profile', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  expiring_soon: { label: 'Expiring soon', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  expired: { label: 'Expired', className: 'bg-gray-100 text-gray-600 ring-gray-300' },
+  evidence_withdrawn: { label: 'No longer current', className: 'bg-gray-100 text-gray-600 ring-gray-300' },
+  insufficient_evidence: {
+    label: 'Not financially verified',
+    className: 'bg-gray-100 text-gray-600 ring-gray-300',
+  },
 }
 
 const SCORE_DIMENSIONS = [
@@ -63,6 +90,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
   const tierColorClass = TIER_COLORS[profile.trustTier]
   const positiveReasons = profile.reasonCodes.filter((r) => r.sentiment === 'positive').slice(0, 5)
   const negativeReasons = profile.reasonCodes.filter((r) => r.sentiment === 'negative').slice(0, 3)
+  const badge = STATUS_BADGE[profile.status]
 
   return (
     <div className="min-h-screen bg-cream">
@@ -73,15 +101,50 @@ export default async function PublicProfilePage({ params }: { params: { token: s
             <ShieldCheck className="h-6 w-6 text-brand" />
             <span className="text-lg font-bold text-gray-900">Equiscore</span>
           </div>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-            Verified profile
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${badge.className}`}>
+            {badge.label}
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+        {/* Freshness banner — impossible to miss when the score is not current */}
+        {!profile.isCurrent && (
+          <div className="flex items-start gap-3 rounded-2xl bg-gray-100 px-5 py-4 ring-1 ring-gray-300">
+            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+            <div>
+              <p className="font-semibold text-gray-900">
+                {profile.status === 'expired'
+                  ? 'This score has expired'
+                  : profile.status === 'evidence_withdrawn'
+                    ? 'This profile is no longer current'
+                    : 'This profile is not backed by financial evidence'}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">{profile.statusMessage}</p>
+              {profile.financialDataAsOf && (
+                <p className="mt-1 text-sm text-gray-500">
+                  Based on financial evidence up to {formatDate(profile.financialDataAsOf)}.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        {profile.status === 'expiring_soon' && profile.validUntil && (
+          <div className="flex items-start gap-3 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200">
+            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-900">
+                Still current, but expires {formatDate(profile.validUntil)}
+              </p>
+              <p className="mt-1 text-sm text-amber-800">{profile.statusMessage}</p>
+            </div>
+          </div>
+        )}
+
         {/* Hero */}
-        <div className={`rounded-2xl border-2 p-8 ${tierColorClass}`}>
+        <div
+          className={`rounded-2xl border-2 p-8 ${tierColorClass} ${!profile.isCurrent ? 'opacity-60' : ''}`}
+        >
           <p className="mb-1 text-sm font-medium text-gray-500">Trust profile for</p>
           <h1 className="mb-4 text-2xl font-bold text-gray-900">
             {profile.applicantName ?? 'Applicant'}
@@ -149,11 +212,25 @@ export default async function PublicProfilePage({ params }: { params: { token: s
           </div>
         )}
 
-        {/* Metadata */}
+        {/* Metadata — evidence coverage, computation, score validity and link access
+            are four distinct facts and are never collapsed into one date. */}
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
           <div className="grid gap-2 text-sm sm:grid-cols-2">
             <div className="text-gray-500">
-              Score computed: <span className="font-medium text-gray-900">{formatDate(profile.computedAt)}</span>
+              Financial evidence up to:{' '}
+              <span className="font-medium text-gray-900">
+                {profile.financialDataAsOf ? formatDate(profile.financialDataAsOf) : 'No financial evidence'}
+              </span>
+            </div>
+            <div className="text-gray-500">
+              Score computed:{' '}
+              <span className="font-medium text-gray-900">{formatDate(profile.computedAt)}</span>
+            </div>
+            <div className="text-gray-500">
+              {profile.isCurrent ? 'Score valid until:' : 'Score expired:'}{' '}
+              <span className="font-medium text-gray-900">
+                {profile.validUntil ? formatDate(profile.validUntil) : '—'}
+              </span>
             </div>
             <div className="text-gray-500">
               Link expires: <span className="font-medium text-gray-900">{formatDate(profile.expiresAt)}</span>
@@ -163,8 +240,8 @@ export default async function PublicProfilePage({ params }: { params: { token: s
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400">
-          This report was generated by Equiscore and is provided for reference only.
-          Scores are based on self-declared and open banking data at the time of assessment.
+          This report was generated by Equiscore and is provided for reference only. A score is valid for
+          up to three months from the latest date its financial evidence covers.
         </p>
       </main>
     </div>
