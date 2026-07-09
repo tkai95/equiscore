@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { buildInsightProfile } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
@@ -15,11 +15,37 @@ import { AuditService } from '../audit/audit.service'
 import type { PreviewProfileDto } from './insights.dto'
 
 @Injectable()
-export class InsightsService {
+export class InsightsService implements OnModuleInit {
+  private readonly logger = new Logger(InsightsService.name)
+
   constructor(
     private readonly scoringService: ScoringService,
     private readonly audit: AuditService
   ) {}
+
+  /**
+   * On boot, any import still "processing" belongs to a process that has since
+   * died (a deploy or crash killed its in-memory promise), so it can never
+   * finish. Mark those older than a few minutes as failed so the user sees a
+   * clear "try again" instead of a spinner that never resolves. The age guard
+   * avoids racing a job a sibling instance genuinely started seconds ago.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      const cutoff = new Date(Date.now() - 3 * 60 * 1000)
+      const reaped = await db.statementImportJob.updateMany({
+        where: { status: 'processing', createdAt: { lt: cutoff } },
+        data: {
+          status: 'failed',
+          error: 'The import was interrupted. Please try uploading again.',
+          completedAt: new Date(),
+        },
+      })
+      if (reaped.count > 0) this.logger.warn(`Reaped ${reaped.count} orphaned import job(s) on boot`)
+    } catch (err) {
+      this.logger.error(`Import-job reaper failed: ${err instanceof Error ? err.message : err}`)
+    }
+  }
 
   /**
    * Build a profile straight from posted transactions — no database, no
@@ -107,15 +133,23 @@ export class InsightsService {
   }
 
   private async runPdfImportJob(jobId: string, userId: string, pdfBuffer: Buffer): Promise<void> {
+    const startedAt = Date.now()
+    this.logger.log(`Import ${jobId}: reading PDF (${(pdfBuffer.length / 1024).toFixed(0)} KB)`)
     try {
       const apiKey = process.env['ANTHROPIC_API_KEY']
       if (!apiKey) throw new Error('Statement reading is not available right now.')
 
       const extraction = await extractTransactionsFromPdf(apiKey, pdfBuffer.toString('base64'))
+      this.logger.log(
+        `Import ${jobId}: extracted ${extraction.transactions.length} txns in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`
+      )
 
       // Cancelled during the slow read? Stop before persisting anything.
       const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
-      if (!current || current.status === 'cancelled') return
+      if (!current || current.status === 'cancelled') {
+        this.logger.log(`Import ${jobId}: cancelled, discarding result`)
+        return
+      }
 
       if (extraction.transactions.length === 0) {
         throw new Error(
@@ -134,23 +168,22 @@ export class InsightsService {
         where: { id: jobId },
         data: { status: 'completed', result: result as never, completedAt: new Date() },
       })
+      this.logger.log(`Import ${jobId}: completed in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong reading the statement.'
+      this.logger.error(`Import ${jobId}: failed after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${message}`)
       await db.statementImportJob
         .update({
           where: { id: jobId },
-          data: {
-            status: 'failed',
-            error: err instanceof Error ? err.message : 'Something went wrong reading the statement.',
-            completedAt: new Date(),
-          },
+          data: { status: 'failed', error: message, completedAt: new Date() },
         })
         .catch(() => undefined)
     }
   }
 
-  // Generous vs. a real read (30–90s): only a genuinely dead job (e.g. the
-  // container restarted and lost the in-process promise) should trip this.
-  private static readonly JOB_STALE_MS = 8 * 60 * 1000
+  // The extractor self-aborts at 5 min, so a live read always resolves (complete
+  // or failed) well within this. Reaching it means the job is genuinely orphaned.
+  private static readonly JOB_STALE_MS = 6 * 60 * 1000
 
   /** A job stuck "processing" past the timeout (e.g. a container restart) reads as failed. */
   private withStaleness<T extends { status: string; createdAt: Date }>(job: T): T {

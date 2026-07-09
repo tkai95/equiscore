@@ -495,8 +495,8 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                   Reading your statement…
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  This usually takes under a minute. You can leave this page or close the tab — we&apos;ll
-                  show a ✓ up top when it&apos;s done.
+                  Reading a full statement can take a couple of minutes. You can leave this page or
+                  close the tab, and we&apos;ll show a ✓ up top when it&apos;s done.
                 </p>
                 <button
                   onClick={() => cancelMut.mutate(activeJob.id)}

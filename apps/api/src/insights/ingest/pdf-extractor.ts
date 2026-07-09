@@ -58,27 +58,49 @@ export async function extractTransactionsFromPdf(
 ): Promise<PdfExtractionResult> {
   const client = new Anthropic({ apiKey })
 
-  // Stream so a large statement's output can't hit an HTTP timeout.
-  // Sonnet 5: native PDF (typed + scanned), adaptive thinking on by default,
-  // cheaper than Opus. The balance-continuity check downstream guards accuracy.
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-5',
-    max_tokens: 32000,
-    messages: [
+  // A hung model call must never leave the import "processing" forever — abort
+  // after a generous ceiling and surface a clean, retryable error instead.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+
+  let message
+  try {
+    // Stream so a large statement's output can't hit an HTTP timeout.
+    // Sonnet 5: native PDF (typed + scanned), cheaper than Opus. Thinking is
+    // OFF: this is mechanical structured extraction, not reasoning, so thinking
+    // only adds latency; the balance-continuity check downstream guards accuracy.
+    const stream = client.messages.stream(
       {
-        role: 'user',
-        content: [
+        model: 'claude-sonnet-5',
+        // A full statement can run to hundreds of transactions; 32k truncated the
+        // JSON mid-array (a parse failure that reads as "couldn't read reliably").
+        // 64k is Sonnet 5's output ceiling and covers ~1,000+ transactions.
+        max_tokens: 64000,
+        thinking: { type: 'disabled' },
+        messages: [
           {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf },
+            role: 'user',
+            content: [
+              {
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf },
+              },
+              { type: 'text', text: EXTRACTION_PROMPT },
+            ],
           },
-          { type: 'text', text: EXTRACTION_PROMPT },
         ],
       },
-    ],
-  })
-
-  const message = await stream.finalMessage()
+      { signal: controller.signal }
+    )
+    message = await stream.finalMessage()
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error('The statement took too long to read. Please try again, or use a CSV export.')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (message.stop_reason === 'refusal') {
     throw new Error('The statement could not be processed.')

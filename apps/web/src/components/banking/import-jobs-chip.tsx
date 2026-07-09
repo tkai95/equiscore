@@ -7,9 +7,9 @@ import { CheckCircle2, Loader2, XCircle, X } from 'lucide-react'
 import { useImportJobs } from '@/lib/use-import-jobs'
 
 const DISMISS_KEY = 'equiscore.dismissedImportJobs'
-// A completed/failed job only shows as a fresh notification for a short window;
-// after that it's just history and lives on the Connections page.
-const RECENT_MS = 10 * 60 * 1000
+// A completed/failed job shows as a fresh notification for a while after it
+// finishes, so a slow read that lands while you're on another page isn't missed.
+const RECENT_MS = 30 * 60 * 1000
 
 function loadDismissed(): Set<string> {
   if (typeof window === 'undefined') return new Set()
