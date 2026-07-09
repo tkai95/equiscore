@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
@@ -9,6 +10,7 @@ import { MonthlyFlowChart } from './monthly-flow-chart'
 import { TopMerchants } from './top-merchants'
 import { InsightsCard } from './insights-card'
 import { InsightProfileView } from './insight-profile-view'
+import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
 interface MonthlyPoint {
   month: string
@@ -68,6 +70,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 export function AnalyticsOverview() {
   const { getToken } = useAuth()
+  const [monthDrawer, setMonthDrawer] = useState<DrawerSpec | null>(null)
 
   // Shares the ['insight-profile'] cache with InsightProfileView, so the monthly
   // trends come from the same deterministic engine as everything above — one
@@ -181,9 +184,15 @@ export function AnalyticsOverview() {
 
             {/* Income vs expenses */}
             <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-              <h3 className="mb-4 text-sm font-semibold text-gray-700">Income vs expenses</h3>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Income vs expenses</h3>
+                <span className="text-xs text-gray-400">Tap a month for detail</span>
+              </div>
               <MonthlyFlowChart
                 data={monthly.map((m) => ({ month: m.month, income: m.income, expenses: m.spend, net: m.net }))}
+                onSelectMonth={(m) =>
+                  setMonthDrawer({ type: 'month', key: m, title: monthLabel(m), subtitle: 'Cashflow for this month' })
+                }
               />
             </div>
           </div>
@@ -214,6 +223,8 @@ export function AnalyticsOverview() {
           </p>
         </div>
       )}
+
+      <BreakdownDrawer spec={monthDrawer} onClose={() => setMonthDrawer(null)} />
     </div>
   )
 }

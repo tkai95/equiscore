@@ -1,18 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import {
   CheckCircle2,
-  XCircle,
   HelpCircle,
   AlertTriangle,
   ShieldCheck,
   Clock,
+  ChevronRight,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
+import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
 // Mirrors the InsightProfile shape returned by GET /insights/profile.
 type Rating = 'strong' | 'moderate' | 'medium' | 'limited'
@@ -39,6 +41,7 @@ interface InsightProfile {
   }
   commitments: Array<{
     name: string
+    key: string
     amount: number
     cadence: string
     typicalDayOfMonth: number | null
@@ -205,6 +208,7 @@ function Card({
 
 export function InsightProfileView() {
   const { getToken } = useAuth()
+  const [drawer, setDrawer] = useState<DrawerSpec | null>(null)
   const { data: profile, isLoading } = useQuery<InsightProfile | null>({
     queryKey: ['insight-profile'],
     queryFn: async () => {
@@ -492,8 +496,24 @@ export function InsightProfileView() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {profile.commitments.map((c) => (
-                  <tr key={c.name}>
-                    <td className="py-2.5 font-medium text-gray-800">{c.name}</td>
+                  <tr
+                    key={c.name}
+                    onClick={() =>
+                      setDrawer({
+                        type: 'commitment',
+                        key: c.key,
+                        title: c.name,
+                        subtitle: `${cadenceLabel(c.cadence)} commitment · payment history`,
+                      })
+                    }
+                    className="cursor-pointer transition-colors hover:bg-gray-50"
+                  >
+                    <td className="py-2.5 font-medium text-gray-800">
+                      <span className="flex items-center gap-1">
+                        {c.name}
+                        <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                      </span>
+                    </td>
                     <td className="py-2.5 text-right tabular-nums text-gray-700">
                       {formatCurrency(c.amount)}
                     </td>
@@ -533,12 +553,18 @@ export function InsightProfileView() {
             / month · {Math.round(expenses.essentialShare * 100)}% essential
           </span>
         </div>
-        <div className="mt-4 space-y-2.5">
+        <div className="mt-4 space-y-1">
           {expenses.categories.slice(0, 8).map((c) => (
-            <div key={c.key} className="grid grid-cols-[8rem_1fr_auto] items-center gap-3">
-              <span className="truncate text-xs text-gray-600" title={c.label}>
-                {c.label}
-                {c.unconfirmed && <span className="ml-1 text-amber-500">•</span>}
+            <button
+              key={c.key}
+              onClick={() =>
+                setDrawer({ type: 'category', key: c.key, title: c.label, subtitle: 'Spending category' })
+              }
+              className="grid w-full grid-cols-[8rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-gray-50"
+            >
+              <span className="flex items-center gap-1 truncate text-xs text-gray-600" title={c.label}>
+                <span className="truncate">{c.label}</span>
+                {c.unconfirmed && <span className="text-amber-500">•</span>}
               </span>
               <span className="h-2 rounded-full bg-gray-100">
                 <span
@@ -546,10 +572,11 @@ export function InsightProfileView() {
                   style={{ width: `${Math.max(2, Math.round(c.share * 100))}%` }}
                 />
               </span>
-              <span className="text-xs tabular-nums text-gray-500">
+              <span className="flex items-center gap-1 text-xs tabular-nums text-gray-500">
                 {formatCurrency(c.monthlyAverage)}
+                <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
               </span>
-            </div>
+            </button>
           ))}
         </div>
         <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
@@ -614,6 +641,8 @@ export function InsightProfileView() {
           </p>
         )}
       </Card>
+
+      <BreakdownDrawer spec={drawer} onClose={() => setDrawer(null)} />
     </div>
   )
 }

@@ -103,6 +103,8 @@ export interface ExpenseProfile {
 
 export interface Commitment {
   name: string
+  /** Normalised counterparty key — used to fetch this commitment's payments. */
+  key: string
   category: TransactionCategory
   amount: number // typical (median) amount
   cadence: Cadence

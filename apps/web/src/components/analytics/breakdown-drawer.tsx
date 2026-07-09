@@ -1,0 +1,155 @@
+'use client'
+
+import { useAuth } from '@clerk/nextjs'
+import { useQuery } from '@tanstack/react-query'
+import { api, type Breakdown, type TxnRow } from '@/lib/api'
+import { Drawer } from '@/components/ui/drawer'
+import { formatCurrency, formatDate } from '@/lib/utils'
+
+export interface DrawerSpec {
+  type: 'category' | 'commitment' | 'month'
+  key: string
+  title: string
+  subtitle?: string
+}
+
+export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; onClose: () => void }) {
+  const { getToken } = useAuth()
+  const { data, isLoading } = useQuery<Breakdown>({
+    queryKey: ['breakdown', spec?.type, spec?.key],
+    enabled: !!spec,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const token = await getToken()
+      return api.insights.getBreakdown(token!, spec!.type, spec!.key)
+    },
+  })
+
+  return (
+    <Drawer
+      open={!!spec}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+      title={spec?.title ?? ''}
+      subtitle={spec?.subtitle}
+    >
+      {isLoading || !data ? (
+        <div className="space-y-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-10 animate-pulse rounded-lg bg-gray-100" />
+          ))}
+        </div>
+      ) : data.kind === 'category' ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Monthly avg" value={formatCurrency(data.monthlyAverage)} />
+            <Stat label="Total" value={formatCurrency(data.total)} />
+            <Stat label="Payments" value={String(data.transactionCount)} />
+          </div>
+          {data.merchants.length > 0 && (
+            <Section title="Top merchants">
+              <div className="space-y-1.5">
+                {data.merchants.map((m) => (
+                  <div key={m.name} className="flex items-center justify-between text-sm">
+                    <span className="min-w-0 truncate text-gray-700">{m.name}</span>
+                    <span className="shrink-0 tabular-nums text-gray-500">
+                      {formatCurrency(m.total)}
+                      <span className="ml-1 text-xs text-gray-400">×{m.count}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+          <Section title={`Transactions (${data.transactionCount})`}>
+            <TxnList rows={data.transactions} />
+          </Section>
+        </div>
+      ) : data.kind === 'commitment' ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Typical" value={formatCurrency(data.typicalAmount)} />
+            <Stat label="Total paid" value={formatCurrency(data.total)} />
+            <Stat label="Payments" value={String(data.count)} />
+          </div>
+          <Section title="Payment history">
+            <TxnList rows={data.transactions} />
+          </Section>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="In" value={formatCurrency(data.income)} tone="in" />
+            <Stat label="Out" value={formatCurrency(data.spend)} tone="out" />
+            <Stat
+              label="Net"
+              value={`${data.net >= 0 ? '+' : ''}${formatCurrency(data.net)}`}
+              tone={data.net >= 0 ? 'in' : 'out'}
+            />
+          </div>
+          {data.categories.length > 0 && (
+            <Section title="Where it went">
+              <div className="space-y-1.5">
+                {data.categories.map((c) => (
+                  <div key={c.label} className="flex items-center justify-between text-sm">
+                    <span className="min-w-0 truncate text-gray-700">{c.label}</span>
+                    <span className="shrink-0 tabular-nums text-gray-500">{formatCurrency(c.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+          {data.largest.length > 0 && (
+            <Section title="Largest payments">
+              <TxnList rows={data.largest} />
+            </Section>
+          )}
+        </div>
+      )}
+    </Drawer>
+  )
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'in' | 'out' }) {
+  return (
+    <div className="rounded-lg bg-gray-50 px-3 py-2.5">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p
+        className={`mt-0.5 text-sm font-semibold tabular-nums ${
+          tone === 'in' ? 'text-emerald-600' : tone === 'out' ? 'text-rose-600' : 'text-gray-900'
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</h3>
+      {children}
+    </div>
+  )
+}
+
+function TxnList({ rows }: { rows: TxnRow[] }) {
+  if (rows.length === 0) return <p className="text-sm text-gray-400">No transactions found.</p>
+  return (
+    <div className="divide-y divide-gray-50">
+      {rows.map((t, i) => (
+        <div key={`${t.date}-${i}`} className="flex items-center justify-between gap-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm text-gray-700">{t.description || 'Transaction'}</p>
+            <p className="text-xs text-gray-400">{formatDate(t.date)}</p>
+          </div>
+          <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+            {formatCurrency(t.amount)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}

@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Get,
   Param,
+  Query,
   Post,
   HttpCode,
   UseGuards,
@@ -72,6 +73,21 @@ export class InsightsController {
   async profile(@CurrentUser() user: RequestUser) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     return this.insights.getProfileForUser(dbUser.id)
+  }
+
+  /** Drill-down behind a category, commitment, or month (the click-through drawers). */
+  @Get('breakdown')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Transactions and sub-aggregates behind a category, commitment, or month' })
+  async breakdown(
+    @CurrentUser() user: RequestUser,
+    @Query('type') type: string,
+    @Query('key') key: string
+  ) {
+    if (!type || !key) throw new BadRequestException('type and key are required')
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.getBreakdown(dbUser.id, type, key)
   }
 
   /**

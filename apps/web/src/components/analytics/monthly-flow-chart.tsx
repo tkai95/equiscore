@@ -79,7 +79,13 @@ function CustomTooltip({
   )
 }
 
-export function MonthlyFlowChart({ data }: { data: MonthSummary[] }) {
+export function MonthlyFlowChart({
+  data,
+  onSelectMonth,
+}: {
+  data: MonthSummary[]
+  onSelectMonth?: (monthKey: string) => void
+}) {
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-gray-400">
@@ -89,6 +95,7 @@ export function MonthlyFlowChart({ data }: { data: MonthSummary[] }) {
   }
 
   const chartData = data.map((d) => ({
+    key: d.month,
     month: formatMonthKey(d.month),
     Income: d.income,
     Expenses: d.expenses,
@@ -96,7 +103,17 @@ export function MonthlyFlowChart({ data }: { data: MonthSummary[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={chartData} barCategoryGap="30%" barGap={4}>
+      <BarChart
+        data={chartData}
+        barCategoryGap="30%"
+        barGap={4}
+        onClick={(state) => {
+          const key = (state as { activePayload?: Array<{ payload?: { key?: string } }> })
+            ?.activePayload?.[0]?.payload?.key
+          if (key && onSelectMonth) onSelectMonth(key)
+        }}
+        className={onSelectMonth ? 'cursor-pointer' : undefined}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
         <XAxis
           dataKey="month"

@@ -5,6 +5,10 @@ import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
 import { extractTransactionsFromPdf } from './ingest/pdf-extractor'
 import { checkBalanceContinuity } from './engine/integrity'
+import { classify } from './engine/classify'
+import { resolveCategory } from './engine/expenses'
+import { normalizeCounterparty } from './engine/normalize'
+import { monthKey, toDate, round2 } from './engine/util'
 import { classifyTransaction } from '../banking/transaction-classifier'
 import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
@@ -339,5 +343,130 @@ export class InsightsService {
     }
 
     return buildInsightProfile(txns, ctx)
+  }
+
+  private async loadNormalizedTxns(userId: string): Promise<NormalizedTxn[]> {
+    const rows = await db.bankTransaction.findMany({
+      where: { bankAccount: { bankConnection: { userId } } },
+      orderBy: { bookedAt: 'desc' },
+      select: { bookedAt: true, amount: true, direction: true, description: true, merchantName: true },
+    })
+    return rows.map((t) => ({
+      date: t.bookedAt.toISOString().slice(0, 10),
+      amount: Math.abs(t.amount),
+      direction: t.direction,
+      description: t.description,
+      merchantName: t.merchantName,
+      balance: null,
+    }))
+  }
+
+  /**
+   * Drill-down behind a summary row: the transactions (and sub-aggregates) that
+   * make up a spend category, a recurring commitment, or a single month. Uses
+   * the exact same classification the profile does, so a drawer always
+   * reconciles with the card it opened from.
+   */
+  async getBreakdown(userId: string, type: string, key: string) {
+    const txns = await this.loadNormalizedTxns(userId)
+    const months = new Set(txns.map((t) => monthKey(toDate(t.date)))).size || 1
+    if (type === 'category') return this.categoryBreakdown(txns, key, months)
+    if (type === 'commitment') return this.commitmentBreakdown(txns, key)
+    if (type === 'month') return this.monthBreakdown(txns, key)
+    throw new BadRequestException('Unknown breakdown type')
+  }
+
+  private merchantName(t: NormalizedTxn): string {
+    return t.merchantName?.trim() || t.description?.trim() || 'Unknown'
+  }
+
+  private categoryBreakdown(txns: NormalizedTxn[], key: string, months: number) {
+    const debits = txns.filter((t) => t.direction === 'debit')
+    const matches = debits.filter((t) => resolveCategory(t, classify(t)).key === key)
+    const label = matches[0] ? resolveCategory(matches[0], classify(matches[0])).label : key
+    const total = matches.reduce((s, t) => s + t.amount, 0)
+
+    const merchantMap = new Map<string, { total: number; count: number }>()
+    for (const t of matches) {
+      const name = this.merchantName(t)
+      const m = merchantMap.get(name) ?? { total: 0, count: 0 }
+      m.total += t.amount
+      m.count++
+      merchantMap.set(name, m)
+    }
+    const merchants = [...merchantMap.entries()]
+      .map(([name, m]) => ({ name, total: round2(m.total), count: m.count }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+
+    return {
+      kind: 'category' as const,
+      key,
+      label,
+      total: round2(total),
+      monthlyAverage: round2(total / months),
+      transactionCount: matches.length,
+      merchants,
+      transactions: matches.slice(0, 80).map((t) => ({
+        date: t.date,
+        description: t.description ?? label,
+        amount: round2(t.amount),
+      })),
+    }
+  }
+
+  private commitmentBreakdown(txns: NormalizedTxn[], key: string) {
+    const matches = txns.filter((t) => t.direction === 'debit' && normalizeCounterparty(t) === key)
+    const total = matches.reduce((s, t) => s + t.amount, 0)
+    const amounts = matches.map((t) => t.amount).sort((a, b) => a - b)
+    const typicalAmount = amounts.length ? amounts[Math.floor(amounts.length / 2)]! : 0
+    return {
+      kind: 'commitment' as const,
+      key,
+      total: round2(total),
+      count: matches.length,
+      typicalAmount: round2(typicalAmount),
+      transactions: matches.slice(0, 80).map((t) => ({
+        date: t.date,
+        description: t.description ?? '',
+        amount: round2(t.amount),
+      })),
+    }
+  }
+
+  private monthBreakdown(txns: NormalizedTxn[], key: string) {
+    const inMonth = txns.filter((t) => monthKey(toDate(t.date)) === key)
+    let income = 0
+    let spend = 0
+    const catMap = new Map<string, { label: string; total: number }>()
+    for (const t of inMonth) {
+      if (t.direction === 'credit') {
+        income += t.amount
+        continue
+      }
+      const base = classify(t)
+      if (base === 'savings_transfer' || base === 'investment') continue
+      spend += t.amount
+      const def = resolveCategory(t, base)
+      const c = catMap.get(def.key) ?? { label: def.label, total: 0 }
+      c.total += t.amount
+      catMap.set(def.key, c)
+    }
+    return {
+      kind: 'month' as const,
+      month: key,
+      income: round2(income),
+      spend: round2(spend),
+      net: round2(income - spend),
+      categories: [...catMap.values()]
+        .map((c) => ({ label: c.label, total: round2(c.total) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 6),
+      largest: inMonth
+        .filter((t) => t.direction === 'debit')
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 6)
+        .map((t) => ({ date: t.date, description: t.description ?? '', amount: round2(t.amount) })),
+    }
   }
 }

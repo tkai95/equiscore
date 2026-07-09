@@ -14,6 +14,40 @@ export interface StatementImportResult {
   overallTier: string
 }
 
+export interface TxnRow {
+  date: string
+  description: string
+  amount: number
+}
+export interface CategoryBreakdown {
+  kind: 'category'
+  key: string
+  label: string
+  total: number
+  monthlyAverage: number
+  transactionCount: number
+  merchants: Array<{ name: string; total: number; count: number }>
+  transactions: TxnRow[]
+}
+export interface CommitmentBreakdown {
+  kind: 'commitment'
+  key: string
+  total: number
+  count: number
+  typicalAmount: number
+  transactions: TxnRow[]
+}
+export interface MonthBreakdown {
+  kind: 'month'
+  month: string
+  income: number
+  spend: number
+  net: number
+  categories: Array<{ label: string; total: number }>
+  largest: TxnRow[]
+}
+export type Breakdown = CategoryBreakdown | CommitmentBreakdown | MonthBreakdown
+
 export interface ImportJob {
   id: string
   status: ImportJobStatus
@@ -110,6 +144,12 @@ export const api = {
   },
   insights: {
     getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
+    getBreakdown: (token: string, type: 'category' | 'commitment' | 'month', key: string) =>
+      apiFetch<Breakdown>(
+        `/insights/breakdown?type=${type}&key=${encodeURIComponent(key)}`,
+        {},
+        token
+      ),
     // Starts an async import; returns a job to poll (PDF reads take 30–90s).
     importPdf: async (token: string, file: File) => {
       const form = new FormData()

@@ -46,6 +46,7 @@ export function analyzeCommitments(
 
     commitments.push({
       name: s.name,
+      key: s.key,
       category: cat,
       amount: round2(s.amount),
       cadence: s.cadence,
