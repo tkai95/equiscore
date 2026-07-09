@@ -376,6 +376,15 @@ export class InsightsService implements OnModuleInit {
     return answers.map((a) => a.questionId)
   }
 
+  /** The user's answers, keyed by question id — for answer-specific reclassification. */
+  async getQuestionAnswers(userId: string): Promise<Record<string, string>> {
+    const rows = await db.insightQuestionAnswer.findMany({
+      where: { userId },
+      select: { questionId: true, answer: true },
+    })
+    return Object.fromEntries(rows.map((r) => [r.questionId, r.answer]))
+  }
+
   /**
    * Capture the user's explanation of a flagged/ambiguous transaction. The
    * answer resolves the follow-up question (so it stops being asked), raises
@@ -395,7 +404,7 @@ export class InsightsService implements OnModuleInit {
 
   /** Build a profile from whatever transactions the user already has stored. */
   async getProfileForUser(userId: string): Promise<InsightProfile> {
-    const [user, accounts, transactions, rentalProfile, resolvedQuestionIds] = await Promise.all([
+    const [user, accounts, transactions, rentalProfile, answers] = await Promise.all([
       db.user.findUnique({ where: { id: userId }, include: { profile: true } }),
       db.bankAccount.findMany({
         where: { bankConnection: { userId } },
@@ -413,7 +422,7 @@ export class InsightsService implements OnModuleInit {
         },
       }),
       db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
-      this.getResolvedQuestionIds(userId),
+      this.getQuestionAnswers(userId),
     ])
 
     if (!user) throw new NotFoundException('User not found')
@@ -436,7 +445,8 @@ export class InsightsService implements OnModuleInit {
       accountHolderName: accounts.find((a) => a.accountHolderName)?.accountHolderName ?? null,
       profileName: user.profile?.fullName ?? null,
       declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
-      resolvedQuestionIds,
+      resolvedQuestionIds: Object.keys(answers),
+      answers,
     }
 
     return buildInsightProfile(txns, ctx)

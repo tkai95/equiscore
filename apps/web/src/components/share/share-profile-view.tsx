@@ -299,6 +299,9 @@ export function ShareProfileView() {
                         </span>
                       )}
                       <TierBadge tier={link.trustScore.overallTier} />
+                      <span className="text-xs font-medium tabular-nums text-gray-500">
+                        {link.trustScore.overallScore} / 100
+                      </span>
                       {expired && (
                         <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">
                           Expired

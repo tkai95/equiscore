@@ -101,7 +101,7 @@ export class FeatureEngineeringService {
       }))
       const answered = await db.insightQuestionAnswer.findMany({
         where: { userId },
-        select: { questionId: true },
+        select: { questionId: true, answer: true },
       })
       const insight = buildInsightProfile(normTxns, {
         source: features.openBankingConnected ? 'open_banking' : 'statement_upload',
@@ -109,6 +109,7 @@ export class FeatureEngineeringService {
         profileName: profile?.fullName ?? null,
         declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
         resolvedQuestionIds: answered.map((a) => a.questionId),
+        answers: Object.fromEntries(answered.map((a) => [a.questionId, a.answer])),
       })
 
       features.monthsOfBankHistory = Math.min(insight.period.months, 24)

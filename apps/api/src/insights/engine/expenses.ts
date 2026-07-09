@@ -55,15 +55,30 @@ const UNCONFIRMED_KEYS = new Set(['family_support'])
 export function analyzeExpenses(
   txns: NormalizedTxn[],
   resolvedIds: Set<string>,
-  months: number
+  months: number,
+  answers?: Record<string, string>,
+  // Keys of recurring debit streams — the reclassification only applies to
+  // regular person-payments, never a one-off transfer that happens to be flagged.
+  recurringDebitKeys?: Set<string>
 ): ExpenseProfile {
   const debits = txns.filter((t) => t.direction === 'debit')
+
+  const personTransferOverride: TransactionCategory | null =
+    answers?.['expense:family_support'] === 'Rent'
+      ? 'rent_payment'
+      : answers?.['expense:family_support'] === 'Repaying a loan'
+        ? 'loan_repayment'
+        : null
 
   const buckets = new Map<string, { def: CatDef; total: number }>()
   let totalSpend = 0
 
   for (const t of debits) {
-    const base = classify(t)
+    let base = classify(t)
+    const key = normalizeCounterparty(t)
+    if (base === 'other' && personTransferOverride && looksLikePerson(key) && recurringDebitKeys?.has(key)) {
+      base = personTransferOverride
+    }
     // Savings/investment outflows are not spending — exclude, like the analytics summary does.
     if (base === 'savings_transfer' || base === 'investment') continue
     const def = resolveCategory(t, base)

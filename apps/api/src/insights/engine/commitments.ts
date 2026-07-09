@@ -20,13 +20,27 @@ const RETURN_PATTERN =
 
 export function analyzeCommitments(
   debitStreams: RecurringStream[],
-  txns: NormalizedTxn[]
+  txns: NormalizedTxn[],
+  answers?: Record<string, string>
 ): { commitments: Commitment[]; paymentBehaviour: PaymentBehaviour } {
   const returns = txns.filter((t) => RETURN_PATTERN.test(t.description ?? ''))
 
+  // When the user has told us their person-to-person payments are actually rent
+  // (or a loan), honour it — a private-landlord rent then counts toward rental
+  // reliability and affordability, not just "family support".
+  const personTransferOverride: TransactionCategory | null =
+    answers?.['expense:family_support'] === 'Rent'
+      ? 'rent_payment'
+      : answers?.['expense:family_support'] === 'Repaying a loan'
+        ? 'loan_repayment'
+        : null
+
   const commitments: Commitment[] = []
   for (const s of debitStreams) {
-    const cat = classify(s.txns[Math.floor(s.txns.length / 2)]!)
+    let cat = classify(s.txns[Math.floor(s.txns.length / 2)]!)
+    if (cat === 'other' && looksLikePerson(s.key) && personTransferOverride) {
+      cat = personTransferOverride
+    }
 
     // Behavioural fallback: an unclassified stream that leaves on a regular
     // rhythm for a stable amount *is* a commitment — a gym membership, a

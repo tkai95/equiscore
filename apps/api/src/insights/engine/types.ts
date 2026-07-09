@@ -34,6 +34,8 @@ export interface ProfileContext {
   declaredMonthlyRent?: number | null
   /** Answers already given to previously-generated questions, keyed by question id. */
   resolvedQuestionIds?: string[]
+  /** The actual answer text per question id, for answer-specific reclassification. */
+  answers?: Record<string, string>
 }
 
 // ─── Output ───────────────────────────────────────────────────────────────────

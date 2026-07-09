@@ -41,8 +41,9 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   const recurringKeys = new Set([...creditStreams, ...debitStreams].map((s) => s.key))
 
   const income = analyzeIncome(txns, creditStreams, resolvedIds)
-  const expenses = analyzeExpenses(txns, resolvedIds, months)
-  const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, txns)
+  const recurringDebitKeys = new Set(debitStreams.map((s) => s.key))
+  const expenses = analyzeExpenses(txns, resolvedIds, months, ctx.answers, recurringDebitKeys)
+  const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, txns, ctx.answers)
   const integrity = checkBalanceContinuity(txns)
   const risk = detectRisk(txns, recurringKeys, paymentBehaviour.overdraftMonths, resolvedIds, integrity)
 
