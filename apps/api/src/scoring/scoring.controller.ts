@@ -46,6 +46,17 @@ export class ScoringController {
     return this.scoringService.getLatestScoreWithStatus(userId, type)
   }
 
+  @Get('improvements')
+  @ApiOperation({ summary: 'Prioritised actions that would raise the score, with point estimates' })
+  @ApiQuery({ name: 'type', required: false, enum: ['general', 'tenant', 'lender_readiness', 'telecom'] })
+  async improvements(
+    @CurrentUser() user: RequestUser,
+    @Query('type') type: ScorecardType = 'general'
+  ) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.scoringService.getImprovements(userId, type)
+  }
+
   @Post('impact-preview')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Preview how the score would change if evidence were removed (no writes)' })

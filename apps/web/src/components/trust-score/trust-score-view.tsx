@@ -2,13 +2,12 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, type ScoreImprovements } from '@/lib/api'
 import { ScoreRing } from './score-ring'
-import { TierBadge } from './tier-badge'
 import { ReasonCodeList } from './reason-code-list'
 import { SubScoreGrid } from './sub-score-grid'
 import Link from 'next/link'
-import { RefreshCw, AlertTriangle, Clock, Landmark, Upload } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Clock, Landmark, Upload, ArrowUpRight, ArrowRight } from 'lucide-react'
 import { formatDate, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
@@ -77,6 +76,15 @@ export function TrustScoreView() {
     queryFn: async () => {
       const token = await getToken()
       return api.scores.latest(token!, 'general') as Promise<TrustScoreData | null>
+    },
+  })
+
+  const { data: improvements } = useQuery<ScoreImprovements>({
+    queryKey: ['score-improvements'],
+    enabled: !!score,
+    queryFn: async () => {
+      const token = await getToken()
+      return api.scores.improvements(token!, 'general')
     },
   })
 
@@ -185,18 +193,17 @@ export function TrustScoreView() {
             <div className="flex flex-col items-center gap-6 lg:flex-row">
               <ScoreRing score={score.overallScore} tier={score.overallTier} size={160} />
               <div className="flex-1 text-center lg:text-left">
-                <div className="mb-3 flex justify-center lg:justify-start">
-                  <TierBadge tier={score.overallTier} size="lg" />
-                </div>
-                <h2 className="mb-2 text-xl font-bold text-gray-900">
+                <p className="text-3xl font-bold text-gray-900">Trust Profile: {score.overallTier}</p>
+                <p className="mt-1 text-lg font-medium text-gray-500">
+                  Score{' '}
+                  <span className="font-semibold tabular-nums text-gray-900">{score.overallScore}</span> /
+                  100
+                </p>
+                <h2 className="mt-2 text-xl font-semibold text-gray-900">
                   {TIER_LABELS[score.overallTier]}
                 </h2>
-                <p className="text-gray-600">
-                  Your trust profile has been assessed across 7 dimensions. The score reflects the
-                  strength and consistency of your verified evidence — not a moral judgment.
-                </p>
                 {score.fraudRisk !== 'pass' && (
-                  <div className="mt-4 flex items-center gap-2 text-amber-700">
+                  <div className="mt-4 flex items-center justify-center gap-2 text-amber-700 lg:justify-start">
                     <AlertTriangle className="h-4 w-4" />
                     <span className="text-sm">Some signals require additional review</span>
                   </div>
@@ -205,12 +212,51 @@ export function TrustScoreView() {
             </div>
           </div>
 
+          {/* How to raise your score — the action layer */}
+          {improvements && improvements.improvements.length > 0 && (
+            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+              <div className="mb-1 flex items-center gap-2">
+                <ArrowUpRight className="h-5 w-5 text-brand" />
+                <h2 className="font-semibold text-gray-900">How to raise your score</h2>
+              </div>
+              <p className="mb-5 text-sm text-gray-500">
+                The highest-impact steps for your profile, with the points each would add.
+              </p>
+              <div className="space-y-3">
+                {improvements.improvements.map((imp) => (
+                  <Link
+                    key={imp.id}
+                    href={imp.href}
+                    className="group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition-colors hover:border-brand/40 hover:bg-cream/40"
+                  >
+                    {imp.estimatedGain !== null && (
+                      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-brand/10 text-brand">
+                        <span className="text-lg font-bold leading-none">+{imp.estimatedGain}</span>
+                        <span className="text-[10px] font-medium uppercase">points</span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900">{imp.title}</p>
+                      <p className="mt-0.5 text-sm text-gray-500">{imp.detail}</p>
+                      {imp.reachesTier && imp.reachesTier !== score.overallTier && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          Would reach Trust Profile: {imp.reachesTier}
+                        </p>
+                      )}
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Sub-scores */}
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-            <h2 className="mb-2 font-semibold text-gray-900">Score breakdown</h2>
+            <h2 className="mb-2 font-semibold text-gray-900">What makes up your score</h2>
             <p className="mb-6 text-sm text-gray-500">
-              Each dimension is scored separately so you know exactly what&apos;s strong and what
-              needs improvement.
+              Seven dimensions, scored separately, so you know exactly what is strong and what needs
+              work.
             </p>
             <SubScoreGrid score={score} />
           </div>

@@ -15,7 +15,7 @@ import {
   TrendingDown,
   ExternalLink,
 } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, type ScoreImprovements } from '@/lib/api'
 import { cn, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
@@ -297,6 +297,17 @@ export function DashboardOverview() {
     },
   })
 
+  const { data: improvements } = useQuery<ScoreImprovements>({
+    queryKey: ['score-improvements'],
+    enabled: !!score,
+    queryFn: async () => {
+      const token = await getToken()
+      return api.scores.improvements(token!, 'general')
+    },
+  })
+
+  const topImprovement = improvements?.improvements[0]
+
   const isLoading = scoreLoading || profileLoading || accountsLoading || docsLoading
 
   const profileStage = profile?.profileStage ?? null
@@ -388,10 +399,12 @@ export function DashboardOverview() {
               <PassportRing score={score.overallScore} tier={score.overallTier} />
               <div className="flex-1 space-y-2">
                 <div>
-                  <p className="text-xs text-gray-400">Trust Score</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {score.overallScore}
-                    <span className="text-lg font-normal text-gray-400"> / 100</span>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Trust Profile
+                  </p>
+                  <p className="text-3xl font-bold text-gray-900">Tier {score.overallTier}</p>
+                  <p className="text-sm font-medium tabular-nums text-gray-500">
+                    Score {score.overallScore} / 100
                   </p>
                 </div>
                 <p className="text-sm leading-relaxed text-gray-600">
@@ -423,19 +436,44 @@ export function DashboardOverview() {
           )}
         </div>
 
-        {/* Recommended next step */}
+        {/* Recommended next step — data-driven from the improvement engine when scored */}
         <div className="col-span-2 flex flex-col rounded-2xl bg-brand p-6 text-white shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/60">
             Recommended Next Step
           </p>
-          <h3 className="mt-3 text-xl font-semibold leading-snug">{nextStep.label}</h3>
-          <p className="mt-2 flex-1 text-sm leading-relaxed text-white/75">{nextStep.detail}</p>
-          <Link
-            href={nextStep.href}
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-cream"
-          >
-            {nextStep.label} <ArrowRight className="h-4 w-4" />
-          </Link>
+          {topImprovement ? (
+            <>
+              <h3 className="mt-3 text-xl font-semibold leading-snug">{topImprovement.title}</h3>
+              {topImprovement.estimatedGain !== null && (
+                <p className="mt-2 text-sm font-semibold text-white">
+                  +{topImprovement.estimatedGain} points
+                  {topImprovement.reachesTier && topImprovement.reachesTier !== score?.overallTier
+                    ? ` → Tier ${topImprovement.reachesTier}`
+                    : ''}
+                </p>
+              )}
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/75">
+                {topImprovement.detail}
+              </p>
+              <Link
+                href={topImprovement.href}
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-cream"
+              >
+                Do it now <ArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          ) : (
+            <>
+              <h3 className="mt-3 text-xl font-semibold leading-snug">{nextStep.label}</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/75">{nextStep.detail}</p>
+              <Link
+                href={nextStep.href}
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-cream"
+              >
+                {nextStep.label} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          )}
         </div>
       </div>
 

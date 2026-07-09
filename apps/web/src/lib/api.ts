@@ -56,6 +56,21 @@ export interface MonthBreakdown {
 }
 export type Breakdown = CategoryBreakdown | CommitmentBreakdown | IncomeBreakdown | MonthBreakdown
 
+export interface ScoreImprovement {
+  id: string
+  title: string
+  detail: string
+  href: string
+  estimatedGain: number | null
+  reachesTier: string | null
+  dimension: string
+}
+export interface ScoreImprovements {
+  currentScore: number
+  currentTier: string
+  improvements: ScoreImprovement[]
+}
+
 export interface ImportJob {
   id: string
   status: ImportJobStatus
@@ -134,6 +149,8 @@ export const api = {
       apiFetch(`/scores/recompute?type=${type}`, { method: 'POST' }, token),
     latest: (token: string, type = 'general') =>
       apiFetch(`/scores/latest?type=${type}`, {}, token),
+    improvements: (token: string, type = 'general') =>
+      apiFetch<ScoreImprovements>(`/scores/improvements?type=${type}`, {}, token),
     history: (token: string) => apiFetch('/scores/history', {}, token),
     impactPreview: (
       token: string,

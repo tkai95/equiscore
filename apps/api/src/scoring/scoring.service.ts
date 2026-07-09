@@ -76,6 +76,121 @@ export class ScoringService {
   }
 
   /**
+   * Deterministic "how to raise your score" engine. For each fixable gap we
+   * re-run computeTrustScore with that one thing improved and report the actual
+   * point gain — so an action says "+9, C to B", never a vague nudge. Only the
+   * verification/identity/completeness levers are here; financial behaviour is
+   * the applicant's situation, and flagged-transaction explanations live on the
+   * Insights page.
+   */
+  async getImprovements(userId: string, scorecardType: ScorecardType = 'general') {
+    const features = await this.featureEngineering.computeFeatures(userId)
+    const current = computeTrustScore({ userId, scorecardType, features })
+
+    const gainFrom = (mod: Partial<TrustFeatures>): number => {
+      const s = computeTrustScore({ userId, scorecardType, features: { ...features, ...mod } })
+      return Math.max(0, s.overallScore - current.overallScore)
+    }
+    const tierAt = (mod: Partial<TrustFeatures>): TrustTier =>
+      computeTrustScore({ userId, scorecardType, features: { ...features, ...mod } }).overallTier
+
+    const improvements: Array<{
+      id: string
+      title: string
+      detail: string
+      href: string
+      estimatedGain: number | null
+      reachesTier: TrustTier | null
+      dimension: string
+    }> = []
+    const hasBank = features.connectedAccountsCount > 0
+
+    if (!hasBank) {
+      improvements.push({
+        id: 'add_bank',
+        title: 'Add your bank data',
+        detail:
+          'Connect a bank via Open Banking or upload a statement. This is the single biggest step — it lets us verify your income, rent, and payment reliability.',
+        href: '/dashboard/connections',
+        estimatedGain: null,
+        reachesTier: null,
+        dimension: 'Verification Strength',
+      })
+    } else {
+      if (!features.accountHolderNameMatch) {
+        const mod: Partial<TrustFeatures> = { accountHolderNameMatch: true }
+        const g = gainFrom(mod)
+        if (g > 0)
+          improvements.push({
+            id: 'name_match',
+            title: 'Match your name to your bank account',
+            detail:
+              'The name on your bank data does not match your profile. Set your profile name to your legal name as it appears at the bank, or reconnect the correct account.',
+            href: '/dashboard/profile',
+            estimatedGain: g,
+            reachesTier: tierAt(mod),
+            dimension: 'Identity Confidence',
+          })
+      }
+      if (!features.openBankingConnected) {
+        const mod: Partial<TrustFeatures> = {
+          openBankingConnected: true,
+          verifiedSourcesCount: features.verifiedSourcesCount + 1,
+        }
+        const g = gainFrom(mod)
+        if (g > 0)
+          improvements.push({
+            id: 'open_banking',
+            title: 'Connect your bank via Open Banking',
+            detail:
+              'A live Open Banking connection is stronger evidence than an uploaded statement, and keeps your score current automatically.',
+            href: '/dashboard/connections',
+            estimatedGain: g,
+            reachesTier: tierAt(mod),
+            dimension: 'Verification Strength',
+          })
+      }
+      if (features.documentCount === 0) {
+        const mod: Partial<TrustFeatures> = {
+          documentCount: 1,
+          hasUploadedDocuments: true,
+          verifiedSourcesCount: features.verifiedSourcesCount + 1,
+        }
+        const g = gainFrom(mod)
+        if (g > 0)
+          improvements.push({
+            id: 'documents',
+            title: 'Upload proof of identity or address',
+            detail:
+              'A passport, driving licence, or recent utility bill adds verified evidence to your profile.',
+            href: '/dashboard/documents',
+            estimatedGain: g,
+            reachesTier: tierAt(mod),
+            dimension: 'Verification Strength',
+          })
+      }
+      if (features.profileFieldsComplete < 1) {
+        const mod: Partial<TrustFeatures> = { profileFieldsComplete: 1 }
+        const g = gainFrom(mod)
+        if (g > 0)
+          improvements.push({
+            id: 'profile',
+            title: 'Complete your profile',
+            detail:
+              'Add the remaining details — date of birth, nationality, residency status, and employment type.',
+            href: '/dashboard/profile',
+            estimatedGain: g,
+            reachesTier: tierAt(mod),
+            dimension: 'Profile Completeness',
+          })
+      }
+    }
+
+    improvements.sort((a, b) => (b.estimatedGain ?? 999) - (a.estimatedGain ?? 999))
+    return { currentScore: current.overallScore, currentTier: current.overallTier, improvements }
+  }
+
+  /**
    * The evidence backing a score, with the latest date each source covers.
    *
    * Coverage — not upload time — is what anchors freshness, so we take the most
