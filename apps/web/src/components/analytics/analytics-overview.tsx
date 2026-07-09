@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { MonthlyFlowChart } from './monthly-flow-chart'
-import { InsightsCard } from './insights-card'
 import { InsightProfileView } from './insight-profile-view'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
@@ -25,18 +24,6 @@ interface Profile {
   income: { averageMonthlyIncome: number }
   expenses: { averageMonthlySpend: number; essentialShare: number }
   monthly: MonthlyPoint[]
-}
-
-interface Insight {
-  type: 'positive' | 'warning' | 'info'
-  title: string
-  body: string
-}
-
-interface InsightsResponse {
-  insights: Insight[]
-  generatedAt: string
-  unavailable?: boolean
 }
 
 function monthLabel(key: string): string {
@@ -69,13 +56,6 @@ export function AnalyticsOverview() {
       return api.insights.getProfile(token!) as Promise<Profile | null>
     },
     staleTime: 5 * 60 * 1000,
-  })
-
-  const insightsMutation = useMutation<InsightsResponse>({
-    mutationFn: async () => {
-      const token = await getToken()
-      return api.analytics.insights(token!) as Promise<InsightsResponse>
-    },
   })
 
   const hasData = (profile?.period.transactionCount ?? 0) > 0
@@ -174,15 +154,6 @@ export function AnalyticsOverview() {
               />
             </div>
           </div>
-
-          {/* Optional AI narrative — supplementary to the deterministic profile above */}
-          <InsightsCard
-            insights={insightsMutation.data?.insights ?? []}
-            isLoading={insightsMutation.isPending}
-            unavailable={insightsMutation.data?.unavailable}
-            hasData
-            onGenerate={() => insightsMutation.mutate()}
-          />
         </>
       )}
 

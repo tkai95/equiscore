@@ -43,14 +43,14 @@ export function AppSidebar() {
   }, [isInProfile])
 
   return (
-    <aside className="flex w-64 flex-col border-r border-[#D8D6C9] bg-cream-surface">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-[#D8D6C9] bg-cream-surface">
       <div className="border-b border-[#D8D6C9] px-6 py-5">
         <Link href="/">
           <Image src="/logo.png" alt="Equiscore" width={160} height={42} priority />
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {/* Dashboard */}
         <NavLink href="/dashboard" label="Dashboard" icon={LayoutDashboard} pathname={pathname} exact />
 
