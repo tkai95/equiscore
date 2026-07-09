@@ -5,20 +5,34 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
   ArrowRight,
-  CheckCircle2,
   Building2,
   FileText,
   Users,
   Briefcase,
-  Share2,
   TrendingUp,
   TrendingDown,
-  ExternalLink,
 } from 'lucide-react'
 import { api, type ScoreImprovements } from '@/lib/api'
-import { cn, TIER_COLORS } from '@/lib/utils'
+import { cn, TIER_COLORS, formatCurrency } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
+
+type InsightData = {
+  period: { transactionCount: number }
+  affordability: {
+    rating: 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
+    disposableIncome: number
+    surplusAfterAll: number
+    ratios: { rentToIncome: number | null }
+  }
+} | null
+
+const AFF_RATING: Record<string, { label: string; className: string }> = {
+  comfortable: { label: 'Comfortable', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  manageable: { label: 'Manageable', className: 'bg-teal-50 text-teal-700 ring-teal-200' },
+  stretched: { label: 'Stretched', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  at_risk: { label: 'At risk', className: 'bg-red-50 text-red-700 ring-red-200' },
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -72,19 +86,6 @@ const STAGE_ORDER = [
 function stageIndex(stage: string | null) {
   const i = STAGE_ORDER.indexOf(stage ?? 'created')
   return i < 0 ? 0 : i
-}
-
-function formatRelative(date: string | null | undefined): string {
-  if (!date) return ''
-  const diff = Date.now() - new Date(date).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Yesterday'
-  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 function getNextStep(
@@ -308,6 +309,17 @@ export function DashboardOverview() {
 
   const topImprovement = improvements?.improvements[0]
 
+  const { data: insight } = useQuery<InsightData>({
+    queryKey: ['insight-profile'],
+    enabled: accounts.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const token = await getToken()
+      return api.insights.getProfile(token!) as Promise<InsightData>
+    },
+  })
+  const aff = insight && insight.period.transactionCount > 0 ? insight.affordability : null
+
   const isLoading = scoreLoading || profileLoading || accountsLoading || docsLoading
 
   const profileStage = profile?.profileStage ?? null
@@ -327,41 +339,6 @@ export function DashboardOverview() {
   )
   const hasActiveBank = accounts.some((a) => a.bankConnection.connectionStatus === 'active')
 
-  const activities: Array<{
-    label: string
-    time: string
-    icon: React.ElementType
-    color: string
-  }> = []
-  if (score?.computedAt)
-    activities.push({
-      label: 'Trust score computed',
-      time: formatRelative(score.computedAt),
-      icon: CheckCircle2,
-      color: 'text-emerald-500',
-    })
-  if (accounts[0]?.bankConnection.lastSyncedAt)
-    activities.push({
-      label: `${accounts[0].bankConnection.institutionName ?? 'Bank'} synced`,
-      time: formatRelative(accounts[0].bankConnection.lastSyncedAt),
-      icon: Building2,
-      color: 'text-blue-500',
-    })
-  documents.slice(0, 2).forEach((doc) => {
-    activities.push({
-      label: `${doc.documentType.replace(/_/g, ' ')} uploaded`,
-      time: formatRelative(doc.uploadedAt),
-      icon: FileText,
-      color: 'text-purple-500',
-    })
-  })
-  if (activities.length === 0)
-    activities.push({
-      label: 'Account created',
-      time: 'Today',
-      icon: CheckCircle2,
-      color: 'text-brand',
-    })
 
   return (
     <div className="space-y-5">
@@ -591,8 +568,74 @@ export function DashboardOverview() {
         </div>
       )}
 
-      {/* Row 4: Connected evidence + Recent activity + Recipient preview */}
-      <div className="grid gap-5 lg:grid-cols-3">
+      {/* Row 4: Affordability snapshot + Connected evidence */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Affordability snapshot */}
+        {aff ? (
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-700">Affordability</h2>
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-medium ring-1',
+                  AFF_RATING[aff.rating]?.className,
+                )}
+              >
+                {AFF_RATING[aff.rating]?.label ?? aff.rating}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-gray-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500">Disposable</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900">
+                  {formatCurrency(aff.disposableIncome)}
+                </p>
+                <p className="text-[11px] text-gray-400">after essentials</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500">Surplus</p>
+                <p
+                  className={cn(
+                    'mt-0.5 text-lg font-semibold tabular-nums',
+                    aff.surplusAfterAll >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  {aff.surplusAfterAll >= 0 ? '+' : ''}
+                  {formatCurrency(aff.surplusAfterAll)}
+                </p>
+                <p className="text-[11px] text-gray-400">after all spending</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500">Rent</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900">
+                  {aff.ratios.rentToIncome !== null
+                    ? `${Math.round(aff.ratios.rentToIncome * 100)}%`
+                    : '—'}
+                </p>
+                <p className="text-[11px] text-gray-400">of income</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/analytics"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+            >
+              Full breakdown <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-gray-100 bg-white p-5 text-center shadow-sm">
+            <p className="text-sm text-gray-400">
+              Add your bank data to see your affordability at a glance.
+            </p>
+            <Link
+              href="/dashboard/connections"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
+            >
+              Add bank data <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
+
         {/* Connected evidence tiles */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">Connected Evidence</h2>
@@ -646,88 +689,6 @@ export function DashboardOverview() {
           </div>
         </div>
 
-        {/* Recent activity */}
-        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-gray-700">Recent Activity</h2>
-          <div className="space-y-4">
-            {activities.map((a, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-50">
-                  <a.icon className={cn('h-3.5 w-3.5', a.color)} />
-                </div>
-                <div>
-                  <p className="text-sm capitalize text-gray-700">{a.label}</p>
-                  <p className="text-xs text-gray-400">{a.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recipient preview */}
-        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">Recipient View</h2>
-            <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
-          </div>
-
-          {score ? (
-            <div>
-              <div className="rounded-lg bg-gray-50 p-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      'flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold',
-                      TIER_COLORS[score.overallTier],
-                    )}
-                  >
-                    {score.overallTier}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-gray-900">
-                      {profile?.fullName ?? 'Your name'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Tier {score.overallTier} · Score {score.overallScore}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>Identity</span>
-                    <StatusDot status={hasIdentityDoc ? 'verified' : 'none'} />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>Banking</span>
-                    <StatusDot status={hasActiveBank ? 'verified' : 'none'} />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>Income</span>
-                    <StatusDot status={hasIncomeDoc ? 'verified' : 'none'} />
-                  </div>
-                </div>
-              </div>
-              <Link
-                href="/dashboard/share"
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-brand/20 px-4 py-2 text-xs font-medium text-brand transition-colors hover:bg-cream"
-              >
-                <Share2 className="h-3.5 w-3.5" /> Share profile
-              </Link>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-sm text-gray-400">
-                Generate your score to preview what recipients see
-              </p>
-              <Link
-                href="/dashboard/trust-score"
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand-dark"
-              >
-                Get your score <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
