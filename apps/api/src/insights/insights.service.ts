@@ -414,20 +414,39 @@ export class InsightsService implements OnModuleInit {
     message: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = []
   ): Promise<{ answer: string }> {
-    const context = await this.buildChatContext(userId)
-    const system = `You are the EquiScore assistant. EquiScore turns someone's bank data into a shareable Trust Profile (a score out of 100 and a tier A to E) that proves their financial reliability to landlords and lenders, alongside insights into their income, spending, affordability, and payment reliability.
-
-Answer the user's question using ONLY the data below about THEIR profile. Be concise, warm, and specific with numbers (use £). If the data does not contain the answer, say you do not have that information — never invent figures.
-
-You can also help them use the site. Pages: Dashboard (overview and the single best next step), My Trust Score (the score, why it is what it is, and how to raise it), Analytics (income, spending, commitments, affordability, monthly trends, and follow-up questions to explain flagged transactions), Connections (connect a bank via Open Banking or upload a statement), Documents (upload ID or proof of address), Share Profile (create a link to share with a landlord or lender).
-
-THEIR DATA:
-${context}`
-
-    const recent = history.slice(-8).map((m) => ({ role: m.role, content: m.content }))
-    const answer = await this.callAssistant(system, recent, message)
+    const system = this.chatSystem(await this.buildChatContext(userId))
+    const answer = await this.callAssistant(system, history.slice(-8), message)
     this.audit.log(userId, 'insight.chat', { chars: message.length })
     return { answer }
+  }
+
+  /** Streaming variant — tokens are pushed to onToken as they arrive. */
+  async chatStream(
+    userId: string,
+    message: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    onToken: (t: string) => void
+  ): Promise<void> {
+    const system = this.chatSystem(await this.buildChatContext(userId))
+    await this.streamAssistant(system, history.slice(-8), message, onToken)
+    this.audit.log(userId, 'insight.chat', { chars: message.length, stream: true })
+  }
+
+  private chatSystem(context: string): string {
+    return `You are the EquiScore assistant. EquiScore turns someone's bank data into a shareable Trust Profile — a score out of 100 and a tier from A (best) to E — that proves their financial reliability to landlords and lenders, alongside deep insight into their income, spending, affordability, and payment reliability.
+
+RULES:
+- Answer using ONLY the data provided below about THIS user. Be specific with figures and always use £. Never invent numbers — if the data does not contain the answer, say so plainly.
+- Be warm, concise, and genuinely helpful. Format with Markdown: short paragraphs, **bold** for key figures, and bullet lists where it helps. Do not use headings larger than bold.
+- When you recommend an action, include a Markdown link to the exact page so they can act in one click. Paths: Dashboard [/dashboard], My Trust Score [/dashboard/trust-score], Analytics [/dashboard/analytics], Connections (connect a bank or upload a statement) [/dashboard/connections], Documents (upload ID / proof of address) [/dashboard/documents], Share Profile [/dashboard/share], My Profile [/dashboard/profile]. For example: "[Upload your documents](/dashboard/documents)".
+
+HOW THE SITE WORKS (to answer how-to questions):
+- To raise the score: verify identity (name on the bank must match the profile), connect Open Banking or upload more evidence, upload an ID or proof of address, and explain any flagged transactions. The Trust Score is capped at Tier C until identity and verification are confirmed.
+- To share with a landlord/lender: create a time-limited link on Share Profile — they see it with no account.
+- To explain a flagged transaction: answer the follow-up questions on Analytics; the answer clears the flag and can raise the score.
+
+THIS USER'S DATA:
+${context}`
   }
 
   private async buildChatContext(userId: string): Promise<string> {
@@ -470,6 +489,19 @@ ${context}`
       }
       if (p.questions.length) {
         lines.push(`Open follow-up questions: ${p.questions.map((q) => q.question).join(' | ')}`)
+      }
+      const recentTxns = await db.bankTransaction.findMany({
+        where: { bankAccount: { bankConnection: { userId } } },
+        orderBy: { bookedAt: 'desc' },
+        take: 40,
+        select: { bookedAt: true, amount: true, direction: true, description: true, merchantName: true },
+      })
+      if (recentTxns.length) {
+        lines.push(
+          `Most recent transactions (newest first): ${recentTxns
+            .map((t) => `${t.bookedAt.toISOString().slice(0, 10)} ${t.direction === 'credit' ? '+' : '-'}£${Math.abs(t.amount)} ${t.merchantName || t.description || ''}`.trim())
+            .join('; ')}.`
+        )
       }
     } else {
       lines.push('No bank data has been added yet — they should connect a bank or upload a statement on Connections.')
@@ -524,6 +556,78 @@ ${context}`
     }
 
     return 'The assistant is not available right now. Please try again later.'
+  }
+
+  private async streamAssistant(
+    system: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    message: string,
+    onToken: (t: string) => void
+  ): Promise<void> {
+    const messages = [...history, { role: 'user' as const, content: message }]
+
+    const glmKey = process.env['GLM_API_KEY']
+    if (glmKey) {
+      try {
+        const baseUrl = process.env['GLM_BASE_URL'] ?? 'https://api.z.ai/api/paas/v4'
+        const model = process.env['GLM_MODEL'] ?? 'glm-5.2'
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
+          body: JSON.stringify({
+            model,
+            max_tokens: 900,
+            stream: true,
+            messages: [{ role: 'system', content: system }, ...messages],
+          }),
+        })
+        if (res.ok && res.body) {
+          const reader = res.body.getReader()
+          const decoder = new TextDecoder()
+          let buf = ''
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            const lines = buf.split('\n')
+            buf = lines.pop() ?? ''
+            for (const line of lines) {
+              const t = line.trim()
+              if (!t.startsWith('data:')) continue
+              const data = t.slice(5).trim()
+              if (data === '[DONE]') return
+              try {
+                const j = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
+                const delta = j.choices?.[0]?.delta?.content
+                if (delta) onToken(delta)
+              } catch {
+                /* keepalive or partial frame — ignore */
+              }
+            }
+          }
+          return
+        }
+        this.logger.warn(`GLM stream failed: ${res.status}`)
+      } catch (err) {
+        this.logger.warn(`GLM stream error: ${err instanceof Error ? err.message : err}`)
+      }
+    }
+
+    const anthropicKey = process.env['ANTHROPIC_API_KEY']
+    if (anthropicKey) {
+      const client = new Anthropic({ apiKey: anthropicKey })
+      const stream = client.messages.stream({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 900,
+        system,
+        messages,
+      })
+      stream.on('text', (t) => onToken(t))
+      await stream.finalMessage()
+      return
+    }
+
+    onToken('The assistant is not available right now. Please try again later.')
   }
 
   /** Build a profile from whatever transactions the user already has stored. */

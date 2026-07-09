@@ -8,10 +8,12 @@ import {
   Query,
   Post,
   HttpCode,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
@@ -107,6 +109,42 @@ export class InsightsController {
     }
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     return this.insights.chat(dbUser.id, body.message.slice(0, 2000), (body.history ?? []).slice(-8))
+  }
+
+  /** Streaming assistant (Server-Sent Events) — tokens arrive as they're generated. */
+  @Post('chat/stream')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Streaming assistant (SSE)' })
+  async chatStream(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { message?: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> },
+    @Res() res: Response
+  ) {
+    if (!body?.message || body.message.trim().length === 0) {
+      res.status(400).json({ message: 'message is required' })
+      return
+    }
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache, no-transform')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
+    res.flushHeaders()
+
+    try {
+      await this.insights.chatStream(
+        dbUser.id,
+        body.message.slice(0, 2000),
+        (body.history ?? []).slice(-8),
+        (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`)
+      )
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`)
+    } catch {
+      res.write(`data: ${JSON.stringify({ error: true })}\n\n`)
+    }
+    res.end()
   }
 
   /** Drill-down behind a category, commitment, or month (the click-through drawers). */

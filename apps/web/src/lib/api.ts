@@ -101,6 +101,42 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, token?: stri
   return res.json() as Promise<T>
 }
 
+/** Stream the assistant's reply token-by-token over SSE. */
+export async function streamChat(
+  token: string,
+  message: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  onToken: (t: string) => void
+): Promise<void> {
+  const res = await fetch(`${API_URL}/insights/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message, history }),
+  })
+  if (!res.ok || !res.body) throw new Error('The assistant is unavailable')
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const parts = buf.split('\n\n')
+    buf = parts.pop() ?? ''
+    for (const part of parts) {
+      const line = part.trim()
+      if (!line.startsWith('data:')) continue
+      try {
+        const data = JSON.parse(line.slice(5).trim()) as { token?: string; error?: boolean }
+        if (data.error) throw new Error('assistant error')
+        if (data.token) onToken(data.token)
+      } catch {
+        /* ignore malformed frame */
+      }
+    }
+  }
+}
+
 export const api = {
   auth: {
     sync: (token: string) => apiFetch('/auth/sync', { method: 'POST' }, token),
