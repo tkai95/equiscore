@@ -53,6 +53,8 @@ export interface Period {
 
 export interface IncomeSource {
   name: string
+  /** Normalised counterparty key — used to fetch this source's payments. */
+  key: string
   category: TransactionCategory
   total: number
   monthlyAverage: number

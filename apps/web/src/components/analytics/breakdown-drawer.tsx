@@ -7,7 +7,7 @@ import { Drawer } from '@/components/ui/drawer'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 export interface DrawerSpec {
-  type: 'category' | 'commitment' | 'month'
+  type: 'category' | 'commitment' | 'income' | 'month'
   key: string
   title: string
   subtitle?: string
@@ -66,15 +66,23 @@ export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; on
             <TxnList rows={data.transactions} />
           </Section>
         </div>
-      ) : data.kind === 'commitment' ? (
+      ) : data.kind === 'commitment' || data.kind === 'income' ? (
         <div className="space-y-5">
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Typical" value={formatCurrency(data.typicalAmount)} />
-            <Stat label="Total paid" value={formatCurrency(data.total)} />
+            <Stat
+              label="Typical"
+              value={formatCurrency(data.typicalAmount)}
+              tone={data.kind === 'income' ? 'in' : undefined}
+            />
+            <Stat
+              label={data.kind === 'income' ? 'Total received' : 'Total paid'}
+              value={formatCurrency(data.total)}
+              tone={data.kind === 'income' ? 'in' : undefined}
+            />
             <Stat label="Payments" value={String(data.count)} />
           </div>
-          <Section title="Payment history">
-            <TxnList rows={data.transactions} />
+          <Section title={data.kind === 'income' ? 'Money received' : 'Payment history'}>
+            <TxnList rows={data.transactions} positive={data.kind === 'income'} />
           </Section>
         </div>
       ) : (
@@ -135,7 +143,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function TxnList({ rows }: { rows: TxnRow[] }) {
+function TxnList({ rows, positive }: { rows: TxnRow[]; positive?: boolean }) {
   if (rows.length === 0) return <p className="text-sm text-gray-400">No transactions found.</p>
   return (
     <div className="divide-y divide-gray-50">
@@ -145,7 +153,12 @@ function TxnList({ rows }: { rows: TxnRow[] }) {
             <p className="truncate text-sm text-gray-700">{t.description || 'Transaction'}</p>
             <p className="text-xs text-gray-400">{formatDate(t.date)}</p>
           </div>
-          <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+          <span
+            className={`shrink-0 text-sm font-medium tabular-nums ${
+              positive ? 'text-emerald-600' : 'text-gray-900'
+            }`}
+          >
+            {positive ? '+' : ''}
             {formatCurrency(t.amount)}
           </span>
         </div>

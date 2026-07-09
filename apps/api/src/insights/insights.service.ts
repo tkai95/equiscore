@@ -405,6 +405,7 @@ export class InsightsService implements OnModuleInit {
     const months = new Set(txns.map((t) => monthKey(toDate(t.date)))).size || 1
     if (type === 'category') return this.categoryBreakdown(txns, key, months)
     if (type === 'commitment') return this.commitmentBreakdown(txns, key)
+    if (type === 'income') return this.incomeBreakdown(txns, key)
     if (type === 'month') return this.monthBreakdown(txns, key)
     throw new BadRequestException('Unknown breakdown type')
   }
@@ -455,6 +456,26 @@ export class InsightsService implements OnModuleInit {
     const typicalAmount = amounts.length ? amounts[Math.floor(amounts.length / 2)]! : 0
     return {
       kind: 'commitment' as const,
+      key,
+      total: round2(total),
+      count: matches.length,
+      typicalAmount: round2(typicalAmount),
+      transactions: matches.slice(0, 80).map((t) => ({
+        date: t.date,
+        description: t.description ?? '',
+        amount: round2(t.amount),
+      })),
+    }
+  }
+
+  /** The money received from one income source, payment by payment (credits). */
+  private incomeBreakdown(txns: NormalizedTxn[], key: string) {
+    const matches = txns.filter((t) => t.direction === 'credit' && normalizeCounterparty(t) === key)
+    const total = matches.reduce((s, t) => s + t.amount, 0)
+    const amounts = matches.map((t) => t.amount).sort((a, b) => a - b)
+    const typicalAmount = amounts.length ? amounts[Math.floor(amounts.length / 2)]! : 0
+    return {
+      kind: 'income' as const,
       key,
       total: round2(total),
       count: matches.length,

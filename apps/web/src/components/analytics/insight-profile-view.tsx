@@ -31,7 +31,7 @@ interface InsightProfile {
     recurringSalaryDetected: boolean
     primaryCharacter: string
     characterTags: string[]
-    sources: Array<{ name: string; category: string; monthlyAverage: number; monthsPresent: number; pendingConfirmation: boolean }>
+    sources: Array<{ name: string; key: string; category: string; monthlyAverage: number; monthsPresent: number; pendingConfirmation: boolean }>
     narrative: string
   }
   expenses: {
@@ -401,20 +401,29 @@ export function InsightProfileView() {
           ))}
         </div>
         {income.sources.length > 0 && (
-          <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+          <div className="mt-4 space-y-1 border-t border-gray-100 pt-4">
             {income.sources.map((s) => (
-              <div key={s.name} className="flex items-center justify-between text-sm">
+              <button
+                key={s.name}
+                onClick={() =>
+                  setDrawer({ type: 'income', key: s.key, title: s.name, subtitle: 'Money received' })
+                }
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-50"
+              >
                 <div className="min-w-0">
-                  <span className="font-medium text-gray-800">{s.name}</span>
+                  <span className="flex items-center gap-1 font-medium text-gray-800">
+                    {s.name}
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                  </span>
                   {s.pendingConfirmation && (
-                    <span className="ml-2 text-sm text-amber-600">needs confirmation</span>
+                    <span className="text-sm text-amber-600">needs confirmation</span>
                   )}
                   <span className="block text-sm text-gray-400">{s.monthsPresent} months</span>
                 </div>
-                <span className="font-medium tabular-nums text-gray-900">
+                <span className="shrink-0 font-medium tabular-nums text-gray-900">
                   {formatCurrency(s.monthlyAverage)}/mo
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         )}

@@ -37,6 +37,14 @@ export interface CommitmentBreakdown {
   typicalAmount: number
   transactions: TxnRow[]
 }
+export interface IncomeBreakdown {
+  kind: 'income'
+  key: string
+  total: number
+  count: number
+  typicalAmount: number
+  transactions: TxnRow[]
+}
 export interface MonthBreakdown {
   kind: 'month'
   month: string
@@ -46,7 +54,7 @@ export interface MonthBreakdown {
   categories: Array<{ label: string; total: number }>
   largest: TxnRow[]
 }
-export type Breakdown = CategoryBreakdown | CommitmentBreakdown | MonthBreakdown
+export type Breakdown = CategoryBreakdown | CommitmentBreakdown | IncomeBreakdown | MonthBreakdown
 
 export interface ImportJob {
   id: string
@@ -144,7 +152,7 @@ export const api = {
   },
   insights: {
     getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
-    getBreakdown: (token: string, type: 'category' | 'commitment' | 'month', key: string) =>
+    getBreakdown: (token: string, type: 'category' | 'commitment' | 'income' | 'month', key: string) =>
       apiFetch<Breakdown>(
         `/insights/breakdown?type=${type}&key=${encodeURIComponent(key)}`,
         {},

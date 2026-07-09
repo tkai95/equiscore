@@ -66,9 +66,10 @@ export function analyzeIncome(
   }
 
   const monthsSpan = Math.max(1, monthlyValues.length)
-  const sources: IncomeSource[] = [...byParty.values()]
-    .map((e) => ({
+  const sources: IncomeSource[] = [...byParty.entries()]
+    .map(([key, e]) => ({
       name: e.name,
+      key,
       category: e.cat,
       total: round2(e.total),
       monthlyAverage: round2(e.total / monthsSpan),
