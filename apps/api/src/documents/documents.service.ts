@@ -21,11 +21,17 @@ export class DocumentsService {
     const projectRef = config.get<string>('SUPABASE_PROJECT_REF') ?? ''
     this.bucket = config.get<string>('SUPABASE_STORAGE_BUCKET') ?? 'equiscore-documents'
 
-    // Supabase Storage is S3-compatible — just point the SDK at their endpoint
+    // Supabase's S3 endpoint lives on a dedicated `.storage.supabase.co` subdomain
+    // (NOT `<ref>.supabase.co`). Prefer the exact endpoint from the dashboard via
+    // SUPABASE_S3_ENDPOINT; fall back to the correct constructed form.
+    const endpoint =
+      config.get<string>('SUPABASE_S3_ENDPOINT') ??
+      `https://${projectRef}.storage.supabase.co/storage/v1/s3`
+
     this.s3 = new S3Client({
       forcePathStyle: true,
-      region: config.get<string>('SUPABASE_S3_REGION') ?? 'eu-west-2',
-      endpoint: `https://${projectRef}.supabase.co/storage/v1/s3`,
+      region: config.get<string>('SUPABASE_S3_REGION') ?? 'eu-west-1',
+      endpoint,
       credentials: {
         accessKeyId: config.get<string>('SUPABASE_S3_ACCESS_KEY_ID') ?? '',
         secretAccessKey: config.get<string>('SUPABASE_S3_SECRET_ACCESS_KEY') ?? '',
