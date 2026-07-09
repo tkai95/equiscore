@@ -1,4 +1,15 @@
-import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  BadRequestException,
+  Get,
+  Post,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -73,5 +84,22 @@ export class InsightsController {
   async importCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     return this.insights.importCsv(dbUser.id, dto.csv)
+  }
+
+  /**
+   * Import a PDF bank statement (typed or scanned): Claude extracts the
+   * transactions, then they run through the same parse→score→tamper-check path.
+   */
+  @Post('import-pdf')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Import a PDF bank statement and recompute the score' })
+  async importPdf(@CurrentUser() user: RequestUser, @UploadedFile() file?: Express.Multer.File) {
+    if (!file || file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Please upload a PDF file.')
+    }
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.importPdf(dbUser.id, file.buffer)
   }
 }

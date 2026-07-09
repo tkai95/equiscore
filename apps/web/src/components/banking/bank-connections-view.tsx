@@ -156,16 +156,19 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
     },
   })
 
-  // "Score without Open Banking" — parse a CSV export and import it directly.
+  // "Score without Open Banking" — import a statement (PDF or CSV) directly.
+  // PDFs are read by Claude server-side; CSVs are parsed deterministically.
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const importCsv = useMutation({
+  const importStatement = useMutation({
     mutationFn: async (file: File) => {
-      const csv = await file.text()
       const token = await getToken()
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      if (isPdf) return api.insights.importPdf(token!, file)
+      const csv = await file.text()
       return api.insights.importCsv(token!, csv)
     },
     onSuccess: () => {
-      for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts']]) {
+      for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts'], ['insight-profile']]) {
         void queryClient.invalidateQueries({ queryKey: key })
       }
     },
@@ -405,59 +408,60 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
           <div className="min-w-0 flex-1">
             <p className="font-medium text-gray-900">Can&apos;t connect a bank? Upload a statement</p>
             <p className="mt-0.5 text-sm text-gray-500">
-              Export your transactions as a CSV from your banking app and upload it — we&apos;ll read
-              it and build your profile. Nothing is shared without your say-so.
+              Upload a <strong>PDF</strong> bank statement (a download or a photo works), or a{' '}
+              <strong>CSV</strong> export from your banking app — we&apos;ll read it and build your
+              profile. Nothing is shared without your say-so.
             </p>
 
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".pdf,.csv,application/pdf,text/csv"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) importCsv.mutate(file)
+                if (file) importStatement.mutate(file)
                 e.target.value = ''
               }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={importCsv.isPending}
+              disabled={importStatement.isPending}
               className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
-              <Upload className={cn('h-4 w-4', importCsv.isPending && 'animate-pulse')} />
-              {importCsv.isPending ? 'Reading your statement…' : 'Upload a statement (CSV)'}
+              <Upload className={cn('h-4 w-4', importStatement.isPending && 'animate-pulse')} />
+              {importStatement.isPending ? 'Reading your statement…' : 'Upload a statement (PDF or CSV)'}
             </button>
 
-            {importCsv.isSuccess && importCsv.data && (
+            {importStatement.isSuccess && importStatement.data && (
               <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200">
-                Imported <strong>{importCsv.data.imported}</strong> transactions
-                {importCsv.data.imported > 0 && (
+                Imported <strong>{importStatement.data.imported}</strong> transactions
+                {importStatement.data.imported > 0 && (
                   <>
                     {' '}
-                    ({formatDate(importCsv.data.coverageStart)} – {formatDate(importCsv.data.coverageEnd)})
+                    ({formatDate(importStatement.data.coverageStart)} – {formatDate(importStatement.data.coverageEnd)})
                   </>
                 )}
                 . Your score is now{' '}
                 <strong>
-                  {importCsv.data.overallTier} / {importCsv.data.overallScore}
+                  {importStatement.data.overallTier} / {importStatement.data.overallScore}
                 </strong>
                 .
-                {importCsv.data.ledgerVerified && (
+                {importStatement.data.ledgerVerified && (
                   <span className="mt-1 block text-xs text-emerald-700/80">
                     ✓ Statement ledger verified — every balance reconciles.
                   </span>
                 )}
-                {importCsv.data.skipped > 0 && (
+                {importStatement.data.skipped > 0 && (
                   <span className="mt-1 block text-xs text-emerald-700/80">
-                    {importCsv.data.skipped} rows couldn&apos;t be read and were skipped.
+                    {importStatement.data.skipped} rows couldn&apos;t be read and were skipped.
                   </span>
                 )}
               </div>
             )}
-            {importCsv.isError && (
+            {importStatement.isError && (
               <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
-                {(importCsv.error as Error).message ||
+                {(importStatement.error as Error).message ||
                   "We couldn't read that file. Make sure it's a CSV export from your bank."}
               </div>
             )}

@@ -3,6 +3,7 @@ import { db } from '@equiscore/database'
 import { buildInsightProfile } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
+import { extractTransactionsFromPdf } from './ingest/pdf-extractor'
 import { checkBalanceContinuity } from './engine/integrity'
 import { classifyTransaction } from '../banking/transaction-classifier'
 import { ScoringService } from '../scoring/scoring.service'
@@ -78,34 +79,74 @@ export class InsightsService {
         parsed.warnings.join(' ') || 'No transactions could be read from this file.'
       )
     }
+    return this.persistStatement(userId, parsed.transactions, {
+      sourceType: 'csv',
+      skipped: parsed.detected.rowsSkipped,
+      warnings: parsed.warnings,
+    })
+  }
 
-    const txns = parsed.transactions
+  /**
+   * Import a PDF bank statement (typed or scanned): Claude extracts the
+   * transactions, then they flow through the identical persist + integrity +
+   * scoring path as CSV. AI is confined to the extraction boundary; the ledger
+   * check verifies its output before anything is scored.
+   */
+  async importPdf(userId: string, pdfBuffer: Buffer) {
+    const apiKey = process.env['ANTHROPIC_API_KEY']
+    if (!apiKey) {
+      throw new BadRequestException('Statement reading is not available right now.')
+    }
 
+    const extraction = await extractTransactionsFromPdf(apiKey, pdfBuffer.toString('base64'))
+    if (extraction.transactions.length === 0) {
+      throw new BadRequestException(
+        extraction.warnings.join(' ') || 'No transactions could be read from this statement.'
+      )
+    }
+
+    return this.persistStatement(userId, extraction.transactions, {
+      sourceType: 'pdf',
+      skipped: 0,
+      warnings: extraction.warnings,
+      accountHolderName: extraction.accountHolderName,
+    })
+  }
+
+  /**
+   * Shared statement-persistence path for CSV and PDF: run the anti-tamper
+   * ledger check, persist as a statement-sourced connection, and recompute.
+   */
+  private async persistStatement(
+    userId: string,
+    txns: NormalizedTxn[],
+    opts: { sourceType: 'csv' | 'pdf'; skipped: number; warnings: string[]; accountHolderName?: string | null }
+  ) {
     // Anti-tamper gate. A real bank export is a ledger: each row's running
     // balance must equal the previous balance plus or minus that row's amount.
-    // Editing an amount, or dropping a row from the middle, breaks this. We
-    // refuse to score a statement that doesn't reconcile rather than let a
-    // doctored file produce an inflated score that gets shared with a landlord.
-    // (Statements without a balance column can't be checked, so they pass.)
+    // A doctored CSV — or a misread PDF — breaks this, so we refuse to score it
+    // rather than let a wrong figure inflate a score that gets shared.
+    // (Statements with no balance column can't be checked, so they pass.)
     const integrity = checkBalanceContinuity(txns)
     if (integrity.hasBalances && !integrity.continuous) {
       const b = integrity.breaks[0]
       this.audit.log(userId, 'statement.integrity_failed', {
+        sourceType: opts.sourceType,
         checkedRows: integrity.checkedRows,
         breaks: integrity.breaks.length,
         firstBreak: b ?? null,
       })
+      const where = b ? ` around ${b.date} (expected ${b.expected}, we read ${b.actual})` : ''
       throw new BadRequestException(
-        `This statement's running balance doesn't reconcile${
-          b ? ` around ${b.date} (expected ${b.expected}, the file shows ${b.actual})` : ''
-        }. This usually means the file is incomplete or has been edited. Please upload the original, unmodified export from your bank.`
+        opts.sourceType === 'pdf'
+          ? `The figures we read from this statement don't add up${where} — the scan may be unclear. Please try a clearer copy or a CSV export from your bank.`
+          : `This statement's running balance doesn't reconcile${where}. This usually means the file is incomplete or has been edited. Please upload the original, unmodified export from your bank.`
       )
     }
 
     const dates = txns.map((t) => t.date).sort()
     const coverageStart = dates[0]!
     const coverageEnd = dates[dates.length - 1]!
-    // Closing balance = the balance on the latest-dated row, if the file has one.
     const closingBalance =
       [...txns]
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
@@ -127,6 +168,7 @@ export class InsightsService {
         bankConnectionId: connection.id,
         externalAccountId: `stmt_${connection.id}`,
         accountName: 'Uploaded statement',
+        accountHolderName: opts.accountHolderName ?? undefined,
         accountType: 'current',
         currency: 'GBP',
         currentBalance: closingBalance ?? undefined,
@@ -137,7 +179,6 @@ export class InsightsService {
     await db.bankTransaction.createMany({
       data: txns.map((t, i) => ({
         bankAccountId: account.id,
-        // No provider txn id exists, so synthesize a deterministic, unique one.
         externalTxnId: `${t.date}-${t.direction}-${Math.round(t.amount * 100)}-${i}`,
         bookedAt: new Date(t.date),
         amount: t.amount,
@@ -158,8 +199,9 @@ export class InsightsService {
 
     this.audit.log(userId, 'statement.imported', {
       connectionId: connection.id,
+      sourceType: opts.sourceType,
       transactions: txns.length,
-      skipped: parsed.detected.rowsSkipped,
+      skipped: opts.skipped,
       coverageStart,
       coverageEnd,
     })
@@ -169,13 +211,12 @@ export class InsightsService {
     return {
       connectionId: connection.id,
       imported: txns.length,
-      skipped: parsed.detected.rowsSkipped,
+      skipped: opts.skipped,
       coverageStart,
       coverageEnd,
       closingBalance,
-      // True when the file carried balances and every row reconciled.
       ledgerVerified: integrity.hasBalances && integrity.continuous,
-      warnings: parsed.warnings,
+      warnings: opts.warnings,
       overallScore: score.overallScore,
       overallTier: score.overallTier,
     }

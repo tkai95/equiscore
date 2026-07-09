@@ -85,6 +85,33 @@ export const api = {
   },
   insights: {
     getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
+    importPdf: async (token: string, file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      // Multipart: let the browser set the boundary Content-Type; only send auth.
+      const res = await fetch(`${API_URL}/insights/import-pdf`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      if (!res.ok) {
+        const error = (await res.json().catch(() => ({ message: res.statusText }))) as {
+          message?: string
+        }
+        throw new Error(error.message ?? 'Upload failed')
+      }
+      return res.json() as Promise<{
+        connectionId: string
+        imported: number
+        skipped: number
+        coverageStart: string
+        coverageEnd: string
+        ledgerVerified: boolean
+        warnings: string[]
+        overallScore: number
+        overallTier: string
+      }>
+    },
     importCsv: (token: string, csv: string) =>
       apiFetch<{
         connectionId: string
