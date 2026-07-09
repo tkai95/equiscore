@@ -59,8 +59,10 @@ export async function extractTransactionsFromPdf(
   const client = new Anthropic({ apiKey })
 
   // Stream so a large statement's output can't hit an HTTP timeout.
+  // Sonnet 5: native PDF (typed + scanned), adaptive thinking on by default,
+  // cheaper than Opus. The balance-continuity check downstream guards accuracy.
   const stream = client.messages.stream({
-    model: 'claude-opus-4-8',
+    model: 'claude-sonnet-5',
     max_tokens: 32000,
     messages: [
       {
