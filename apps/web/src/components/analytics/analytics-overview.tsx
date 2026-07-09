@@ -2,40 +2,28 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { MonthlyFlowChart } from './monthly-flow-chart'
-import { CategoryBreakdown } from './category-breakdown'
 import { TopMerchants } from './top-merchants'
 import { InsightsCard } from './insights-card'
 import { InsightProfileView } from './insight-profile-view'
 
-interface Stats {
-  avgMonthlyIncome: number
-  avgMonthlyExpenses: number
-  currentMonthIncome: number
-  currentMonthExpenses: number
-  currentMonthNet: number
-  totalTransactions: number
-  monthsOfData: number
-  savingsRate: number
-}
-
-interface MonthSummary {
+interface MonthlyPoint {
   month: string
   income: number
-  expenses: number
+  spend: number
+  essentialSpend: number
   net: number
+  surplusAfterEssentials: number
 }
 
-interface CategoryData {
-  category: string
-  label: string
-  totalAmount: number
-  transactionCount: number
-  type: 'income' | 'expense'
-  percentage: number
+interface Profile {
+  period: { transactionCount: number; months: number }
+  income: { averageMonthlyIncome: number }
+  expenses: { averageMonthlySpend: number; essentialShare: number }
+  monthly: MonthlyPoint[]
 }
 
 interface MerchantData {
@@ -47,11 +35,7 @@ interface MerchantData {
 }
 
 interface AnalyticsSummary {
-  monthlySummary: MonthSummary[]
-  categoryBreakdown: CategoryData[]
   topMerchants: MerchantData[]
-  stats: Stats
-  monthOverMonth: { incomeChangePct: number; expensesChangePct: number }
 }
 
 interface Insight {
@@ -66,49 +50,36 @@ interface InsightsResponse {
   unavailable?: boolean
 }
 
-function StatCard({
-  label,
-  value,
-  sub,
-  changePct,
-}: {
-  label: string
-  value: string
-  sub?: string
-  changePct?: number
-}) {
-  const hasChange = changePct !== undefined
-  const up = hasChange && changePct > 0
-  const down = hasChange && changePct < 0
+function monthLabel(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  if (!y || !m) return key
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
 
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
-      <div className="mt-1 flex items-center gap-1.5">
-        {hasChange && (
-          <>
-            {up && <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />}
-            {down && <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />}
-            {!up && !down && <Minus className="h-3.5 w-3.5 text-gray-400" />}
-            <span
-              className={`text-xs font-medium ${
-                up ? 'text-emerald-600' : down ? 'text-rose-600' : 'text-gray-400'
-              }`}
-            >
-              {changePct > 0 ? '+' : ''}
-              {changePct}% vs last month
-            </span>
-          </>
-        )}
-        {sub && !hasChange && <span className="text-xs text-gray-400">{sub}</span>}
-      </div>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{value}</p>
+      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
     </div>
   )
 }
 
 export function AnalyticsOverview() {
   const { getToken } = useAuth()
+
+  // Shares the ['insight-profile'] cache with InsightProfileView, so the monthly
+  // trends come from the same deterministic engine as everything above — one
+  // source of truth, no second fetch.
+  const { data: profile } = useQuery<Profile | null>({
+    queryKey: ['insight-profile'],
+    queryFn: async () => {
+      const token = await getToken()
+      return api.insights.getProfile(token!) as Promise<Profile | null>
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
   const summaryQuery = useQuery<AnalyticsSummary>({
     queryKey: ['analytics-summary'],
@@ -126,120 +97,101 @@ export function AnalyticsOverview() {
     },
   })
 
-  const summary = summaryQuery.data
-  const { stats, monthOverMonth } = summary ?? {}
+  const hasData = (profile?.period.transactionCount ?? 0) > 0
+  const monthly = profile?.monthly ?? []
+  const latest = monthly[monthly.length - 1]
 
-  const noData = !summaryQuery.isLoading && summary?.stats.totalTransactions === 0
+  const avgIncome = profile?.income.averageMonthlyIncome ?? 0
+  const avgSpend = profile?.expenses.averageMonthlySpend ?? 0
+  const avgSurplus = avgIncome - avgSpend
+  const surplusPct = avgIncome > 0 ? Math.round((avgSurplus / avgIncome) * 100) : 0
+  const avgSurplusAfterEssentials = avgIncome - avgSpend * (profile?.expenses.essentialShare ?? 0)
+
+  const rankedByNet = [...monthly].sort((a, b) => b.net - a.net)
+  const best = rankedByNet[0]
+  const tightest = rankedByNet.length > 1 ? rankedByNet[rankedByNet.length - 1] : undefined
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
         <p className="mt-1 text-sm text-gray-500">
-          What your bank data says about your income, spending, and reliability — from open banking
-          or an uploaded statement.
+          What your bank data says about your income, spending, and reliability, from Open Banking or
+          an uploaded statement.
         </p>
       </div>
 
       {/* Deterministic insight profile — the primary, explainable view */}
       <InsightProfileView />
 
-      {/* Stats row */}
-      {summaryQuery.isLoading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />
-          ))}
-        </div>
-      ) : noData ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <TrendingUp className="mx-auto h-8 w-8 text-gray-300" />
-          <p className="mt-3 text-sm font-medium text-gray-600">No transaction data yet</p>
-          <p className="mt-1 text-xs text-gray-400">
-            Connect a bank account to see your analytics
-          </p>
-        </div>
-      ) : (
+      {hasData && (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard
-              label="Avg Monthly Income"
-              value={formatCurrency(stats?.avgMonthlyIncome ?? 0)}
-              changePct={monthOverMonth?.incomeChangePct}
-            />
-            <StatCard
-              label="Avg Monthly Expenses"
-              value={formatCurrency(stats?.avgMonthlyExpenses ?? 0)}
-              changePct={monthOverMonth?.expensesChangePct}
-            />
-            <StatCard
-              label="Savings Rate"
-              value={`${stats?.savingsRate ?? 0}%`}
-              sub="of monthly income"
-            />
-            <StatCard
-              label="Transactions"
-              value={(stats?.totalTransactions ?? 0).toLocaleString()}
-              sub={`across ${stats?.monthsOfData ?? 0} months`}
-            />
-          </div>
-
-          {/* Monthly chart */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-gray-700">Income vs Expenses</h2>
-            <MonthlyFlowChart data={summary?.monthlySummary ?? []} />
-          </div>
-
-          {/* Category + Merchants side by side */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-6">
-              <h2 className="mb-4 text-sm font-semibold text-gray-700">Spending by Category</h2>
-              <CategoryBreakdown
-                data={(summary?.categoryBreakdown ?? []).filter((c) => c.type === 'expense')}
+          {/* ── Monthly trends ──────────────────────────────────────────── */}
+          <div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Monthly trends
+            </h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatCard
+                label={`Latest month${latest ? ` · ${monthLabel(latest.month)}` : ''}`}
+                value={`${latest && latest.net >= 0 ? '+' : ''}${formatCurrency(latest?.net ?? 0)}`}
+                sub={
+                  latest
+                    ? `In ${formatCurrency(latest.income)} · Out ${formatCurrency(latest.spend)}`
+                    : undefined
+                }
+              />
+              <StatCard
+                label="Average monthly surplus"
+                value={`${avgSurplus >= 0 ? '+' : ''}${formatCurrency(avgSurplus)}`}
+                sub={`${surplusPct}% of income · ${formatCurrency(avgIncome)} in, ${formatCurrency(avgSpend)} out`}
+              />
+              <StatCard
+                label="Surplus after essentials"
+                value={`${avgSurplusAfterEssentials >= 0 ? '+' : ''}${formatCurrency(avgSurplusAfterEssentials)}`}
+                sub="Income minus essential costs, per month"
               />
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-6">
-              <h2 className="mb-4 text-sm font-semibold text-gray-700">Top Merchants</h2>
-              <TopMerchants data={summary?.topMerchants ?? []} />
+
+            {/* Best / tightest month */}
+            {best && tightest && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4">
+                  <ArrowUpRight className="h-5 w-5 shrink-0 text-emerald-500" />
+                  <div>
+                    <p className="text-xs text-gray-500">Strongest surplus month</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {monthLabel(best.month)} · {best.net >= 0 ? '+' : ''}
+                      {formatCurrency(best.net)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4">
+                  <ArrowDownRight className="h-5 w-5 shrink-0 text-rose-500" />
+                  <div>
+                    <p className="text-xs text-gray-500">Tightest month</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {monthLabel(tightest.month)} · {tightest.net >= 0 ? '+' : ''}
+                      {formatCurrency(tightest.net)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Income vs expenses */}
+            <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
+              <h3 className="mb-4 text-sm font-semibold text-gray-700">Income vs expenses</h3>
+              <MonthlyFlowChart
+                data={monthly.map((m) => ({ month: m.month, income: m.income, expenses: m.spend, net: m.net }))}
+              />
             </div>
           </div>
 
-          {/* Net flow indicator */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">This Month Net</p>
-                <p
-                  className={`mt-1 text-xl font-semibold ${
-                    (stats?.currentMonthNet ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                  }`}
-                >
-                  {(stats?.currentMonthNet ?? 0) >= 0 ? '+' : ''}
-                  {formatCurrency(stats?.currentMonthNet ?? 0)}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center gap-6 text-sm text-gray-500">
-                  <span>
-                    In:{' '}
-                    <span className="font-medium text-emerald-600">
-                      {formatCurrency(stats?.currentMonthIncome ?? 0)}
-                    </span>
-                  </span>
-                  <span>
-                    Out:{' '}
-                    <span className="font-medium text-rose-600">
-                      {formatCurrency(stats?.currentMonthExpenses ?? 0)}
-                    </span>
-                  </span>
-                </div>
-              </div>
-              {(stats?.currentMonthNet ?? 0) >= 0 ? (
-                <TrendingUp className="h-8 w-8 text-emerald-400" />
-              ) : (
-                <TrendingDown className="h-8 w-8 text-rose-400" />
-              )}
-            </div>
+          {/* Top merchants */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <h2 className="mb-4 text-sm font-semibold text-gray-700">Top merchants</h2>
+            <TopMerchants data={summaryQuery.data?.topMerchants ?? []} />
           </div>
 
           {/* Optional AI narrative — supplementary to the deterministic profile above */}
@@ -251,6 +203,16 @@ export function AnalyticsOverview() {
             onGenerate={() => insightsMutation.mutate()}
           />
         </>
+      )}
+
+      {!hasData && !profile && (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <TrendingUp className="mx-auto h-8 w-8 text-gray-300" />
+          <p className="mt-3 text-sm font-medium text-gray-600">No transaction data yet</p>
+          <p className="mt-1 text-xs text-gray-400">
+            Connect a bank account or upload a statement to see your trends.
+          </p>
+        </div>
       )}
     </div>
   )

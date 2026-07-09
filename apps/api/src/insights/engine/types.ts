@@ -195,6 +195,16 @@ export interface OverallScore {
   limitingFactors: string[]
 }
 
+/** One calendar month of cashflow, for trend/best-month/surplus diagnostics. */
+export interface MonthlyPoint {
+  month: string // "YYYY-MM"
+  income: number // money in
+  spend: number // money out, excluding transfers to savings/investments
+  essentialSpend: number // the essential portion of that spend
+  net: number // income − spend
+  surplusAfterEssentials: number // income − essentialSpend
+}
+
 export interface InsightProfile {
   period: Period
   income: IncomeProfile
@@ -210,5 +220,9 @@ export interface InsightProfile {
   /** Fraction of transaction value that is confidently classified (0–1). */
   transactionClarity: number
   overall: OverallScore
+  /** Per-month cashflow series (oldest → newest). */
+  monthly: MonthlyPoint[]
+  /** Plain-English, deterministic summary of the whole profile. */
+  summary: string
   source: ProfileContext['source']
 }

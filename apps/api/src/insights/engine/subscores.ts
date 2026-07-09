@@ -35,12 +35,15 @@ const TIER_THRESHOLDS: Array<{ tier: Tier; min: number }> = [
   { tier: 'E', min: 0 },
 ]
 
+// Strength language only. "Verified" is reserved for the evidence line, which is
+// source-aware (Open Banking vs uploaded statement) — a tier label must never
+// imply bank verification for statement-only evidence.
 const TIER_LABELS: Record<Tier, string> = {
-  A: 'Highly verified and financially stable',
-  B: 'Verified and generally reliable',
-  C: 'Partially verified with moderate confidence',
-  D: 'Limited evidence or inconsistent profile',
-  E: 'Insufficient confidence — further review needed',
+  A: 'Strong financial profile',
+  B: 'Solid, generally reliable profile',
+  C: 'Moderate profile with partial evidence',
+  D: 'Limited or inconsistent profile',
+  E: 'Insufficient evidence for confidence',
 }
 
 export interface SubScoreInput {
@@ -74,7 +77,9 @@ export function computeSubScores(input: SubScoreInput): {
     { key: 'affordability', label: 'Affordability', score: affordability, rating: rate(affordability) },
     { key: 'transactionClarity', label: 'Transaction clarity', score: clarity, rating: rate(clarity) },
     { key: 'evidenceConfidence', label: 'Evidence confidence', score: evidence, rating: rate(evidence) },
-    { key: 'riskFlags', label: 'Risk flags', score: risk, rating: rate(risk) },
+    // Kept keyed 'riskFlags' for the weighting; surfaced to users as "Context"
+    // (a high score means nothing needs explaining, not that risk is "strong").
+    { key: 'riskFlags', label: 'Context', score: risk, rating: rate(risk) },
   ]
 
   const overallScore = Math.round(

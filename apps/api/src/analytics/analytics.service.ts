@@ -34,13 +34,15 @@ export class AnalyticsService {
   constructor(private readonly config: ConfigService) {}
 
   async getSummary(userId: string) {
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-
+    // Anchor everything to the DATA, not the wall clock. An uploaded statement's
+    // coverage ends before "today", so a today-based window would clip the oldest
+    // month (breaking counts vs the insight engine, which reads every row) and
+    // make "this month" empty (the source of the -100% and £0.00 bugs). We load
+    // all rows — statements are bounded — and treat the latest month present as
+    // the current month.
     const transactions = await db.bankTransaction.findMany({
       where: {
         bankAccount: { bankConnection: { userId } },
-        bookedAt: { gte: twelveMonthsAgo },
       },
       select: {
         amount: true,
@@ -56,9 +58,6 @@ export class AnalyticsService {
     const monthlyMap = new Map<string, { income: number; expenses: number }>()
     const categoryTotals = new Map<string, { total: number; count: number }>()
     const merchantTotals = new Map<string, { total: number; count: number; category: string }>()
-
-    const now = new Date()
-    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
     for (const txn of transactions) {
       const d = txn.bookedAt
@@ -95,12 +94,17 @@ export class AnalyticsService {
       }
     })
 
-    const completedMonths = monthlySummary.filter((m) => m.month < currentMonthKey)
+    // The latest month present in the statement IS the current month here.
+    const latestMonthKey = sortedMonths[sortedMonths.length - 1] ?? ''
+    // Average over prior months when there are several (the final month may be a
+    // partial period); fall back to all months when that's all we have.
+    const priorMonths = monthlySummary.filter((m) => m.month < latestMonthKey)
+    const completedMonths = priorMonths.length > 0 ? priorMonths : monthlySummary
     const avgMonthlyIncome = avg(completedMonths.map((m) => m.income))
     const avgMonthlyExpenses = avg(completedMonths.map((m) => m.expenses))
 
-    const currentMonthData = monthlySummary.find((m) => m.month === currentMonthKey)
-    const previousMonthKey = getPreviousMonthKey(currentMonthKey)
+    const currentMonthData = monthlySummary.find((m) => m.month === latestMonthKey)
+    const previousMonthKey = getPreviousMonthKey(latestMonthKey)
     const previousMonthData = monthlySummary.find((m) => m.month === previousMonthKey)
 
     const savingsRate =

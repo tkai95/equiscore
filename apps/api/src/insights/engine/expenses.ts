@@ -16,7 +16,7 @@ interface CatDef {
 }
 
 /** Map a base TransactionCategory (+ description refinement) to a customer-facing bucket. */
-function resolveCategory(t: NormalizedTxn, base: TransactionCategory): CatDef {
+export function resolveCategory(t: NormalizedTxn, base: TransactionCategory): CatDef {
   const desc = t.description ?? ''
   switch (base) {
     case 'rent_payment':

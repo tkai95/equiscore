@@ -1,7 +1,18 @@
-import type { NormalizedTxn, ProfileContext, InsightProfile, StabilitySignals, Period } from './types'
+import type {
+  NormalizedTxn,
+  ProfileContext,
+  InsightProfile,
+  StabilitySignals,
+  Period,
+  MonthlyPoint,
+  IncomeProfile,
+  ExpenseProfile,
+  PaymentBehaviour,
+  SubScore,
+} from './types'
 import { detectRecurringStreams } from './recurrence'
 import { analyzeIncome } from './income'
-import { analyzeExpenses } from './expenses'
+import { analyzeExpenses, resolveCategory } from './expenses'
 import { analyzeCommitments } from './commitments'
 import { detectRisk } from './risk'
 import { checkBalanceContinuity } from './integrity'
@@ -53,6 +64,9 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     pendingQuestionCount: risk.unusual.filter((u) => u.status === 'pending_context').length,
   })
 
+  const monthly = computeMonthly(txns)
+  const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
+
   return {
     period,
     income,
@@ -67,8 +81,110 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     subScores,
     transactionClarity: round2(transactionClarity),
     overall,
+    monthly,
+    summary,
     source: ctx.source,
   }
+}
+
+/**
+ * Per-calendar-month cashflow. Money in vs money out (savings/investment
+ * transfers are not "spend"), and the essential portion of that spend so we can
+ * show surplus-after-essentials, best/tightest month, and the latest month.
+ */
+function computeMonthly(txns: NormalizedTxn[]): MonthlyPoint[] {
+  const map = new Map<string, { income: number; spend: number; essentialSpend: number }>()
+  for (const t of txns) {
+    const key = monthKey(toDate(t.date))
+    const m = map.get(key) ?? { income: 0, spend: 0, essentialSpend: 0 }
+    if (t.direction === 'credit') {
+      m.income += t.amount
+    } else {
+      const base = classify(t)
+      if (base !== 'savings_transfer' && base !== 'investment') {
+        m.spend += t.amount
+        if (resolveCategory(t, base).essential) m.essentialSpend += t.amount
+      }
+    }
+    map.set(key, m)
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([month, m]) => ({
+      month,
+      income: round2(m.income),
+      spend: round2(m.spend),
+      essentialSpend: round2(m.essentialSpend),
+      net: round2(m.income - m.spend),
+      surplusAfterEssentials: round2(m.income - m.essentialSpend),
+    }))
+}
+
+/**
+ * A deterministic, plain-English read of the whole profile. No model involved:
+ * every clause is a template over the sub-scores and cashflow, so the words can
+ * never disagree with the numbers on the page.
+ */
+function buildSummary(p: {
+  income: IncomeProfile
+  expenses: ExpenseProfile
+  subScores: SubScore[]
+  source: ProfileContext['source']
+}): string {
+  const ratingOf = (key: string) => p.subScores.find((s) => s.key === key)?.rating ?? 'medium'
+  const word = (r: string) => (r === 'strong' ? 'strong' : r === 'limited' ? 'limited' : 'moderate')
+
+  // Income clause.
+  const stable =
+    p.income.consistency === 'very_consistent' || p.income.consistency === 'consistent'
+  const charNoun: Record<string, string> = {
+    employment: 'employment income',
+    self_employed: 'self-employed income',
+    gig: 'gig and freelance income',
+    benefits: 'benefits income',
+    mixed: 'income from mixed sources',
+    unclear: 'income that still needs context',
+  }
+  const incomeClause =
+    p.income.averageMonthlyIncome > 0
+      ? `${stable ? 'stable' : 'variable'} ${charNoun[p.income.primaryCharacter] ?? 'income'}`
+      : 'no clearly identified regular income'
+
+  // Payment reliability clause.
+  const payR = ratingOf('essentialPaymentConsistency')
+  const payClause =
+    payR === 'strong'
+      ? 'consistent, on-time essential bill payments'
+      : payR === 'moderate'
+        ? 'generally reliable essential bill payments'
+        : 'some gaps in essential bill payments'
+
+  // Affordability clause.
+  const surplus = p.income.averageMonthlyIncome - p.expenses.averageMonthlySpend
+  const essentialSpend = p.expenses.averageMonthlySpend * p.expenses.essentialShare
+  const surplusAfterEssentials = p.income.averageMonthlyIncome - essentialSpend
+  const affR = ratingOf('affordability')
+  const surplusDescriptor =
+    surplus <= 0
+      ? 'the monthly surplus is negative'
+      : surplusAfterEssentials <= 0
+        ? 'there is little left after essential costs'
+        : affR === 'strong'
+          ? 'there is a comfortable surplus after essential costs'
+          : 'the surplus after essential costs is positive but limited'
+  const affordabilityClause = `Affordability is ${word(affR)} because ${surplusDescriptor}.`
+
+  // Evidence clause.
+  const evR = ratingOf('evidenceConfidence')
+  const evidenceBasis =
+    p.source === 'open_banking'
+      ? 'the profile is based on verified Open Banking data'
+      : p.source === 'statement_upload'
+        ? 'the profile is based on an uploaded statement rather than Open Banking'
+        : 'the profile is based on sample data'
+  const evidenceClause = `Evidence confidence is ${word(evR)} because ${evidenceBasis}.`
+
+  return `This profile shows ${incomeClause} with ${payClause}. ${affordabilityClause} ${evidenceClause}`
 }
 
 function computePeriod(txns: NormalizedTxn[]): Period {
