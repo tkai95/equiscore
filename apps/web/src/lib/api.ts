@@ -68,11 +68,34 @@ export const api = {
     latest: (token: string, type = 'general') =>
       apiFetch(`/scores/latest?type=${type}`, {}, token),
     history: (token: string) => apiFetch('/scores/history', {}, token),
+    impactPreview: (
+      token: string,
+      exclude: { excludeConnectionIds?: string[]; excludeDocumentIds?: string[] }
+    ) =>
+      apiFetch<{
+        current: { overallScore: number; overallTier: string; status: string }
+        projected: { overallScore: number; overallTier: string; status: string }
+        delta: number
+      }>('/scores/impact-preview', { method: 'POST', body: JSON.stringify(exclude) }, token),
   },
   analytics: {
     summary: (token: string) => apiFetch('/analytics/summary', {}, token),
     insights: (token: string) =>
       apiFetch('/analytics/insights', { method: 'POST' }, token),
+  },
+  insights: {
+    importCsv: (token: string, csv: string) =>
+      apiFetch<{
+        connectionId: string
+        imported: number
+        skipped: number
+        coverageStart: string
+        coverageEnd: string
+        ledgerVerified: boolean
+        warnings: string[]
+        overallScore: number
+        overallTier: string
+      }>('/insights/import-csv', { method: 'POST', body: JSON.stringify({ csv }) }, token),
   },
   sharing: {
     create: (token: string, data: unknown) =>

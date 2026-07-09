@@ -7,6 +7,7 @@ import {
   IsString,
   ValidateNested,
   ArrayMaxSize,
+  MaxLength,
 } from 'class-validator'
 
 export class NormalizedTxnDto {
@@ -59,4 +60,26 @@ export class PreviewProfileDto {
   @IsArray()
   @IsString({ each: true })
   resolvedQuestionIds?: string[]
+}
+
+const MAX_CSV_CHARS = 8_000_000 // ~8MB of text; comfortably covers years of statements
+
+export class PreviewCsvDto {
+  @IsString()
+  @MaxLength(MAX_CSV_CHARS)
+  csv!: string
+
+  @IsOptional()
+  @IsString()
+  accountHolderName?: string
+
+  @IsOptional()
+  @IsString()
+  profileName?: string
+}
+
+export class ImportCsvDto {
+  @IsString()
+  @MaxLength(MAX_CSV_CHARS)
+  csv!: string
 }

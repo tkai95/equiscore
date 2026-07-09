@@ -3,9 +3,30 @@ import { db } from '@equiscore/database'
 import type { TrustFeatures } from '@equiscore/shared'
 import { DEFAULT_FEATURES } from '@equiscore/shared'
 
+export interface EvidenceExclusion {
+  connectionIds?: string[]
+  documentIds?: string[]
+}
+
 @Injectable()
 export class FeatureEngineeringService {
-  async computeFeatures(userId: string): Promise<TrustFeatures> {
+  /**
+   * Compute features from a user's evidence.
+   *
+   * `exclude` lets a caller ask "what would the features be *without* this bank
+   * connection or document" — the basis for a deletion-impact preview. It is a
+   * pure read; nothing is persisted.
+   */
+  async computeFeatures(userId: string, exclude?: EvidenceExclusion): Promise<TrustFeatures> {
+    const excludeConnectionFilter =
+      exclude?.connectionIds && exclude.connectionIds.length > 0
+        ? { id: { notIn: exclude.connectionIds } }
+        : {}
+    const excludeDocumentFilter =
+      exclude?.documentIds && exclude.documentIds.length > 0
+        ? { id: { notIn: exclude.documentIds } }
+        : {}
+
     const [user, bankConnections, documents, rentalProfile] = await Promise.all([
       db.user.findUnique({
         where: { id: userId },
@@ -15,7 +36,7 @@ export class FeatureEngineeringService {
         },
       }),
       db.bankConnection.findMany({
-        where: { userId, connectionStatus: 'active' },
+        where: { userId, connectionStatus: 'active', ...excludeConnectionFilter },
         include: {
           bankAccounts: {
             include: {
@@ -26,7 +47,7 @@ export class FeatureEngineeringService {
           },
         },
       }),
-      db.uploadedDocument.findMany({ where: { userId } }),
+      db.uploadedDocument.findMany({ where: { userId, ...excludeDocumentFilter } }),
       db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
     ])
 

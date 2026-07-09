@@ -1,13 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { computeTrustScore, SCORE_VERSION } from '@equiscore/shared'
-import type { ScorecardType, TrustFeatures } from '@equiscore/shared'
-import { FeatureEngineeringService } from './feature-engineering.service'
+import type { ScorecardType, TrustFeatures, TrustTier } from '@equiscore/shared'
+import { FeatureEngineeringService, type EvidenceExclusion } from './feature-engineering.service'
 import { AuditService } from '../audit/audit.service'
 import {
   computeFinancialDataAsOf,
   computeValidUntil,
+  deriveScoreStatus,
+  isCurrent,
   type EvidenceManifestEntry,
+  type ScoreDisplayStatus,
 } from './score-status'
 
 @Injectable()
@@ -79,14 +82,26 @@ export class ScoringService {
    * recent transaction date per connection rather than `lastSyncedAt`. A sync
    * that returns nothing new does not make a stale score fresh again.
    */
-  private async buildEvidenceManifest(userId: string): Promise<EvidenceManifestEntry[]> {
+  private async buildEvidenceManifest(
+    userId: string,
+    exclude?: EvidenceExclusion
+  ): Promise<EvidenceManifestEntry[]> {
+    const excludeConnections =
+      exclude?.connectionIds && exclude.connectionIds.length > 0
+        ? { id: { notIn: exclude.connectionIds } }
+        : {}
+    const excludeDocuments =
+      exclude?.documentIds && exclude.documentIds.length > 0
+        ? { id: { notIn: exclude.documentIds } }
+        : {}
+
     const [connections, documents] = await Promise.all([
       db.bankConnection.findMany({
-        where: { userId, connectionStatus: 'active' },
+        where: { userId, connectionStatus: 'active', ...excludeConnections },
         select: { id: true },
       }),
       db.uploadedDocument.findMany({
-        where: { userId, verificationStatus: { not: 'rejected' } },
+        where: { userId, verificationStatus: { not: 'rejected' }, ...excludeDocuments },
         select: { id: true },
       }),
     ])
@@ -194,6 +209,82 @@ export class ScoringService {
     return db.trustScore.findFirst({
       where: { userId, scorecardType },
       orderBy: { computedAt: 'desc' },
+    })
+  }
+
+  /**
+   * Latest score with its freshness resolved — what the applicant should see
+   * about their own profile, mirroring the recipient view. Legacy scores get a
+   * fallback freshness date from current evidence rather than reading as stale.
+   */
+  async getLatestScoreWithStatus(userId: string, scorecardType: ScorecardType = 'general') {
+    const score = await this.getLatestScore(userId, scorecardType)
+    if (!score) return null
+
+    const manifestIntact = await this.verifyEvidenceIntact(userId, score.evidenceManifest)
+    const { financialDataAsOf, validUntil } = await this.resolveFreshness(userId, score)
+    const status = deriveScoreStatus({ financialDataAsOf, validUntil, manifestIntact, now: new Date() })
+
+    return { ...score, financialDataAsOf, validUntil, status, isCurrent: isCurrent(status) }
+  }
+
+  /**
+   * Dry-run: what the score would be if a piece of evidence were removed.
+   *
+   * Recomputes features both with and without the excluded source and returns
+   * the delta — WITHOUT persisting anything. This is what turns an irreversible
+   * disconnect or deletion into an informed choice ("B/78 → C/59"). Because the
+   * scoring engine is a pure function, this is cheap and exact.
+   */
+  async previewImpact(
+    userId: string,
+    exclude: EvidenceExclusion,
+    scorecardType: ScorecardType = 'general'
+  ): Promise<{
+    current: { overallScore: number; overallTier: TrustTier; status: ScoreDisplayStatus }
+    projected: { overallScore: number; overallTier: TrustTier; status: ScoreDisplayStatus }
+    delta: number
+  }> {
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user) throw new NotFoundException('User not found')
+
+    // Both scores computed live from the same moment, so the delta is internally
+    // consistent even if the stored score predates recent evidence changes.
+    const [currentFeatures, projectedFeatures] = await Promise.all([
+      this.featureEngineering.computeFeatures(userId),
+      this.featureEngineering.computeFeatures(userId, exclude),
+    ])
+
+    const current = computeTrustScore({ userId, scorecardType, features: currentFeatures })
+    const projected = computeTrustScore({ userId, scorecardType, features: projectedFeatures })
+
+    const [currentManifest, projectedManifest] = await Promise.all([
+      this.buildEvidenceManifest(userId),
+      this.buildEvidenceManifest(userId, exclude),
+    ])
+
+    return {
+      current: {
+        overallScore: current.overallScore,
+        overallTier: current.overallTier,
+        status: this.statusFromManifest(currentManifest),
+      },
+      projected: {
+        overallScore: projected.overallScore,
+        overallTier: projected.overallTier,
+        status: this.statusFromManifest(projectedManifest),
+      },
+      delta: projected.overallScore - current.overallScore,
+    }
+  }
+
+  private statusFromManifest(manifest: EvidenceManifestEntry[]): ScoreDisplayStatus {
+    const financialDataAsOf = computeFinancialDataAsOf(manifest)
+    return deriveScoreStatus({
+      financialDataAsOf,
+      validUntil: computeValidUntil(financialDataAsOf),
+      manifestIntact: true,
+      now: new Date(),
     })
   }
 

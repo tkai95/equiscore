@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -16,6 +16,8 @@ import {
   Briefcase,
   ChevronRight,
   Unlink,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -130,6 +132,16 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
     },
   })
 
+  // Dry-run the score impact of disconnecting the bank the user is confirming.
+  const { data: impact, isLoading: impactLoading } = useQuery({
+    queryKey: ['disconnect-impact', confirmingId],
+    enabled: confirmingId !== null,
+    queryFn: async () => {
+      const token = await getToken()
+      return api.scores.impactPreview(token!, { excludeConnectionIds: [confirmingId!] })
+    },
+  })
+
   const disconnectMutation = useMutation({
     mutationFn: async (connectionId: string) => {
       const token = await getToken()
@@ -138,6 +150,21 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
     onSuccess: () => {
       setConfirmingId(null)
       // Removing bank data changes the score and every view derived from it.
+      for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts']]) {
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+    },
+  })
+
+  // "Score without Open Banking" — parse a CSV export and import it directly.
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const importCsv = useMutation({
+    mutationFn: async (file: File) => {
+      const csv = await file.text()
+      const token = await getToken()
+      return api.insights.importCsv(token!, csv)
+    },
+    onSuccess: () => {
       for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts']]) {
         void queryClient.invalidateQueries({ queryKey: key })
       }
@@ -254,8 +281,36 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                           {connection.accounts.length}{' '}
                           {connection.accounts.length === 1 ? 'account' : 'accounts'} and their
                           transaction history. Your trust score will be recalculated without this
-                          data, and is likely to fall.
+                          data.
                         </p>
+
+                        {/* Concrete, dry-run score impact */}
+                        <div className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm ring-1 ring-red-100">
+                          {impactLoading || !impact ? (
+                            <span className="text-red-800/70">Calculating score impact…</span>
+                          ) : impact.delta < 0 ? (
+                            <span className="text-red-900">
+                              Your score would drop from{' '}
+                              <strong>
+                                {impact.current.overallTier} / {impact.current.overallScore}
+                              </strong>{' '}
+                              to{' '}
+                              <strong>
+                                {impact.projected.overallTier} / {impact.projected.overallScore}
+                              </strong>{' '}
+                              ({impact.delta}).
+                            </span>
+                          ) : (
+                            <span className="text-red-900">
+                              Your score would stay at{' '}
+                              <strong>
+                                {impact.projected.overallTier} / {impact.projected.overallScore}
+                              </strong>
+                              .
+                            </span>
+                          )}
+                        </div>
+
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             onClick={() => disconnectMutation.mutate(connection.id)}
@@ -339,6 +394,75 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
         <p className="mt-2 text-xs text-gray-400">
           Powered by TrueLayer · Secure Open Banking · Read-only access
         </p>
+      </div>
+
+      {/* Upload a statement — the no-open-banking path */}
+      <div className="rounded-2xl border border-dashed border-[#D8D6C9] bg-cream/50 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-gray-100">
+            <FileSpreadsheet className="h-5 w-5 text-brand" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-gray-900">Can&apos;t connect a bank? Upload a statement</p>
+            <p className="mt-0.5 text-sm text-gray-500">
+              Export your transactions as a CSV from your banking app and upload it — we&apos;ll read
+              it and build your profile. Nothing is shared without your say-so.
+            </p>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) importCsv.mutate(file)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importCsv.isPending}
+              className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Upload className={cn('h-4 w-4', importCsv.isPending && 'animate-pulse')} />
+              {importCsv.isPending ? 'Reading your statement…' : 'Upload a statement (CSV)'}
+            </button>
+
+            {importCsv.isSuccess && importCsv.data && (
+              <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200">
+                Imported <strong>{importCsv.data.imported}</strong> transactions
+                {importCsv.data.imported > 0 && (
+                  <>
+                    {' '}
+                    ({formatDate(importCsv.data.coverageStart)} – {formatDate(importCsv.data.coverageEnd)})
+                  </>
+                )}
+                . Your score is now{' '}
+                <strong>
+                  {importCsv.data.overallTier} / {importCsv.data.overallScore}
+                </strong>
+                .
+                {importCsv.data.ledgerVerified && (
+                  <span className="mt-1 block text-xs text-emerald-700/80">
+                    ✓ Statement ledger verified — every balance reconciles.
+                  </span>
+                )}
+                {importCsv.data.skipped > 0 && (
+                  <span className="mt-1 block text-xs text-emerald-700/80">
+                    {importCsv.data.skipped} rows couldn&apos;t be read and were skipped.
+                  </span>
+                )}
+              </div>
+            )}
+            {importCsv.isError && (
+              <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
+                {(importCsv.error as Error).message ||
+                  "We couldn't read that file. Make sure it's a CSV export from your bank."}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

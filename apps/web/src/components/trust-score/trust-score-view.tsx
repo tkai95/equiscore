@@ -7,11 +7,18 @@ import { ScoreRing } from './score-ring'
 import { TierBadge } from './tier-badge'
 import { ReasonCodeList } from './reason-code-list'
 import { SubScoreGrid } from './sub-score-grid'
-import { RefreshCw, AlertTriangle } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Clock } from 'lucide-react'
 import { formatDate, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
 import { cn } from '@/lib/utils'
+
+type ScoreDisplayStatus =
+  | 'current'
+  | 'expiring_soon'
+  | 'expired'
+  | 'evidence_withdrawn'
+  | 'insufficient_evidence'
 
 interface TrustScoreData {
   id: string
@@ -27,6 +34,37 @@ interface TrustScoreData {
   fraudRisk: string
   reasonCodes: Array<{ code: string; dimension: string; sentiment: string; message: string; weight: number }>
   computedAt: string
+  status?: ScoreDisplayStatus
+  isCurrent?: boolean
+  financialDataAsOf?: string | null
+  validUntil?: string | null
+}
+
+/** Action-oriented copy for the applicant (recipients get more neutral wording). */
+const APPLICANT_STATUS: Record<
+  Exclude<ScoreDisplayStatus, 'current'>,
+  { tone: 'amber' | 'gray'; title: string; body: string }
+> = {
+  expiring_soon: {
+    tone: 'amber',
+    title: 'Your score is expiring soon',
+    body: 'Sync your bank or upload a newer statement to keep it current for anyone you share it with.',
+  },
+  expired: {
+    tone: 'gray',
+    title: 'Your score has expired',
+    body: 'It was based on financial evidence that is now more than three months old. Refresh your bank data or upload a newer statement to make it current again.',
+  },
+  evidence_withdrawn: {
+    tone: 'gray',
+    title: 'Your score is no longer backed by active evidence',
+    body: 'Reconnect a bank account or upload a statement to restore a current, verifiable score.',
+  },
+  insufficient_evidence: {
+    tone: 'gray',
+    title: 'Add financial evidence to verify your score',
+    body: 'Connect a bank account or upload a bank statement so your score is backed by real financial data.',
+  },
 }
 
 export function TrustScoreView() {
@@ -67,7 +105,12 @@ export function TrustScoreView() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Trust Score</h1>
           {score && (
-            <p className="text-sm text-gray-500">Last updated {formatDate(score.computedAt)}</p>
+            <p className="text-sm text-gray-500">
+              Last updated {formatDate(score.computedAt)}
+              {score.isCurrent && score.validUntil && (
+                <> · Current until {formatDate(score.validUntil)}</>
+              )}
+            </p>
           )}
         </div>
         <button
@@ -79,6 +122,34 @@ export function TrustScoreView() {
           {score ? 'Refresh score' : 'Generate score'}
         </button>
       </div>
+
+      {/* Freshness — the applicant's own view of what recipients will see */}
+      {score && score.status && score.status !== 'current' && (
+        <div
+          className={cn(
+            'flex items-start gap-3 rounded-2xl px-5 py-4 ring-1',
+            APPLICANT_STATUS[score.status].tone === 'amber'
+              ? 'bg-amber-50 text-amber-900 ring-amber-200'
+              : 'bg-gray-100 text-gray-700 ring-gray-300'
+          )}
+        >
+          <Clock
+            className={cn(
+              'mt-0.5 h-5 w-5 shrink-0',
+              APPLICANT_STATUS[score.status].tone === 'amber' ? 'text-amber-600' : 'text-gray-500'
+            )}
+          />
+          <div>
+            <p className="font-semibold">{APPLICANT_STATUS[score.status].title}</p>
+            <p className="mt-1 text-sm opacity-90">{APPLICANT_STATUS[score.status].body}</p>
+            {score.financialDataAsOf && (
+              <p className="mt-1 text-sm opacity-75">
+                Based on financial evidence up to {formatDate(score.financialDataAsOf)}.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {!score && !recompute.isPending && (
         <div className="rounded-2xl border border-[#D8D6C9] bg-cream p-8 text-center">

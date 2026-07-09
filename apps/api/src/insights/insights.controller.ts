@@ -4,7 +4,7 @@ import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { AuthService } from '../auth/auth.service'
 import { InsightsService } from './insights.service'
-import { PreviewProfileDto } from './insights.dto'
+import { PreviewProfileDto, PreviewCsvDto, ImportCsvDto } from './insights.dto'
 
 @ApiTags('insights')
 @Controller('insights')
@@ -35,6 +35,23 @@ export class InsightsController {
     return this.insights.preview(dto)
   }
 
+  /**
+   * Dev-only: parse a CSV statement and build a profile, without persisting.
+   * Fail-closed exactly like /preview.
+   */
+  @Post('preview-csv')
+  @ApiOperation({ summary: 'Parse a CSV statement into a profile (non-production, no persistence)' })
+  previewCsv(@Body() dto: PreviewCsvDto) {
+    const explicitlyEnabled = process.env['INSIGHTS_PREVIEW_ENABLED'] === 'true'
+    if (!explicitlyEnabled || process.env['NODE_ENV'] === 'production') {
+      throw new ForbiddenException('Preview endpoint is not enabled')
+    }
+    return this.insights.previewCsv(dto.csv, {
+      accountHolderName: dto.accountHolderName,
+      profileName: dto.profileName,
+    })
+  }
+
   @Get('profile')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
@@ -42,5 +59,19 @@ export class InsightsController {
   async profile(@CurrentUser() user: RequestUser) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
     return this.insights.getProfileForUser(dbUser.id)
+  }
+
+  /**
+   * Import a CSV bank statement for the signed-in user: parse, persist as a
+   * statement-sourced connection, and recompute the score. This is the
+   * "get a score without Open Banking" path.
+   */
+  @Post('import-csv')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Import a CSV bank statement and recompute the score' })
+  async importCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.importCsv(dbUser.id, dto.csv)
   }
 }
