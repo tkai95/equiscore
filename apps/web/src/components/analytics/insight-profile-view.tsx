@@ -293,21 +293,23 @@ export function InsightProfileView() {
           )}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          {score ? (
-            <>
-              <span className="text-5xl font-bold tabular-nums text-gray-900">
+        {score ? (
+          <div className="mt-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-4xl font-bold text-gray-900">
+                Trust Profile: {score.overallTier}
+              </span>
+              <span className="rounded-lg bg-gray-100 px-3 py-1 text-lg font-semibold tabular-nums text-gray-700">
                 {score.overallScore}
-                <span className="text-2xl font-medium text-gray-300"> / 100</span>
+                <span className="font-medium text-gray-400"> / 100</span>
               </span>
-              <span className="rounded-lg bg-brand/10 px-3 py-1 text-base font-semibold text-brand">
-                Tier {score.overallTier}
-              </span>
-            </>
-          ) : (
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2">
             <span className="text-2xl font-semibold text-gray-400">Not yet generated</span>
-          )}
-        </div>
+          </div>
+        )}
         {score ? (
           <p className="mt-2 text-lg font-semibold text-gray-900">
             {TIER_LABELS[score.overallTier]}

@@ -189,16 +189,17 @@ export default async function PublicProfilePage({ params }: { params: { token: s
           </h1>
 
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-current bg-white">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{profile.trustTier}</div>
-                <div className="text-xs font-medium">{Math.round(profile.overallScore)}</div>
-              </div>
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-current bg-white">
+              <div className="text-3xl font-bold">{profile.trustTier}</div>
             </div>
             <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Trust Profile</p>
               <p className="text-lg font-semibold text-gray-900">{TIER_LABELS[profile.trustTier]}</p>
+              <p className="mt-0.5 text-sm font-medium tabular-nums text-gray-600">
+                Score {Math.round(profile.overallScore)} / 100
+              </p>
               <p className="mt-1 max-w-md text-sm text-gray-600">
-                This profile has been assessed across identity, income, and financial behaviour signals.
+                Assessed across identity, income, and financial behaviour signals.
               </p>
             </div>
           </div>
