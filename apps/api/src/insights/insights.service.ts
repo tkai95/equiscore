@@ -87,30 +87,101 @@ export class InsightsService {
   }
 
   /**
-   * Import a PDF bank statement (typed or scanned): Claude extracts the
-   * transactions, then they flow through the identical persist + integrity +
-   * scoring path as CSV. AI is confined to the extraction boundary; the ledger
-   * check verifies its output before anything is scored.
+   * Start an async PDF import. Reading a PDF with Claude takes 30–90s, so we
+   * create a persisted job, kick off processing in the background, and return
+   * immediately — the user can navigate away or close the browser and pick the
+   * result back up (a global chip polls for completion).
    */
-  async importPdf(userId: string, pdfBuffer: Buffer) {
-    const apiKey = process.env['ANTHROPIC_API_KEY']
-    if (!apiKey) {
-      throw new BadRequestException('Statement reading is not available right now.')
-    }
-
-    const extraction = await extractTransactionsFromPdf(apiKey, pdfBuffer.toString('base64'))
-    if (extraction.transactions.length === 0) {
-      throw new BadRequestException(
-        extraction.warnings.join(' ') || 'No transactions could be read from this statement.'
-      )
-    }
-
-    return this.persistStatement(userId, extraction.transactions, {
-      sourceType: 'pdf',
-      skipped: 0,
-      warnings: extraction.warnings,
-      accountHolderName: extraction.accountHolderName,
+  async startPdfImportJob(userId: string, pdfBuffer: Buffer, fileName?: string) {
+    const job = await db.statementImportJob.create({
+      data: { userId, sourceType: 'pdf', fileName: fileName ?? null, status: 'processing' },
     })
+    // Fire-and-forget; the promise keeps the event loop alive and captures its
+    // own errors onto the job row, so it never rejects unhandled.
+    void this.runPdfImportJob(job.id, userId, pdfBuffer)
+    return { jobId: job.id, status: job.status }
+  }
+
+  private async runPdfImportJob(jobId: string, userId: string, pdfBuffer: Buffer): Promise<void> {
+    try {
+      const apiKey = process.env['ANTHROPIC_API_KEY']
+      if (!apiKey) throw new Error('Statement reading is not available right now.')
+
+      const extraction = await extractTransactionsFromPdf(apiKey, pdfBuffer.toString('base64'))
+
+      // Cancelled during the slow read? Stop before persisting anything.
+      const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
+      if (!current || current.status === 'cancelled') return
+
+      if (extraction.transactions.length === 0) {
+        throw new Error(
+          extraction.warnings.join(' ') || 'No transactions could be read from this statement.'
+        )
+      }
+
+      const result = await this.persistStatement(userId, extraction.transactions, {
+        sourceType: 'pdf',
+        skipped: 0,
+        warnings: extraction.warnings,
+        accountHolderName: extraction.accountHolderName,
+      })
+
+      await db.statementImportJob.update({
+        where: { id: jobId },
+        data: { status: 'completed', result: result as never, completedAt: new Date() },
+      })
+    } catch (err) {
+      await db.statementImportJob
+        .update({
+          where: { id: jobId },
+          data: {
+            status: 'failed',
+            error: err instanceof Error ? err.message : 'Something went wrong reading the statement.',
+            completedAt: new Date(),
+          },
+        })
+        .catch(() => undefined)
+    }
+  }
+
+  // Generous vs. a real read (30–90s): only a genuinely dead job (e.g. the
+  // container restarted and lost the in-process promise) should trip this.
+  private static readonly JOB_STALE_MS = 8 * 60 * 1000
+
+  /** A job stuck "processing" past the timeout (e.g. a container restart) reads as failed. */
+  private withStaleness<T extends { status: string; createdAt: Date }>(job: T): T {
+    if (job.status === 'processing' && Date.now() - job.createdAt.getTime() > InsightsService.JOB_STALE_MS) {
+      return { ...job, status: 'failed', error: 'Timed out while reading the statement. Please try again.' } as T
+    }
+    return job
+  }
+
+  async getImportJob(userId: string, jobId: string) {
+    const job = await db.statementImportJob.findFirst({ where: { id: jobId, userId } })
+    return job ? this.withStaleness(job) : null
+  }
+
+  /** Recent jobs for the global "analysis complete" chip. */
+  async listImportJobs(userId: string) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const jobs = await db.statementImportJob.findMany({
+      where: { userId, createdAt: { gte: since } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    })
+    return jobs.map((j) => this.withStaleness(j))
+  }
+
+  async cancelImportJob(userId: string, jobId: string) {
+    const job = await db.statementImportJob.findFirst({ where: { id: jobId, userId } })
+    if (!job) throw new NotFoundException('Import not found')
+    if (job.status === 'processing') {
+      return db.statementImportJob.update({
+        where: { id: jobId },
+        data: { status: 'cancelled', completedAt: new Date() },
+      })
+    }
+    return job
   }
 
   /**

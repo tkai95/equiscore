@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   BadRequestException,
   Get,
+  Param,
   Post,
+  HttpCode,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -87,19 +89,54 @@ export class InsightsController {
   }
 
   /**
-   * Import a PDF bank statement (typed or scanned): Claude extracts the
-   * transactions, then they run through the same parse→score→tamper-check path.
+   * Import a PDF bank statement (typed or scanned). Reading a PDF with Claude
+   * takes 30–90s, so this returns a job immediately and processes in the
+   * background — the client polls the job and shows a completion chip. The user
+   * can navigate away or close the browser; the job survives in the DB.
    */
   @Post('import-pdf')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024 } }))
-  @ApiOperation({ summary: 'Import a PDF bank statement and recompute the score' })
+  @ApiOperation({ summary: 'Start an async PDF statement import; returns a job to poll' })
   async importPdf(@CurrentUser() user: RequestUser, @UploadedFile() file?: Express.Multer.File) {
     if (!file || file.mimetype !== 'application/pdf') {
       throw new BadRequestException('Please upload a PDF file.')
     }
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
-    return this.insights.importPdf(dbUser.id, file.buffer)
+    return this.insights.startPdfImportJob(dbUser.id, file.buffer, file.originalname)
+  }
+
+  /** Recent import jobs — drives the global "analysis complete" chip. */
+  @Get('import-jobs')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List recent statement import jobs' })
+  async importJobs(@CurrentUser() user: RequestUser) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.listImportJobs(dbUser.id)
+  }
+
+  /** Poll a single import job's status/result. */
+  @Get('import-jobs/:id')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a statement import job by id' })
+  async importJob(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    const job = await this.insights.getImportJob(dbUser.id, id)
+    if (!job) throw new BadRequestException('Import not found')
+    return job
+  }
+
+  /** Cancel an in-progress import (best-effort: the result is discarded). */
+  @Post('import-jobs/:id/cancel')
+  @HttpCode(200)
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel an in-progress statement import' })
+  async cancelImportJob(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.cancelImportJob(dbUser.id, id)
   }
 }

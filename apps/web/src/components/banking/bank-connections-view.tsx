@@ -4,7 +4,8 @@ import { useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { api, type StatementImportResult } from '@/lib/api'
+import { useImportJobs } from '@/lib/use-import-jobs'
 import {
   Landmark,
   RefreshCw,
@@ -18,6 +19,8 @@ import {
   Unlink,
   Upload,
   FileSpreadsheet,
+  Loader2,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -157,13 +160,18 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
   })
 
   // "Score without Open Banking" — import a statement (PDF or CSV) directly.
-  // PDFs are read by Claude server-side; CSVs are parsed deterministically.
+  // CSV parses deterministically in-request, so it stays synchronous. A PDF is
+  // read by Claude (30–90s), so it runs as a background job: we return instantly
+  // and the user can leave the page — the global chip announces completion.
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const importStatement = useMutation({
-    mutationFn: async (file: File) => {
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+
+  const { data: jobs = [] } = useImportJobs()
+  const activeJob = activeJobId ? jobs.find((j) => j.id === activeJobId) : undefined
+
+  const importCsvMut = useMutation({
+    mutationFn: async (file: File): Promise<StatementImportResult> => {
       const token = await getToken()
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-      if (isPdf) return api.insights.importPdf(token!, file)
       const csv = await file.text()
       return api.insights.importCsv(token!, csv)
     },
@@ -173,6 +181,42 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
       }
     },
   })
+
+  const startPdfMut = useMutation({
+    mutationFn: async (file: File) => {
+      const token = await getToken()
+      return api.insights.importPdf(token!, file)
+    },
+    onSuccess: (data) => {
+      setActiveJobId(data.jobId)
+      // Start polling immediately so the "reading…" state appears at once.
+      void queryClient.invalidateQueries({ queryKey: ['import-jobs'] })
+    },
+  })
+
+  const cancelMut = useMutation({
+    mutationFn: async (jobId: string) => {
+      const token = await getToken()
+      return api.insights.cancelImportJob(token!, jobId)
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['import-jobs'] }),
+  })
+
+  const handleFile = (file: File) => {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    importCsvMut.reset()
+    startPdfMut.reset()
+    if (isPdf) {
+      setActiveJobId(null)
+      startPdfMut.mutate(file)
+    } else {
+      setActiveJobId(null)
+      importCsvMut.mutate(file)
+    }
+  }
+
+  const isBusy =
+    startPdfMut.isPending || importCsvMut.isPending || activeJob?.status === 'processing'
 
   const connections = groupByConnection(accounts)
   const hasAccounts = accounts.length > 0
@@ -420,54 +464,115 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) importStatement.mutate(file)
+                if (file) handleFile(file)
                 e.target.value = ''
               }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={importStatement.isPending}
+              disabled={isBusy}
               className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
-              <Upload className={cn('h-4 w-4', importStatement.isPending && 'animate-pulse')} />
-              {importStatement.isPending ? 'Reading your statement…' : 'Upload a statement (PDF or CSV)'}
+              {isBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {startPdfMut.isPending
+                ? 'Uploading…'
+                : importCsvMut.isPending
+                  ? 'Reading your statement…'
+                  : activeJob?.status === 'processing'
+                    ? 'Reading your statement…'
+                    : 'Upload a statement (PDF or CSV)'}
             </button>
 
-            {importStatement.isSuccess && importStatement.data && (
-              <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200">
-                Imported <strong>{importStatement.data.imported}</strong> transactions
-                {importStatement.data.imported > 0 && (
-                  <>
-                    {' '}
-                    ({formatDate(importStatement.data.coverageStart)} – {formatDate(importStatement.data.coverageEnd)})
-                  </>
-                )}
-                . Your score is now{' '}
-                <strong>
-                  {importStatement.data.overallTier} / {importStatement.data.overallScore}
-                </strong>
-                .
-                {importStatement.data.ledgerVerified && (
-                  <span className="mt-1 block text-xs text-emerald-700/80">
-                    ✓ Statement ledger verified — every balance reconciles.
-                  </span>
-                )}
-                {importStatement.data.skipped > 0 && (
-                  <span className="mt-1 block text-xs text-emerald-700/80">
-                    {importStatement.data.skipped} rows couldn&apos;t be read and were skipped.
-                  </span>
-                )}
+            {/* PDF job is running in the background — the user is free to leave. */}
+            {activeJob?.status === 'processing' && (
+              <div className="mt-3 rounded-lg bg-white px-3.5 py-2.5 text-sm text-charcoal-mid ring-1 ring-[#D8D6C9]">
+                <p className="flex items-center gap-2 font-medium">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+                  Reading your statement…
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  This usually takes under a minute. You can leave this page or close the tab — we&apos;ll
+                  show a ✓ up top when it&apos;s done.
+                </p>
+                <button
+                  onClick={() => cancelMut.mutate(activeJob.id)}
+                  disabled={cancelMut.isPending}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {cancelMut.isPending ? 'Cancelling…' : 'Cancel'}
+                </button>
               </div>
             )}
-            {importStatement.isError && (
+
+            {/* Completed PDF job */}
+            {activeJob?.status === 'completed' && activeJob.result && (
+              <ImportSummary data={activeJob.result} />
+            )}
+            {activeJob?.status === 'failed' && (
               <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
-                {(importStatement.error as Error).message ||
-                  "We couldn't read that file. Make sure it's a CSV export from your bank."}
+                {activeJob.error || "We couldn't read that statement. Try a clearer copy or a CSV export."}
+              </div>
+            )}
+            {activeJob?.status === 'cancelled' && (
+              <div className="mt-3 rounded-lg bg-cream px-3.5 py-2.5 text-sm text-charcoal-mid ring-1 ring-[#D8D6C9]">
+                Import cancelled. Nothing was saved — you can upload again whenever you&apos;re ready.
+              </div>
+            )}
+
+            {/* Synchronous CSV result */}
+            {importCsvMut.isSuccess && importCsvMut.data && <ImportSummary data={importCsvMut.data} />}
+
+            {/* Failure to even start the import (bad file, network, PDF reader off) */}
+            {(startPdfMut.isError || importCsvMut.isError) && (
+              <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
+                {((startPdfMut.error ?? importCsvMut.error) as Error)?.message ||
+                  "We couldn't read that file. Make sure it's a CSV export or a clear PDF."}
               </div>
             )}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Shared success summary for a completed import (PDF job result or CSV result). */
+function ImportSummary({ data }: { data: StatementImportResult }) {
+  return (
+    <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200">
+      Imported <strong>{data.imported}</strong> transactions
+      {data.imported > 0 && (
+        <>
+          {' '}
+          ({formatDate(data.coverageStart)} – {formatDate(data.coverageEnd)})
+        </>
+      )}
+      . Your score is now{' '}
+      <strong>
+        {data.overallTier} / {data.overallScore}
+      </strong>
+      .{' '}
+      <Link
+        href="/dashboard/analytics"
+        className="font-semibold underline underline-offset-2 hover:text-emerald-900"
+      >
+        View insights
+      </Link>
+      {data.ledgerVerified && (
+        <span className="mt-1 block text-xs text-emerald-700/80">
+          ✓ Statement ledger verified — every balance reconciles.
+        </span>
+      )}
+      {data.skipped > 0 && (
+        <span className="mt-1 block text-xs text-emerald-700/80">
+          {data.skipped} rows couldn&apos;t be read and were skipped.
+        </span>
+      )}
     </div>
   )
 }

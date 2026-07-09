@@ -1,5 +1,30 @@
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000/api/v1'
 
+export type ImportJobStatus = 'processing' | 'completed' | 'failed' | 'cancelled'
+
+export interface StatementImportResult {
+  connectionId: string
+  imported: number
+  skipped: number
+  coverageStart: string
+  coverageEnd: string
+  ledgerVerified: boolean
+  warnings: string[]
+  overallScore: number
+  overallTier: string
+}
+
+export interface ImportJob {
+  id: string
+  status: ImportJobStatus
+  sourceType: string
+  fileName: string | null
+  result: StatementImportResult | null
+  error: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -85,6 +110,7 @@ export const api = {
   },
   insights: {
     getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
+    // Starts an async import; returns a job to poll (PDF reads take 30–90s).
     importPdf: async (token: string, file: File) => {
       const form = new FormData()
       form.append('file', file)
@@ -100,30 +126,20 @@ export const api = {
         }
         throw new Error(error.message ?? 'Upload failed')
       }
-      return res.json() as Promise<{
-        connectionId: string
-        imported: number
-        skipped: number
-        coverageStart: string
-        coverageEnd: string
-        ledgerVerified: boolean
-        warnings: string[]
-        overallScore: number
-        overallTier: string
-      }>
+      return res.json() as Promise<{ jobId: string; status: ImportJobStatus }>
     },
+    listImportJobs: (token: string) =>
+      apiFetch<ImportJob[]>('/insights/import-jobs', {}, token),
+    getImportJob: (token: string, id: string) =>
+      apiFetch<ImportJob>(`/insights/import-jobs/${id}`, {}, token),
+    cancelImportJob: (token: string, id: string) =>
+      apiFetch<ImportJob>(`/insights/import-jobs/${id}/cancel`, { method: 'POST' }, token),
     importCsv: (token: string, csv: string) =>
-      apiFetch<{
-        connectionId: string
-        imported: number
-        skipped: number
-        coverageStart: string
-        coverageEnd: string
-        ledgerVerified: boolean
-        warnings: string[]
-        overallScore: number
-        overallTier: string
-      }>('/insights/import-csv', { method: 'POST', body: JSON.stringify({ csv }) }, token),
+      apiFetch<StatementImportResult>(
+        '/insights/import-csv',
+        { method: 'POST', body: JSON.stringify({ csv }) },
+        token
+      ),
   },
   sharing: {
     create: (token: string, data: unknown) =>

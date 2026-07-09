@@ -27,6 +27,7 @@ model User {
   trustFeatures  TrustFeature[]
   trustScores    TrustScore[]
   sharedProfiles SharedProfile[]
+  statementImportJobs StatementImportJob[]
   auditEvents    AuditEvent[]
 
   @@map("users")
@@ -486,6 +487,37 @@ model SharedProfile {
   trustScore TrustScore @relation(fields: [trustScoreId], references: [id])
 
   @@map("shared_profiles")
+}
+
+// ─── Statement Import Jobs ────────────────────────────────────────────────────
+// Async ingestion of an uploaded statement (PDF read by Claude takes 30–90s).
+// Persisted so the user can navigate away / close the browser and still see the
+// result — and so a global "analysis complete" chip can pick it up on any page.
+
+model StatementImportJob {
+  id          String                   @id @default(cuid())
+  userId      String                   @map("user_id")
+  status      StatementImportJobStatus @default(processing)
+  sourceType  String                   @default("pdf") @map("source_type")
+  fileName    String?                  @map("file_name")
+  result      Json?                    // { imported, coverageStart, coverageEnd, ledgerVerified, overallScore, overallTier }
+  error       String?
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  completedAt DateTime?                @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("statement_import_jobs")
+}
+
+enum StatementImportJobStatus {
+  processing
+  completed
+  failed
+  cancelled
+
+  @@map("statement_import_job_status")
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────
