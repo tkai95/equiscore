@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import type { TrustFeatures } from '@equiscore/shared'
 import { DEFAULT_FEATURES } from '@equiscore/shared'
+import { buildInsightProfile } from '../insights/engine'
+import type { NormalizedTxn } from '../insights/engine'
 
 export interface EvidenceExclusion {
   connectionIds?: string[]
@@ -84,54 +86,63 @@ export class FeatureEngineeringService {
     features.connectedAccountsCount = allAccounts.length
 
     if (allTransactions.length > 0) {
-      const sortedDates = allTransactions
-        .map((t) => t.bookedAt)
-        .sort((a, b) => a.getTime() - b.getTime())
+      // Source the banking signals from the SAME deterministic engine the
+      // Insights page uses, so the Trust Score reflects that behavioural analysis
+      // (stream-based income, behavioural salary/rent detection, detected
+      // rent-to-income) rather than a second, cruder keyword pass. This is what
+      // makes the number a landlord sees agree with the profile they see.
+      const normTxns: NormalizedTxn[] = allTransactions.map((t) => ({
+        date: t.bookedAt.toISOString().slice(0, 10),
+        amount: Math.abs(t.amount),
+        direction: t.direction as 'credit' | 'debit',
+        description: t.description,
+        merchantName: t.merchantName ?? null,
+        balance: null,
+      }))
+      const insight = buildInsightProfile(normTxns, {
+        source: features.openBankingConnected ? 'open_banking' : 'statement_upload',
+        accountHolderName: allAccounts.find((a) => a.accountHolderName)?.accountHolderName ?? null,
+        profileName: profile?.fullName ?? null,
+        declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
+        resolvedQuestionIds: [],
+      })
 
-      const oldestDate = sortedDates[0]!
-      const newestDate = sortedDates[sortedDates.length - 1]!
-      const monthsDiff =
-        (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
-      features.monthsOfBankHistory = Math.min(Math.round(monthsDiff), 24)
+      features.monthsOfBankHistory = Math.min(insight.period.months, 24)
+      features.averageMonthlyIncome = insight.income.averageMonthlyIncome
+      features.incomeVolatility = insight.income.volatility
+      features.recurringSalaryDetected = insight.income.recurringSalaryDetected
+      features.recurringRentDetected = insight.commitments.some((c) => c.category === 'rent_payment')
+      features.missedPaymentIndicators =
+        insight.paymentBehaviour.missedPayments + insight.paymentBehaviour.returnedPayments
 
-      // Monthly income aggregation (credits, excluding internal transfers)
-      const monthlyIncomes = this.aggregateMonthlyCredits(allTransactions)
-      if (monthlyIncomes.length > 0) {
-        features.averageMonthlyIncome = this.average(monthlyIncomes)
-        features.incomeVolatility = this.coefficientOfVariation(monthlyIncomes)
-      }
-
-      // Salary detection: consistent monthly credits within ±15% range
-      features.recurringSalaryDetected = this.detectRecurringSalary(allTransactions)
-
-      // Rent detection
-      features.recurringRentDetected = this.detectRecurringRent(allTransactions)
-
-      features.missedPaymentIndicators = this.detectMissedPayments(allTransactions)
-
-      // End-of-month balances
+      // Balance-derived features stay on the local reconstruction: it uses each
+      // account's currentBalance, whereas the engine relies on per-transaction
+      // balances that aren't persisted.
       const endOfMonthBalances = this.computeEndOfMonthBalances(allAccounts)
       if (endOfMonthBalances.length > 0) {
         features.averageEndMonthBalance = this.average(endOfMonthBalances)
       }
-
-      // Overdraft dependency
       const monthsInOverdraft = endOfMonthBalances.filter((b) => b < 0).length
       features.overdraftDependency = monthsInOverdraft / Math.max(endOfMonthBalances.length, 1)
 
-      // Savings buffer: months of essential spend
       const avgMonthlySpend = this.computeAverageMonthlySpend(allTransactions)
       if (avgMonthlySpend > 0 && features.averageEndMonthBalance > 0) {
         features.savingsMonthsBuffer = features.averageEndMonthBalance / avgMonthlySpend
       }
 
-      // Rent-to-income ratio
-      const declaredRent = rentalProfile?.monthlyRentDeclared ?? 0
-      if (declaredRent > 0 && features.averageMonthlyIncome > 0) {
-        features.rentToIncomeRatio = declaredRent / features.averageMonthlyIncome
+      // Rent-to-income: prefer the rent the engine actually detected; fall back
+      // to a declared figure only when no rent was found in the transactions.
+      const detectedRentRatio = insight.affordability.ratios.rentToIncome
+      if (detectedRentRatio !== null) {
+        features.rentToIncomeRatio = detectedRentRatio
+      } else {
+        const declaredRent = rentalProfile?.monthlyRentDeclared ?? 0
+        if (declaredRent > 0 && features.averageMonthlyIncome > 0) {
+          features.rentToIncomeRatio = declaredRent / features.averageMonthlyIncome
+        }
       }
 
-      // Name match check
+      // Name match (identity signal) stays local.
       const profileName = profile?.fullName?.toLowerCase() ?? ''
       const accountNames = allAccounts.map((a) => a.accountHolderName?.toLowerCase() ?? '')
       features.accountHolderNameMatch =
@@ -169,67 +180,6 @@ export class FeatureEngineeringService {
       : 0
 
     return features
-  }
-
-  private aggregateMonthlyCredits(
-    transactions: Array<{ direction: string; amount: number; bookedAt: Date; category: string | null }>
-  ): number[] {
-    const monthly = new Map<string, number>()
-
-    for (const txn of transactions) {
-      if (txn.direction !== 'credit') continue
-      if (txn.category === 'savings_transfer') continue
-
-      const key = `${txn.bookedAt.getFullYear()}-${txn.bookedAt.getMonth()}`
-      monthly.set(key, (monthly.get(key) ?? 0) + txn.amount)
-    }
-
-    return Array.from(monthly.values())
-  }
-
-  private detectRecurringSalary(
-    transactions: Array<{ direction: string; amount: number; bookedAt: Date; category: string | null; description: string | null }>
-  ): boolean {
-    const salaryTxns = transactions.filter(
-      (t) =>
-        t.direction === 'credit' &&
-        (t.category === 'salary' ||
-          /salary|payroll|wages|employer/i.test(t.description ?? ''))
-    )
-
-    if (salaryTxns.length < 2) return false
-
-    const months = new Set(
-      salaryTxns.map((t) => `${t.bookedAt.getFullYear()}-${t.bookedAt.getMonth()}`)
-    )
-    return months.size >= 2
-  }
-
-  private detectRecurringRent(
-    transactions: Array<{ direction: string; amount: number; bookedAt: Date; category: string | null; description: string | null }>
-  ): boolean {
-    const rentTxns = transactions.filter(
-      (t) =>
-        t.direction === 'debit' &&
-        (t.category === 'rent_payment' ||
-          /rent|landlord|letting/i.test(t.description ?? ''))
-    )
-
-    if (rentTxns.length < 2) return false
-
-    const months = new Set(
-      rentTxns.map((t) => `${t.bookedAt.getFullYear()}-${t.bookedAt.getMonth()}`)
-    )
-    return months.size >= 2
-  }
-
-  private detectMissedPayments(
-    transactions: Array<{ direction: string; amount: number; description: string | null }>
-  ): number {
-    // Returned/bounced payments appear as credits reversing a failed debit
-    // (returned DD, unpaid standing order, recalled payment)
-    const RETURN_PATTERN = /\b(returned|unpaid|unpaids|bounced|recalled|reversal|reversed|return unpaid)\b/i
-    return transactions.filter((t) => t.description && RETURN_PATTERN.test(t.description)).length
   }
 
   private computeEndOfMonthBalances(
@@ -298,13 +248,6 @@ export class FeatureEngineeringService {
     return nums.reduce((a, b) => a + b, 0) / nums.length
   }
 
-  private coefficientOfVariation(nums: number[]): number {
-    if (nums.length < 2) return 0
-    const avg = this.average(nums)
-    if (avg === 0) return 1
-    const variance = nums.reduce((acc, n) => acc + Math.pow(n - avg, 2), 0) / nums.length
-    return Math.sqrt(variance) / avg
-  }
 
   private nameMatchScore(a: string, b: string): number {
     if (!a || !b) return 0
