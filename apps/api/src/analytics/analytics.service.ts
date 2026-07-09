@@ -182,9 +182,11 @@ export class AnalyticsService {
   }
 
   async getInsights(userId: string) {
-    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY')
-    if (!apiKey) {
-      this.logger.warn('ANTHROPIC_API_KEY not set — insights unavailable')
+    // GLM (Z.ai) if configured, else Claude. Note: this narrative path sends
+    // *aggregated* summary figures (income, category/merchant totals) — never
+    // raw statements — to whichever provider is set.
+    if (!this.config.get<string>('GLM_API_KEY') && !this.config.get<string>('ANTHROPIC_API_KEY')) {
+      this.logger.warn('No insights LLM key set (GLM_API_KEY / ANTHROPIC_API_KEY) — insights unavailable')
       return { insights: [], generatedAt: new Date().toISOString(), unavailable: true }
     }
 
@@ -222,15 +224,10 @@ Return ONLY valid JSON, no markdown or other text:
 {"insights":[{"type":"positive"|"warning"|"info","title":"max 6 word title","body":"1-2 sentences with specific £ amounts or percentages"}]}`
 
     try {
-      const client = new Anthropic({ apiKey })
-      const response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      })
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : '{}'
-      const parsed = JSON.parse(text) as {
+      const text = await this.generateNarrative(prompt)
+      // Parse defensively — a model may wrap the JSON in prose or fences.
+      const jsonStr = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
+      const parsed = JSON.parse(jsonStr) as {
         insights: Array<{ type: string; title: string; body: string }>
       }
       return { insights: parsed.insights ?? [], generatedAt: new Date().toISOString() }
@@ -238,6 +235,37 @@ Return ONLY valid JSON, no markdown or other text:
       this.logger.warn(`Insights generation failed: ${String(err)}`)
       return { insights: [], generatedAt: new Date().toISOString(), error: 'Failed to generate insights' }
     }
+  }
+
+  /**
+   * Generate the narrative from a prompt. Prefers GLM (Z.ai, OpenAI-compatible)
+   * when GLM_API_KEY is set; otherwise Claude Haiku. Extraction of raw
+   * statements stays on Claude and never routes here.
+   */
+  private async generateNarrative(prompt: string): Promise<string> {
+    const glmKey = this.config.get<string>('GLM_API_KEY')
+    if (glmKey) {
+      const baseUrl = this.config.get<string>('GLM_BASE_URL') ?? 'https://api.z.ai/api/paas/v4'
+      const model = this.config.get<string>('GLM_MODEL') ?? 'glm-5.2'
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
+        body: JSON.stringify({ model, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
+      })
+      if (!res.ok) {
+        throw new Error(`GLM request failed: ${res.status} ${await res.text().catch(() => '')}`)
+      }
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+      return data.choices?.[0]?.message?.content ?? '{}'
+    }
+
+    const client = new Anthropic({ apiKey: this.config.get<string>('ANTHROPIC_API_KEY') })
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    return response.content[0]?.type === 'text' ? response.content[0].text : '{}'
   }
 
   private cleanDescription(desc: string | null): string {
