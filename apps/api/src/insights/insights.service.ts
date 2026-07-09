@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
+import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@equiscore/database'
 import { buildInsightProfile } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
@@ -400,6 +401,129 @@ export class InsightsService implements OnModuleInit {
     this.audit.log(userId, 'insight.question_answered', { questionId })
     const score = await this.scoringService.recompute(userId)
     return { ok: true, overallScore: score.overallScore, overallTier: score.overallTier }
+  }
+
+  /**
+   * Grounded assistant. The user asks about their payments, profile, or the
+   * site; the LLM answers over a compact, deterministic snapshot of their own
+   * data (never inventing figures). AI stays at the phrasing boundary — every
+   * number it quotes came from the engine.
+   */
+  async chat(
+    userId: string,
+    message: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<{ answer: string }> {
+    const context = await this.buildChatContext(userId)
+    const system = `You are the EquiScore assistant. EquiScore turns someone's bank data into a shareable Trust Profile (a score out of 100 and a tier A to E) that proves their financial reliability to landlords and lenders, alongside insights into their income, spending, affordability, and payment reliability.
+
+Answer the user's question using ONLY the data below about THEIR profile. Be concise, warm, and specific with numbers (use £). If the data does not contain the answer, say you do not have that information — never invent figures.
+
+You can also help them use the site. Pages: Dashboard (overview and the single best next step), My Trust Score (the score, why it is what it is, and how to raise it), Analytics (income, spending, commitments, affordability, monthly trends, and follow-up questions to explain flagged transactions), Connections (connect a bank via Open Banking or upload a statement), Documents (upload ID or proof of address), Share Profile (create a link to share with a landlord or lender).
+
+THEIR DATA:
+${context}`
+
+    const recent = history.slice(-8).map((m) => ({ role: m.role, content: m.content }))
+    const answer = await this.callAssistant(system, recent, message)
+    this.audit.log(userId, 'insight.chat', { chars: message.length })
+    return { answer }
+  }
+
+  private async buildChatContext(userId: string): Promise<string> {
+    const [profile, score] = await Promise.all([
+      this.getProfileForUser(userId).catch(() => null),
+      db.trustScore.findFirst({ where: { userId }, orderBy: { computedAt: 'desc' } }),
+    ])
+    const lines: string[] = []
+    if (score) {
+      lines.push(
+        `Trust Score: ${score.overallScore}/100, Tier ${score.overallTier}. Dimensions — profile completeness ${score.profileCompletenessScore}, verification strength ${score.verificationStrengthScore}, identity confidence ${score.identityConfidenceScore}, income stability ${score.incomeStabilityScore}, affordability ${score.affordabilityScore}, rental reliability ${score.rentalReliabilityScore}, financial stability ${score.financialStabilityScore}.`
+      )
+    }
+    if (profile && profile.period.transactionCount > 0) {
+      const p = profile
+      lines.push(
+        `Evidence: ${p.source}, ${p.period.months} months, ${p.period.transactionCount} transactions (${p.period.from} to ${p.period.to}).`
+      )
+      lines.push(
+        `Income: about £${p.income.averageMonthlyIncome}/month, ${p.income.primaryCharacter}, ${p.income.consistency}${p.income.recurringSalaryDetected ? ', recurring salary detected' : ''}. Sources: ${p.income.sources.map((s) => `${s.name} £${s.monthlyAverage}/mo`).join(', ')}.`
+      )
+      lines.push(
+        `Spending: about £${p.expenses.averageMonthlySpend}/month, ${Math.round(p.expenses.essentialShare * 100)}% essential. Categories: ${p.expenses.categories.slice(0, 8).map((c) => `${c.label} £${c.monthlyAverage}/mo`).join(', ')}.`
+      )
+      if (p.commitments.length) {
+        lines.push(
+          `Recurring commitments: ${p.commitments.map((c) => `${c.name} £${c.amount} ${c.cadence} (${c.occurrences}/${Math.max(c.monthsCovered, c.occurrences)} paid${c.returnedCount ? `, ${c.returnedCount} returned` : ''})`).join('; ')}.`
+        )
+      }
+      const a = p.affordability
+      lines.push(
+        `Affordability: ${a.rating}. Disposable after essentials £${a.disposableIncome}/month, surplus after all spending £${a.surplusAfterAll}/month, rent-to-income ${a.ratios.rentToIncome !== null ? Math.round(a.ratios.rentToIncome * 100) + '%' : 'n/a'}, estimated max sustainable rent £${a.maxAffordableRent}/month. Stress test (20% income drop): surplus £${a.stressTest.surplusUnderStress}, ${a.stressTest.stillPositive ? 'still positive' : 'negative'}.`
+      )
+      const last = p.monthly[p.monthly.length - 1]
+      if (last) lines.push(`Latest month ${last.month}: money in £${last.income}, out £${last.spend}, net £${last.net}.`)
+      if (p.unusual.length) {
+        lines.push(
+          `Flagged for context (surfaced to explain, not counted against them): ${p.unusual.map((u) => `£${u.amount} ${u.direction === 'debit' ? 'to' : 'from'} ${u.counterparty} on ${u.date} (${u.reason})`).join('; ')}.`
+        )
+      }
+      if (p.questions.length) {
+        lines.push(`Open follow-up questions: ${p.questions.map((q) => q.question).join(' | ')}`)
+      }
+    } else {
+      lines.push('No bank data has been added yet — they should connect a bank or upload a statement on Connections.')
+    }
+    return lines.join('\n')
+  }
+
+  private async callAssistant(
+    system: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    message: string
+  ): Promise<string> {
+    const messages = [...history, { role: 'user' as const, content: message }]
+
+    const glmKey = process.env['GLM_API_KEY']
+    if (glmKey) {
+      try {
+        const baseUrl = process.env['GLM_BASE_URL'] ?? 'https://api.z.ai/api/paas/v4'
+        const model = process.env['GLM_MODEL'] ?? 'glm-5.2'
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
+          body: JSON.stringify({
+            model,
+            max_tokens: 800,
+            messages: [{ role: 'system', content: system }, ...messages],
+          }),
+        })
+        if (res.ok) {
+          const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+          const content = data.choices?.[0]?.message?.content
+          if (content) return content
+        } else {
+          this.logger.warn(`GLM chat failed: ${res.status}`)
+        }
+      } catch (err) {
+        this.logger.warn(`GLM chat error: ${err instanceof Error ? err.message : err}`)
+      }
+    }
+
+    const anthropicKey = process.env['ANTHROPIC_API_KEY']
+    if (anthropicKey) {
+      const client = new Anthropic({ apiKey: anthropicKey })
+      const resp = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        system,
+        messages,
+      })
+      const block = resp.content[0]
+      return block && block.type === 'text' ? block.text : "Sorry, I couldn't answer that just now."
+    }
+
+    return 'The assistant is not available right now. Please try again later.'
   }
 
   /** Build a profile from whatever transactions the user already has stored. */

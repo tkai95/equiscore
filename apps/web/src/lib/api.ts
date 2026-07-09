@@ -181,6 +181,16 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ questionId, answer }) },
         token
       ),
+    chat: (
+      token: string,
+      message: string,
+      history: Array<{ role: 'user' | 'assistant'; content: string }>
+    ) =>
+      apiFetch<{ answer: string }>(
+        '/insights/chat',
+        { method: 'POST', body: JSON.stringify({ message, history }) },
+        token
+      ),
     // Starts an async import; returns a job to poll (PDF reads take 30–90s).
     importPdf: async (token: string, file: File) => {
       const form = new FormData()

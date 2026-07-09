@@ -1,5 +1,6 @@
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { ImportJobsChip } from '@/components/banking/import-jobs-chip'
+import { ChatWidget } from '@/components/chat/chat-widget'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
         <main className="flex-1 overflow-y-auto p-8">{children}</main>
       </div>
+      <ChatWidget />
     </div>
   )
 }

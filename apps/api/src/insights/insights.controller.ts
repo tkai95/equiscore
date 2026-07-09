@@ -92,6 +92,23 @@ export class InsightsController {
     return this.insights.answerQuestion(dbUser.id, body.questionId, body.answer)
   }
 
+  /** Grounded assistant — answers questions about the user's profile, payments, or the site. */
+  @Post('chat')
+  @HttpCode(200)
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ask the assistant about your profile, payments, or the site' })
+  async chat(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { message?: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> }
+  ) {
+    if (!body?.message || body.message.trim().length === 0) {
+      throw new BadRequestException('message is required')
+    }
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.chat(dbUser.id, body.message.slice(0, 2000), (body.history ?? []).slice(-8))
+  }
+
   /** Drill-down behind a category, commitment, or month (the click-through drawers). */
   @Get('breakdown')
   @UseGuards(ClerkAuthGuard)
