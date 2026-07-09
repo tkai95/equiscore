@@ -1,9 +1,46 @@
 import { notFound } from 'next/navigation'
 import { api } from '@/lib/api'
-import { formatDate, TIER_COLORS } from '@/lib/utils'
+import { formatDate, formatCurrency, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
-import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle, Clock } from 'lucide-react'
+import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle, Clock, Home, Wallet } from 'lucide-react'
+
+type AffordabilityRating = 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
+
+interface RecipientInsight {
+  monthsOfHistory: number
+  income: { monthlyAverage: number; character: string; consistency: string; recurringSalaryDetected: boolean }
+  affordability: {
+    rating: AffordabilityRating
+    currentRent: number | null
+    rentToIncome: number | null
+    disposableIncome: number
+    surplusAfterAll: number
+    maxAffordableRent: number
+    stressTest: { incomeDropPct: number; surplusUnderStress: number; stillPositive: boolean; essentialsCovered: boolean }
+    notes: string[]
+  }
+  reliability: { rentPaidConsistently: boolean; onTimeRatio: number; returnedPayments: number; missedPayments: number }
+  strengths: string[]
+  contextClear: boolean
+  clearedTypologies: string[]
+}
+
+const AFFORDABILITY_RATING: Record<AffordabilityRating, { label: string; className: string }> = {
+  comfortable: { label: 'Comfortable', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  manageable: { label: 'Manageable', className: 'bg-teal-50 text-teal-700 ring-teal-200' },
+  stretched: { label: 'Stretched', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  at_risk: { label: 'At risk', className: 'bg-red-50 text-red-700 ring-red-200' },
+}
+
+const CHARACTER_LABEL: Record<string, string> = {
+  employment: 'employment',
+  self_employed: 'self-employment',
+  gig: 'gig / freelance work',
+  benefits: 'benefits',
+  mixed: 'mixed sources',
+  unclear: 'an unclear source',
+}
 
 type ScoreDisplayStatus =
   | 'current'
@@ -36,6 +73,7 @@ interface PublicProfile {
   financialDataAsOf: string | null
   validUntil: string | null
   expiresAt: string
+  insight: RecipientInsight | null
 }
 
 /**
@@ -172,6 +210,126 @@ export default async function PublicProfilePage({ params }: { params: { token: s
             </div>
           )}
         </div>
+
+        {/* Affordability — the decision a landlord/lender is actually making */}
+        {profile.insight && (
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Home className="h-4 w-4 text-brand" />
+                <h2 className="font-semibold text-gray-900">Affordability</h2>
+              </div>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${AFFORDABILITY_RATING[profile.insight.affordability.rating].className}`}
+              >
+                {AFFORDABILITY_RATING[profile.insight.affordability.rating].label}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Assessed from the applicant&apos;s take-home income of{' '}
+              {formatCurrency(profile.insight.income.monthlyAverage)}/month and their real outgoings.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {profile.insight.affordability.rentToIncome !== null && (
+                <div className="rounded-xl bg-gray-50 px-4 py-3">
+                  <p className="text-xs text-gray-500">Rent to income</p>
+                  <p className="mt-0.5 text-xl font-semibold tabular-nums text-gray-900">
+                    {Math.round(profile.insight.affordability.rentToIncome * 100)}%
+                  </p>
+                </div>
+              )}
+              <div className="rounded-xl bg-gray-50 px-4 py-3">
+                <p className="text-xs text-gray-500">Disposable after essentials</p>
+                <p className="mt-0.5 text-xl font-semibold tabular-nums text-gray-900">
+                  {formatCurrency(profile.insight.affordability.disposableIncome)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-gray-50 px-4 py-3">
+                <p className="text-xs text-gray-500">Could sustain rent up to</p>
+                <p className="mt-0.5 text-xl font-semibold tabular-nums text-brand">
+                  {formatCurrency(profile.insight.affordability.maxAffordableRent)}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ring-1 ${
+                profile.insight.affordability.stressTest.stillPositive
+                  ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+                  : 'bg-amber-50 text-amber-900 ring-amber-100'
+              }`}
+            >
+              {profile.insight.affordability.stressTest.stillPositive ? (
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              ) : (
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              )}
+              <span>
+                <span className="font-medium">Stress test: </span>
+                if income dropped {profile.insight.affordability.stressTest.incomeDropPct}%,{' '}
+                {profile.insight.affordability.stressTest.stillPositive
+                  ? `there would still be about ${formatCurrency(Math.abs(profile.insight.affordability.stressTest.surplusUnderStress))}/month spare.`
+                  : profile.insight.affordability.stressTest.essentialsCovered
+                    ? 'the monthly surplus would be gone, but essential costs would still be covered.'
+                    : 'essential costs would no longer be fully covered.'}
+              </span>
+            </div>
+
+            <ul className="mt-4 space-y-1.5">
+              {profile.insight.affordability.notes.map((n) => (
+                <li key={n} className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+                  {n}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Income & payment reliability */}
+        {profile.insight && (
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="mb-4 flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-brand" />
+              <h2 className="font-semibold text-gray-900">Income &amp; reliability</h2>
+            </div>
+            <p className="text-sm text-gray-700">
+              Income of about{' '}
+              <span className="font-semibold">
+                {formatCurrency(profile.insight.income.monthlyAverage)}/month
+              </span>{' '}
+              from {CHARACTER_LABEL[profile.insight.income.character] ?? 'various sources'},{' '}
+              {profile.insight.income.consistency === 'very_consistent'
+                ? 'very consistent month to month'
+                : profile.insight.income.consistency === 'consistent'
+                  ? 'consistent month to month'
+                  : 'variable month to month'}
+              {profile.insight.income.recurringSalaryDetected ? ', with a recurring salary detected' : ''}. Based
+              on {profile.insight.monthsOfHistory} months of history.
+            </p>
+
+            {profile.insight.strengths.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {profile.insight.strengths.map((s) => (
+                  <div key={s} className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                    <span className="text-gray-700">{s}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {profile.insight.contextClear && (
+              <p className="mt-4 border-t border-gray-100 pt-4 text-sm text-emerald-700">
+                No unusual transaction patterns were found
+                {profile.insight.clearedTypologies.length > 0
+                  ? ` (checked and absent: ${profile.insight.clearedTypologies.join(', ')}).`
+                  : '.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Score breakdown */}
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">

@@ -261,6 +261,10 @@ export class InsightsService implements OnModuleInit {
         .reverse()
         .find((t) => typeof t.balance === 'number')?.balance ?? null
 
+    // Re-upload guard: the same statement (same coverage window and row count)
+    // must not stack a second copy on top of the first and double the numbers.
+    await this.replaceMatchingStatement(userId, coverageStart, coverageEnd, txns.length)
+
     const connection = await db.bankConnection.create({
       data: {
         userId,
@@ -327,6 +331,39 @@ export class InsightsService implements OnModuleInit {
       warnings: opts.warnings,
       overallScore: score.overallScore,
       overallTier: score.overallTier,
+    }
+  }
+
+  /**
+   * If the user already has an uploaded statement covering the exact same window
+   * with the same number of rows, it's a re-upload of the same document — delete
+   * the old copy so the new one replaces it instead of doubling every figure.
+   */
+  private async replaceMatchingStatement(
+    userId: string,
+    coverageStart: string,
+    coverageEnd: string,
+    count: number
+  ): Promise<void> {
+    const existing = await db.bankConnection.findMany({
+      where: { userId, providerName: 'statement_upload' },
+      select: { id: true },
+    })
+    for (const conn of existing) {
+      const agg = await db.bankTransaction.aggregate({
+        where: { bankAccount: { bankConnectionId: conn.id } },
+        _min: { bookedAt: true },
+        _max: { bookedAt: true },
+        _count: true,
+      })
+      const start = agg._min.bookedAt ? agg._min.bookedAt.toISOString().slice(0, 10) : null
+      const end = agg._max.bookedAt ? agg._max.bookedAt.toISOString().slice(0, 10) : null
+      if (start === coverageStart && end === coverageEnd && agg._count === count) {
+        await db.bankTransaction.deleteMany({ where: { bankAccount: { bankConnectionId: conn.id } } })
+        await db.bankAccount.deleteMany({ where: { bankConnectionId: conn.id } })
+        await db.bankConnection.delete({ where: { id: conn.id } })
+        this.audit.log(userId, 'statement.replaced', { connectionId: conn.id, coverageStart, coverageEnd })
+      }
     }
   }
 

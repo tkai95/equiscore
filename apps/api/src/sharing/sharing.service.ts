@@ -3,16 +3,74 @@ import { db } from '@equiscore/database'
 import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { ScoringService } from '../scoring/scoring.service'
+import { InsightsService } from '../insights/insights.service'
 import { deriveScoreStatus, isCurrent, statusMessage } from '../scoring/score-status'
 
 const SHARE_TTL_DAYS = 30
+
+// Recipient-safe strengths: a curated subset of the stability signals.
+const STRENGTH_LABELS: Record<string, string> = {
+  stableIncome: 'Stable monthly income',
+  rentNeverMissed: 'Rent paid consistently',
+  billsPaidOnTime: 'Essential bills paid on time',
+  positiveMonthlySurplus: 'Positive monthly surplus',
+  noOverdraftDependency: 'No overdraft dependency',
+  noRecurringFailedPayments: 'No recurring failed payments',
+}
 
 @Injectable()
 export class SharingService {
   constructor(
     private readonly audit: AuditService,
-    private readonly scoringService: ScoringService
+    private readonly scoringService: ScoringService,
+    private readonly insights: InsightsService
   ) {}
+
+  /**
+   * A curated, landlord-facing slice of the deterministic insight profile:
+   * affordability and payment reliability, the things a letting decision turns
+   * on. Deliberately excludes the spending breakdown, merchants, and raw
+   * transactions — those stay private to the applicant.
+   */
+  private async buildRecipientInsight(userId: string) {
+    try {
+      const p = await this.insights.getProfileForUser(userId)
+      if (p.period.transactionCount === 0) return null
+      const stability = p.stability as unknown as Record<string, boolean | number>
+      return {
+        monthsOfHistory: p.period.months,
+        income: {
+          monthlyAverage: p.income.averageMonthlyIncome,
+          character: p.income.primaryCharacter,
+          consistency: p.income.consistency,
+          recurringSalaryDetected: p.income.recurringSalaryDetected,
+        },
+        affordability: {
+          rating: p.affordability.rating,
+          currentRent: p.affordability.currentRent,
+          rentToIncome: p.affordability.ratios.rentToIncome,
+          disposableIncome: p.affordability.disposableIncome,
+          surplusAfterAll: p.affordability.surplusAfterAll,
+          maxAffordableRent: p.affordability.maxAffordableRent,
+          stressTest: p.affordability.stressTest,
+          notes: p.affordability.notes,
+        },
+        reliability: {
+          rentPaidConsistently: p.paymentBehaviour.rentPaidConsistently,
+          onTimeRatio: p.paymentBehaviour.onTimeRatio,
+          returnedPayments: p.paymentBehaviour.returnedPayments,
+          missedPayments: p.paymentBehaviour.missedPayments,
+        },
+        strengths: Object.entries(STRENGTH_LABELS)
+          .filter(([key]) => stability[key] === true)
+          .map(([, label]) => label),
+        contextClear: p.risk.level === 'low' && p.unusual.length === 0,
+        clearedTypologies: p.risk.clearedTypologies,
+      }
+    } catch {
+      return null
+    }
+  }
 
   async createShareLink(userId: string, trustScoreId: string, targetType?: string, targetName?: string) {
     const score = await db.trustScore.findFirst({
@@ -123,6 +181,8 @@ export class SharingService {
       now: new Date(),
     })
 
+    const insight = await this.buildRecipientInsight(shared.userId)
+
     await db.sharedProfile.update({
       where: { id: shared.id },
       data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
@@ -155,6 +215,7 @@ export class SharingService {
       financialDataAsOf,
       validUntil,
       expiresAt: shared.expiresAt,
+      insight,
     }
   }
 }
