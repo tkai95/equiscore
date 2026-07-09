@@ -3,6 +3,7 @@
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 import { FileText, Upload, Trash2, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
@@ -23,14 +24,17 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
+// Bank statements are NOT here — they belong on the Connections page, where
+// they're actually read and scored. This page is for identity & supporting
+// documents (income/employment, address), which are stored as evidence.
 const DOCUMENT_CATEGORIES = [
   {
     label: 'Identity',
     types: ['passport', 'national_id', 'biometric_residence_permit', 'driving_licence'],
   },
   {
-    label: 'Financial',
-    types: ['bank_statement', 'payslip', 'employment_letter', 'p60', 'p45', 'tax_return'],
+    label: 'Income & employment',
+    types: ['payslip', 'employment_letter', 'p60', 'p45', 'tax_return'],
   },
   {
     label: 'Housing',
@@ -158,7 +162,15 @@ export function DocumentsView() {
 
       {/* Upload panel */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <h2 className="mb-4 font-semibold text-gray-900">Upload a document</h2>
+        <h2 className="mb-1 font-semibold text-gray-900">Upload a document</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Identity and supporting documents. Uploading a{' '}
+          <strong>bank statement</strong>?{' '}
+          <Link href="/dashboard/connections" className="font-medium text-brand hover:underline">
+            Add it on Connections
+          </Link>{' '}
+          instead — we&apos;ll read it and build your profile.
+        </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Document type</label>
