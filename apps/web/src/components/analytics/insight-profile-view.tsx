@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { TIER_LABELS } from '@equiscore/shared'
+import type { TrustTier } from '@equiscore/shared'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
@@ -80,7 +82,12 @@ type ScoreStatus =
   | 'evidence_withdrawn'
   | 'insufficient_evidence'
 
-interface Freshness {
+// The ONE canonical score, shared with the dashboard, My Trust Score, and share
+// links. The insight engine no longer shows a competing number of its own — its
+// behavioural analysis is the detail beneath this score, not a second score.
+interface CanonicalScore {
+  overallScore: number
+  overallTier: TrustTier
   computedAt: string
   status?: ScoreStatus
   isCurrent?: boolean
@@ -88,24 +95,6 @@ interface Freshness {
   validUntil?: string | null
 }
 
-const RATING_BAR: Record<Rating, string> = {
-  strong: 'bg-emerald-500',
-  moderate: 'bg-teal-500',
-  medium: 'bg-amber-400',
-  limited: 'bg-amber-500',
-}
-const RATING_STYLES: Record<Rating, string> = {
-  strong: 'bg-emerald-50 text-emerald-700',
-  moderate: 'bg-teal-50 text-teal-700',
-  medium: 'bg-amber-50 text-amber-700',
-  limited: 'bg-amber-100 text-amber-800',
-}
-const RATING_LABEL: Record<Rating, string> = {
-  strong: 'Strong',
-  moderate: 'Moderate',
-  medium: 'Medium',
-  limited: 'Limited',
-}
 const CONSISTENCY_STYLE: Record<Consistency, string> = {
   very_consistent: 'bg-emerald-50 text-emerald-700',
   consistent: 'bg-teal-50 text-teal-700',
@@ -152,20 +141,6 @@ const STATUS_BADGE: Record<ScoreStatus, { label: string; className: string }> = 
 }
 
 // Plain-English "how this was calculated" copy for each key indicator.
-const INDICATOR_HELP: Record<string, string> = {
-  incomeStability:
-    'How steady your income is: whether a regular salary or income stream is detected, and how much it varies month to month.',
-  essentialPaymentConsistency:
-    'Whether essential bills and rent are actually paid, on time, without returned or missed payments.',
-  affordability:
-    'How much is left after essential costs, and how rent compares to income.',
-  transactionClarity:
-    'The share of transactions we can confidently classify. Answering follow-up questions raises this.',
-  evidenceConfidence:
-    'How strong the underlying evidence is. Open Banking scores highest; a reconciling uploaded statement comes next.',
-  riskFlags:
-    'Whether any transactions match patterns that usually need explaining. "Clear" means none were found.',
-}
 
 const ordinal = (n: number) => {
   const v = n % 100
@@ -197,10 +172,10 @@ function Card({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6">
       <div className="flex items-center gap-1.5">
-        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         {help && <InfoTooltip label={`How ${title} is calculated`}>{help}</InfoTooltip>}
       </div>
-      {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
+      {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
       <div className="mt-4">{children}</div>
     </div>
   )
@@ -218,13 +193,13 @@ export function InsightProfileView() {
     staleTime: 5 * 60 * 1000,
   })
 
-  // Freshness lives on the scoring record, not the profile. Same cache key the
-  // rest of the app uses for the score, so an import refreshes it automatically.
-  const { data: freshness } = useQuery<Freshness | null>({
+  // The canonical Trust Score (same cache key the dashboard + My Trust Score use),
+  // so every surface shows the same number and an import refreshes it here too.
+  const { data: score } = useQuery<CanonicalScore | null>({
     queryKey: ['score', 'general'],
     queryFn: async () => {
       const token = await getToken()
-      return api.scores.latest(token!) as Promise<Freshness | null>
+      return api.scores.latest(token!) as Promise<CanonicalScore | null>
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -247,7 +222,7 @@ export function InsightProfileView() {
   const income = profile.income
   const expenses = profile.expenses
   const evidence = EVIDENCE_BY_SOURCE[profile.source] ?? EVIDENCE_BY_SOURCE.statement_upload
-  const status = freshness?.status
+  const status = score?.status
   const badge = status ? STATUS_BADGE[status] : null
 
   const contextClear = profile.risk.level === 'low' && profile.unusual.length === 0
@@ -258,7 +233,7 @@ export function InsightProfileView() {
       {/* ── 1. EquiScore profile: the judgement, up top ───────────────────── */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+          <p className="text-sm font-medium uppercase tracking-wide text-gray-400">
             Your EquiScore profile
           </p>
           {badge && (
@@ -275,83 +250,59 @@ export function InsightProfileView() {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <span className="text-4xl font-bold tabular-nums text-gray-900">
-            {profile.overall.score}
-            <span className="text-2xl font-medium text-gray-300"> / 100</span>
-          </span>
-          <span className="rounded-lg bg-brand/10 px-2.5 py-1 text-sm font-semibold text-brand">
-            Tier {profile.overall.tier}
-          </span>
+          {score ? (
+            <>
+              <span className="text-5xl font-bold tabular-nums text-gray-900">
+                {score.overallScore}
+                <span className="text-2xl font-medium text-gray-300"> / 100</span>
+              </span>
+              <span className="rounded-lg bg-brand/10 px-3 py-1 text-base font-semibold text-brand">
+                Tier {score.overallTier}
+              </span>
+            </>
+          ) : (
+            <span className="text-2xl font-semibold text-gray-400">Not yet generated</span>
+          )}
         </div>
-        <p className="mt-1.5 text-base font-semibold text-gray-900">{profile.overall.label}</p>
-        <p className="text-sm text-gray-500">{evidence.verified}</p>
-        <p className="mt-0.5 text-xs text-gray-400">
+        {score ? (
+          <p className="mt-2 text-lg font-semibold text-gray-900">
+            {TIER_LABELS[score.overallTier]}
+          </p>
+        ) : (
+          <p className="mt-2 text-base text-gray-500">
+            Generate your Trust Score on{' '}
+            <a href="/dashboard/trust-score" className="font-medium text-brand hover:underline">
+              My Trust Score
+            </a>{' '}
+            to see it here.
+          </p>
+        )}
+        <p className="mt-0.5 text-base text-gray-500">{evidence.verified}</p>
+        <p className="mt-1 text-sm text-gray-400">
           Based on {profile.period.months}{' '}
           {profile.period.months === 1 ? 'month' : 'months'} of evidence ·{' '}
           {profile.period.transactionCount.toLocaleString()} transactions
         </p>
 
-        {/* Plain-English summary */}
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-700">{profile.summary}</p>
+        {/* Plain-English summary of the financial behaviour behind the score */}
+        <p className="mt-4 max-w-3xl text-base leading-relaxed text-gray-700">{profile.summary}</p>
 
         {/* Evidence + freshness */}
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-gray-100 pt-4 text-sm sm:grid-cols-4">
+        <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-5 text-base sm:grid-cols-4">
           <Field label="Evidence type" value={evidence.type} />
           <Field
             label="Financial data as of"
-            value={freshness?.financialDataAsOf ? formatDate(freshness.financialDataAsOf) : formatDate(profile.period.to)}
+            value={score?.financialDataAsOf ? formatDate(score.financialDataAsOf) : formatDate(profile.period.to)}
           />
           <Field
             label="Score calculated"
-            value={freshness?.computedAt ? formatDate(freshness.computedAt) : '—'}
+            value={score?.computedAt ? formatDate(score.computedAt) : '—'}
           />
           <Field
             label="Valid until"
-            value={freshness?.validUntil ? formatDate(freshness.validUntil) : '—'}
+            value={score?.validUntil ? formatDate(score.validUntil) : '—'}
           />
         </dl>
-
-        {/* Key indicators */}
-        <div className="mt-5 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {profile.subScores.map((s) => {
-            const isContext = s.key === 'riskFlags'
-            const valueLabel = isContext
-              ? contextClear
-                ? 'Clear'
-                : `${profile.unusual.length} to explain`
-              : RATING_LABEL[s.rating]
-            const valueStyle = isContext
-              ? contextClear
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-amber-50 text-amber-700'
-              : RATING_STYLES[s.rating]
-            const barStyle = isContext
-              ? contextClear
-                ? 'bg-emerald-500'
-                : 'bg-amber-500'
-              : RATING_BAR[s.rating]
-            return (
-              <div key={s.key}>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-sm text-gray-700">
-                    {s.label}
-                    {INDICATOR_HELP[s.key] && (
-                      <InfoTooltip label={`How ${s.label} is calculated`}>
-                        {INDICATOR_HELP[s.key]}
-                      </InfoTooltip>
-                    )}
-                  </span>
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', valueStyle)}>
-                    {valueLabel}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                  <div className={cn('h-full rounded-full', barStyle)} style={{ width: `${s.score}%` }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
       </div>
 
       {/* ── 2. Key strengths + what could improve ─────────────────────────── */}
@@ -397,12 +348,12 @@ export function InsightProfileView() {
         <div className="rounded-xl border border-brand/20 bg-brand/5 p-6">
           <div className="flex items-center gap-2">
             <HelpCircle className="h-4 w-4 text-brand" />
-            <h2 className="text-sm font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900">
               Help us understand {profile.questions.length}{' '}
               {profile.questions.length === 1 ? 'thing' : 'things'}
             </h2>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-sm text-gray-500">
             These are not problems. Answering them raises your transaction clarity and can lift your
             score.
           </p>
@@ -456,9 +407,9 @@ export function InsightProfileView() {
                 <div className="min-w-0">
                   <span className="font-medium text-gray-800">{s.name}</span>
                   {s.pendingConfirmation && (
-                    <span className="ml-2 text-xs text-amber-600">needs confirmation</span>
+                    <span className="ml-2 text-sm text-amber-600">needs confirmation</span>
                   )}
-                  <span className="block text-xs text-gray-400">{s.monthsPresent} months</span>
+                  <span className="block text-sm text-gray-400">{s.monthsPresent} months</span>
                 </div>
                 <span className="font-medium tabular-nums text-gray-900">
                   {formatCurrency(s.monthlyAverage)}/mo
@@ -560,9 +511,9 @@ export function InsightProfileView() {
               onClick={() =>
                 setDrawer({ type: 'category', key: c.key, title: c.label, subtitle: 'Spending category' })
               }
-              className="grid w-full grid-cols-[8rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-gray-50"
+              className="grid w-full grid-cols-[11rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-gray-50"
             >
-              <span className="flex items-center gap-1 truncate text-xs text-gray-600" title={c.label}>
+              <span className="flex items-center gap-1 truncate text-sm text-gray-600" title={c.label}>
                 <span className="truncate">{c.label}</span>
                 {c.unconfirmed && <span className="text-amber-500">•</span>}
               </span>
@@ -572,7 +523,7 @@ export function InsightProfileView() {
                   style={{ width: `${Math.max(2, Math.round(c.share * 100))}%` }}
                 />
               </span>
-              <span className="flex items-center gap-1 text-xs tabular-nums text-gray-500">
+              <span className="flex items-center gap-1 text-sm tabular-nums text-gray-500">
                 {formatCurrency(c.monthlyAverage)}
                 <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
               </span>
@@ -650,7 +601,7 @@ export function InsightProfileView() {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-gray-400">{label}</dt>
+      <dt className="text-sm text-gray-400">{label}</dt>
       <dd className="mt-0.5 font-medium text-gray-800">{value}</dd>
     </div>
   )

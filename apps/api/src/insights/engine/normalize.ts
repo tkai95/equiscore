@@ -57,6 +57,7 @@ function canonical(s: string): string {
     .toLowerCase()
     .replace(/\b(ltd|limited|plc|llp|inc|the)\b/g, '')
     .replace(/[^a-z0-9&'\s-]/g, ' ')
+    .replace(/(?:^|\s)-+(?=\s|$)/g, ' ') // drop standalone hyphen separators ("- landlord rent"), keep "e-on"
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
@@ -69,6 +70,7 @@ export function displayName(key: string): string {
   return key
     .split(' ')
     .filter(Boolean)
+    .filter((w) => /[a-z0-9]/i.test(w)) // drop punctuation-only tokens
     .filter((w) => w !== 'com' && w !== 'co') // "netflix com" → "Netflix"
     .map((w) => (ACRONYMS.has(w) ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1)))
     .join(' ')

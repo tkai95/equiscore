@@ -7,7 +7,6 @@ import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { MonthlyFlowChart } from './monthly-flow-chart'
-import { TopMerchants } from './top-merchants'
 import { InsightsCard } from './insights-card'
 import { InsightProfileView } from './insight-profile-view'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
@@ -26,18 +25,6 @@ interface Profile {
   income: { averageMonthlyIncome: number }
   expenses: { averageMonthlySpend: number; essentialShare: number }
   monthly: MonthlyPoint[]
-}
-
-interface MerchantData {
-  name: string
-  totalAmount: number
-  transactionCount: number
-  category: string
-  label: string
-}
-
-interface AnalyticsSummary {
-  topMerchants: MerchantData[]
 }
 
 interface Insight {
@@ -61,9 +48,9 @@ function monthLabel(key: string): string {
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-base text-gray-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+      {sub && <p className="mt-1 text-sm text-gray-400">{sub}</p>}
     </div>
   )
 }
@@ -80,15 +67,6 @@ export function AnalyticsOverview() {
     queryFn: async () => {
       const token = await getToken()
       return api.insights.getProfile(token!) as Promise<Profile | null>
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const summaryQuery = useQuery<AnalyticsSummary>({
-    queryKey: ['analytics-summary'],
-    queryFn: async () => {
-      const token = await getToken()
-      return api.analytics.summary(token!) as Promise<AnalyticsSummary>
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -118,7 +96,7 @@ export function AnalyticsOverview() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-base text-gray-500">
           What your bank data says about your income, spending, and reliability, from Open Banking or
           an uploaded statement.
         </p>
@@ -131,7 +109,7 @@ export function AnalyticsOverview() {
         <>
           {/* ── Monthly trends ──────────────────────────────────────────── */}
           <div>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            <h2 className="mb-3 text-base font-semibold uppercase tracking-wide text-gray-500">
               Monthly trends
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -185,8 +163,8 @@ export function AnalyticsOverview() {
             {/* Income vs expenses */}
             <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Income vs expenses</h3>
-                <span className="text-xs text-gray-400">Tap a month for detail</span>
+                <h3 className="text-base font-semibold text-gray-700">Income vs expenses</h3>
+                <span className="text-sm text-gray-400">Tap a month for detail</span>
               </div>
               <MonthlyFlowChart
                 data={monthly.map((m) => ({ month: m.month, income: m.income, expenses: m.spend, net: m.net }))}
@@ -195,12 +173,6 @@ export function AnalyticsOverview() {
                 }
               />
             </div>
-          </div>
-
-          {/* Top merchants */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-gray-700">Top merchants</h2>
-            <TopMerchants data={summaryQuery.data?.topMerchants ?? []} />
           </div>
 
           {/* Optional AI narrative — supplementary to the deterministic profile above */}
