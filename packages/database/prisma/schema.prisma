@@ -28,6 +28,7 @@ model User {
   trustScores    TrustScore[]
   sharedProfiles SharedProfile[]
   statementImportJobs StatementImportJob[]
+  insightQuestionAnswers InsightQuestionAnswer[]
   auditEvents    AuditEvent[]
 
   @@map("users")
@@ -518,6 +519,26 @@ enum StatementImportJobStatus {
   cancelled
 
   @@map("statement_import_job_status")
+}
+
+// ─── Insight Question Answers ─────────────────────────────────────────────────
+// Captures the user's explanation of a flagged/ambiguous transaction (an
+// anomalous data point). The questionId matches the engine's follow-up-question
+// id, so feeding answered ids back as resolvedQuestionIds clears the flag,
+// raises transaction clarity, and updates the Trust Score.
+
+model InsightQuestionAnswer {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  questionId String   @map("question_id")
+  answer     String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@map("insight_question_answers")
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────

@@ -75,6 +75,23 @@ export class InsightsController {
     return this.insights.getProfileForUser(dbUser.id)
   }
 
+  /** Capture the user's explanation of a flagged/ambiguous transaction. */
+  @Post('questions/answer')
+  @HttpCode(200)
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Answer a follow-up question about a flagged transaction' })
+  async answerQuestion(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { questionId?: string; answer?: string }
+  ) {
+    if (!body?.questionId || !body?.answer) {
+      throw new BadRequestException('questionId and answer are required')
+    }
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.insights.answerQuestion(dbUser.id, body.questionId, body.answer)
+  }
+
   /** Drill-down behind a category, commitment, or month (the click-through drawers). */
   @Get('breakdown')
   @UseGuards(ClerkAuthGuard)

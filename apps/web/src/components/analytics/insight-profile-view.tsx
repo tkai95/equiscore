@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2,
   HelpCircle,
@@ -207,7 +207,25 @@ function Card({
 
 export function InsightProfileView() {
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
   const [drawer, setDrawer] = useState<DrawerSpec | null>(null)
+  const [answering, setAnswering] = useState<string | null>(null)
+
+  // Capturing an answer resolves the flag and moves the score, so refresh
+  // everything derived from the profile.
+  const answerMutation = useMutation({
+    mutationFn: async ({ questionId, answer }: { questionId: string; answer: string }) => {
+      setAnswering(questionId)
+      const token = await getToken()
+      return api.insights.answerQuestion(token!, questionId, answer)
+    },
+    onSuccess: () => {
+      for (const key of [['insight-profile'], ['score'], ['analytics-summary']]) {
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+    },
+    onSettled: () => setAnswering(null),
+  })
   const { data: profile, isLoading } = useQuery<InsightProfile | null>({
     queryKey: ['insight-profile'],
     queryFn: async () => {
@@ -489,14 +507,22 @@ export function InsightProfileView() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{q.question}</p>
-                    <p className="mt-1 text-xs text-gray-500">{q.detail}</p>
+                    <p className="mt-1 text-sm text-gray-500">{q.detail}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {q.options.map((o) => (
-                        <span key={o} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">
+                        <button
+                          key={o}
+                          onClick={() => answerMutation.mutate({ questionId: q.id, answer: o })}
+                          disabled={answering !== null}
+                          className="rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-600 transition-colors hover:bg-brand hover:text-cream-surface disabled:opacity-50"
+                        >
                           {o}
-                        </span>
+                        </button>
                       ))}
                     </div>
+                    {answering === q.id && (
+                      <p className="mt-2 text-xs text-brand">Saving your answer…</p>
+                    )}
                   </div>
                 </div>
               </div>

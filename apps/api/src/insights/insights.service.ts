@@ -367,9 +367,35 @@ export class InsightsService implements OnModuleInit {
     }
   }
 
+  /** The follow-up questions this user has already answered (by question id). */
+  async getResolvedQuestionIds(userId: string): Promise<string[]> {
+    const answers = await db.insightQuestionAnswer.findMany({
+      where: { userId },
+      select: { questionId: true },
+    })
+    return answers.map((a) => a.questionId)
+  }
+
+  /**
+   * Capture the user's explanation of a flagged/ambiguous transaction. The
+   * answer resolves the follow-up question (so it stops being asked), raises
+   * transaction clarity, and — because the Trust Score now reads the same engine
+   * — can move the score. Recomputes so every surface reflects the answer.
+   */
+  async answerQuestion(userId: string, questionId: string, answer: string) {
+    await db.insightQuestionAnswer.upsert({
+      where: { userId_questionId: { userId, questionId } },
+      create: { userId, questionId, answer },
+      update: { answer },
+    })
+    this.audit.log(userId, 'insight.question_answered', { questionId })
+    const score = await this.scoringService.recompute(userId)
+    return { ok: true, overallScore: score.overallScore, overallTier: score.overallTier }
+  }
+
   /** Build a profile from whatever transactions the user already has stored. */
   async getProfileForUser(userId: string): Promise<InsightProfile> {
-    const [user, accounts, transactions, rentalProfile] = await Promise.all([
+    const [user, accounts, transactions, rentalProfile, resolvedQuestionIds] = await Promise.all([
       db.user.findUnique({ where: { id: userId }, include: { profile: true } }),
       db.bankAccount.findMany({
         where: { bankConnection: { userId } },
@@ -387,6 +413,7 @@ export class InsightsService implements OnModuleInit {
         },
       }),
       db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
+      this.getResolvedQuestionIds(userId),
     ])
 
     if (!user) throw new NotFoundException('User not found')
@@ -409,7 +436,7 @@ export class InsightsService implements OnModuleInit {
       accountHolderName: accounts.find((a) => a.accountHolderName)?.accountHolderName ?? null,
       profileName: user.profile?.fullName ?? null,
       declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
-      resolvedQuestionIds: [],
+      resolvedQuestionIds,
     }
 
     return buildInsightProfile(txns, ctx)

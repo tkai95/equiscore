@@ -158,6 +158,12 @@ export const api = {
         {},
         token
       ),
+    answerQuestion: (token: string, questionId: string, answer: string) =>
+      apiFetch<{ ok: boolean; overallScore: number; overallTier: string }>(
+        '/insights/questions/answer',
+        { method: 'POST', body: JSON.stringify({ questionId, answer }) },
+        token
+      ),
     // Starts an async import; returns a job to poll (PDF reads take 30–90s).
     importPdf: async (token: string, file: File) => {
       const form = new FormData()
