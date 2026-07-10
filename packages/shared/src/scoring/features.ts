@@ -24,6 +24,7 @@ export const DEFAULT_FEATURES: TrustFeatures = {
   selfDeclaredOnly: true,
   openBankingConnected: false,
   hasUploadedDocuments: false,
+  partialAccountCoverage: false,
   residencyStatus: null,
   yearsInUK: 0,
 }

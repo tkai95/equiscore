@@ -183,6 +183,18 @@ export class SharingService {
 
     const insight = await this.buildRecipientInsight(shared.userId)
 
+    // Coverage caveat — tells a recipient the picture may be partial without
+    // leaking the applicant's specific hidden accounts/liabilities. Reuses the
+    // same signal the score already carries so the two never disagree.
+    const scoreReasonCodes = (score.reasonCodes as Array<{ code: string }> | null) ?? []
+    const partialPicture = scoreReasonCodes.some((r) => r.code === 'PARTIAL_ACCOUNT_COVERAGE')
+    const coverage = {
+      partialPicture,
+      note: partialPicture
+        ? 'This profile is based on one connected account. Some activity suggests the applicant holds other accounts that are not included here.'
+        : null,
+    }
+
     await db.sharedProfile.update({
       where: { id: shared.id },
       data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
@@ -215,6 +227,7 @@ export class SharingService {
       financialDataAsOf,
       validUntil,
       expiresAt: shared.expiresAt,
+      coverage,
       insight,
     }
   }

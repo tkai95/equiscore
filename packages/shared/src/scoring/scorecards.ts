@@ -10,8 +10,14 @@ export interface ScorecardResult {
 // ─── Profile Completeness ─────────────────────────────────────────────────────
 
 export function scoreProfileCompleteness(features: TrustFeatures): ScorecardResult {
-  const score = Math.min(100, Math.round(features.profileFieldsComplete * 100))
-  return { score, reasonCodes: [] }
+  const base = Math.min(100, Math.round(features.profileFieldsComplete * 100))
+  // Partial account coverage caps completeness — the picture is incomplete while
+  // the evidence points to accounts we can't see. A modest hold-back (this
+  // dimension carries the least weight), enough to surface the prompt to connect.
+  if (features.partialAccountCoverage) {
+    return { score: Math.min(base, 85), reasonCodes: [REASON_CODES.PARTIAL_ACCOUNT_COVERAGE] }
+  }
+  return { score: base, reasonCodes: [] }
 }
 
 // ─── Verification Strength ────────────────────────────────────────────────────

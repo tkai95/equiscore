@@ -113,6 +113,11 @@ export class FeatureEngineeringService {
         answers: Object.fromEntries(answered.map((a) => [a.questionId, a.answer])),
       })
 
+      // Partial coverage: the statement/account reveals other accounts (savings,
+      // credit, own transfers) while only one account is connected — the profile
+      // is a partial picture until the others are added.
+      features.partialAccountCoverage = insight.externalAccounts.length > 0 && allAccounts.length <= 1
+
       features.monthsOfBankHistory = Math.min(insight.period.months, 24)
       features.averageMonthlyIncome = insight.income.averageMonthlyIncome
       features.incomeVolatility = insight.income.volatility

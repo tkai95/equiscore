@@ -186,6 +186,21 @@ export class ScoringService {
             dimension: 'Profile Completeness',
           })
       }
+      if (features.partialAccountCoverage) {
+        const mod: Partial<TrustFeatures> = { partialAccountCoverage: false }
+        const g = gainFrom(mod)
+        if (g > 0)
+          improvements.push({
+            id: 'accounts',
+            title: 'Connect your other accounts',
+            detail:
+              'Your statement shows activity with other accounts — a savings pot, a credit card, or another account in your name. Connecting them gives a complete picture and strengthens your profile.',
+            href: '/dashboard/connections',
+            estimatedGain: g,
+            reachesTier: tierAt(mod),
+            dimension: 'Profile Completeness',
+          })
+      }
     }
 
     improvements.sort((a, b) => (b.estimatedGain ?? 999) - (a.estimatedGain ?? 999))

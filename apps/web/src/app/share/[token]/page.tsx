@@ -73,6 +73,7 @@ interface PublicProfile {
   financialDataAsOf: string | null
   validUntil: string | null
   expiresAt: string
+  coverage?: { partialPicture: boolean; note: string | null } | null
   insight: RecipientInsight | null
 }
 
@@ -175,6 +176,17 @@ export default async function PublicProfilePage({ params }: { params: { token: s
                 Still current, but expires {formatDate(profile.validUntil)}
               </p>
               <p className="mt-1 text-sm text-amber-800">{profile.statusMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Coverage caveat — the picture may be based on partial account data. */}
+        {profile.coverage?.partialPicture && profile.coverage.note && (
+          <div className="flex items-start gap-3 rounded-2xl bg-gray-50 px-5 py-4 ring-1 ring-gray-200">
+            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
+            <div>
+              <p className="font-semibold text-gray-800">Based on partial account coverage</p>
+              <p className="mt-1 text-sm text-gray-600">{profile.coverage.note}</p>
             </div>
           </div>
         )}

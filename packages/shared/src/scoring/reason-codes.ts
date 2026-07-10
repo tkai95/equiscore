@@ -63,4 +63,7 @@ export const REASON_CODES = {
   RESIDENCY_STATUS_PROVIDED: rc('RESIDENCY_STATUS_PROVIDED', 'identityConfidence', 'positive', 'Residency status is on record', 8),
   ESTABLISHED_UK_RESIDENT: rc('ESTABLISHED_UK_RESIDENT', 'identityConfidence', 'positive', 'Established UK residency history of 3+ years', 10),
   RECENT_UK_ARRIVAL: rc('RECENT_UK_ARRIVAL', 'identityConfidence', 'neutral', 'Recently arrived in the UK — financial history is still being established', 0),
+
+  // Profile completeness
+  PARTIAL_ACCOUNT_COVERAGE: rc('PARTIAL_ACCOUNT_COVERAGE', 'profileCompleteness', 'neutral', 'This profile is based on partial account coverage — connecting your other accounts completes the picture', 15),
 }

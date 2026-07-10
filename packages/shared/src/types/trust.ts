@@ -69,6 +69,9 @@ export interface TrustFeatures {
   selfDeclaredOnly: boolean
   openBankingConnected: boolean
   hasUploadedDocuments: boolean
+  /** The evidence implies accounts we can't see (a partial picture) — one account
+   *  connected/uploaded while transactions reveal savings/credit/own accounts. */
+  partialAccountCoverage: boolean
 
   // Residency signals
   residencyStatus: string | null     // maps to ResidencyStatus enum values
