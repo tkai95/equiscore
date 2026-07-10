@@ -121,30 +121,37 @@ function SidebarNav({
 }
 
 function SidebarFooter({ collapsed = false }: { collapsed?: boolean }) {
-  const pathname = usePathname()
   return (
-    <>
-      <div className="space-y-1 border-t border-[rgba(20,55,48,0.08)] px-3 py-3">
-        <NavLink href="/faq" label="Help & support" icon={LifeBuoy} pathname={pathname} muted collapsed={collapsed} />
-        <NavLink href="/security" label="Privacy & security" icon={Lock} pathname={pathname} muted collapsed={collapsed} />
-      </div>
-      <div className={cn('border-t border-[rgba(20,55,48,0.08)] py-3', collapsed ? 'flex justify-center px-2' : 'px-4')}>
-        <UserButton
-          afterSignOutUrl="/"
-          appearance={{
-            elements: {
-              rootBox: 'w-full',
-              userButtonTrigger: collapsed
-                ? 'flex items-center justify-center rounded-lg p-1.5 hover:bg-brand-50 transition-colors'
-                : 'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-charcoal-mid hover:bg-brand-50 hover:text-charcoal transition-colors',
-              userButtonBox: collapsed ? '' : 'flex-row-reverse gap-3',
-              userButtonOuterIdentifier: 'text-sm text-charcoal',
-            },
-          }}
-          showName={!collapsed}
-        />
-      </div>
-    </>
+    <div className={cn('border-t border-[rgba(20,55,48,0.08)] py-3', collapsed ? 'flex justify-center px-2' : 'px-4')}>
+      <UserButton
+        afterSignOutUrl="/"
+        appearance={{
+          elements: {
+            rootBox: 'w-full',
+            userButtonTrigger: collapsed
+              ? 'flex items-center justify-center rounded-lg p-1.5 hover:bg-brand-50 transition-colors'
+              : 'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-charcoal-mid hover:bg-brand-50 hover:text-charcoal transition-colors',
+            userButtonBox: collapsed ? '' : 'flex-row-reverse gap-3',
+            userButtonOuterIdentifier: 'text-sm text-charcoal',
+          },
+        }}
+        showName={!collapsed}
+      >
+        {/* Help & support and Privacy & security live in the account menu. */}
+        <UserButton.MenuItems>
+          <UserButton.Link
+            label="Help & support"
+            labelIcon={<LifeBuoy className="h-4 w-4" />}
+            href="/faq"
+          />
+          <UserButton.Link
+            label="Privacy & security"
+            labelIcon={<Lock className="h-4 w-4" />}
+            href="/security"
+          />
+        </UserButton.MenuItems>
+      </UserButton>
+    </div>
   )
 }
 

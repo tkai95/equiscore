@@ -130,7 +130,7 @@ function SectionCard({
   className?: string
 }) {
   return (
-    <section className={cn('rounded-2xl border border-border bg-cream-surface p-6', className)}>
+    <section className={cn('rounded-2xl border border-border bg-white p-6', className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-[17px] font-semibold text-charcoal">{title}</h2>
         {aside}
@@ -218,7 +218,7 @@ export function DashboardOverview() {
       {/* ── Section 1: Assessment summary ─────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Trust Portfolio summary */}
-        <div className="rounded-2xl border border-border bg-cream-surface p-7 lg:col-span-3">
+        <div className="rounded-2xl border border-border bg-white p-7 lg:col-span-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand-mid">
             EquiScore Trust Portfolio
           </p>
@@ -315,7 +315,7 @@ export function DashboardOverview() {
               <p className="mt-2 text-sm leading-relaxed text-charcoal-mid">{primaryAction.detail}</p>
 
               {(primaryAction.id === 'verify-identity' || topImprovementGain) && (
-                <dl className="mt-4 space-y-1.5 rounded-xl bg-cream-surface/70 p-3 text-[13px] ring-1 ring-brand/10">
+                <dl className="mt-4 space-y-1.5 rounded-xl bg-white/70 p-3 text-[13px] ring-1 ring-brand/10">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-mid">
                     Expected impact
                   </p>

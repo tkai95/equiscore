@@ -24,7 +24,7 @@ export function ActionCentreView() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center rounded-2xl border border-border bg-cream-surface p-10 text-center">
+        <div className="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center">
           <CheckCircle2 className="h-10 w-10 text-success" aria-hidden />
           <p className="mt-3 text-lg font-semibold text-charcoal">You're all caught up</p>
           <p className="mt-1 max-w-sm text-sm text-charcoal-mid">
@@ -43,7 +43,7 @@ export function ActionCentreView() {
           {items.map((item, i) => (
             <li
               key={item.id}
-              className="flex flex-col gap-4 rounded-2xl border border-border bg-cream-surface p-6 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-6 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex gap-4">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand">
