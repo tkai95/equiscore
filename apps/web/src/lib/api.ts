@@ -101,12 +101,15 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, token?: stri
   return res.json() as Promise<T>
 }
 
-/** Stream the assistant's reply token-by-token over SSE. */
+/** Stream the assistant's reply token-by-token over SSE. `onTool` fires when the
+ *  assistant runs a tool (e.g. pulling transactions), so the UI can show what
+ *  it's doing. */
 export async function streamChat(
   token: string,
   message: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
-  onToken: (t: string) => void
+  onToken: (t: string) => void,
+  onTool?: (name: string) => void
 ): Promise<void> {
   const res = await fetch(`${API_URL}/insights/chat/stream`, {
     method: 'POST',
@@ -127,8 +130,13 @@ export async function streamChat(
       const line = part.trim()
       if (!line.startsWith('data:')) continue
       try {
-        const data = JSON.parse(line.slice(5).trim()) as { token?: string; error?: boolean }
+        const data = JSON.parse(line.slice(5).trim()) as {
+          token?: string
+          tool?: string
+          error?: boolean
+        }
         if (data.error) throw new Error('assistant error')
+        if (data.tool) onTool?.(data.tool)
         if (data.token) onToken(data.token)
       } catch {
         /* ignore malformed frame */

@@ -3,11 +3,17 @@
 import { useState, useRef, useEffect, Fragment } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { MessageCircle, X, Send, Sparkles } from 'lucide-react'
+import { MessageCircle, X, Send, Sparkles, Search } from 'lucide-react'
 import { streamChat } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
+
+// Friendly, honest labels for the tools the assistant can actually run — shown
+// only when it's really doing that work (a tool call over the SSE stream).
+const TOOL_LABELS: Record<string, string> = {
+  get_transactions: 'Reviewing your transactions…',
+}
 
 const SUGGESTIONS = [
   'How much do I spend on subscriptions?',
@@ -23,6 +29,8 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  // What the assistant is actively doing (e.g. running a tool), shown live.
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,16 +49,25 @@ export function ChatWidget() {
     const history = messages
     setMessages((m) => [...m, { role: 'user', content: q }, { role: 'assistant', content: '' }])
     setLoading(true)
+    setToolStatus(null)
     try {
       const token = await getToken()
-      await streamChat(token!, q, history, (tok) => {
-        setMessages((m) => {
-          const copy = [...m]
-          const i = copy.length - 1
-          copy[i] = { role: 'assistant', content: copy[i]!.content + tok }
-          return copy
-        })
-      })
+      await streamChat(
+        token!,
+        q,
+        history,
+        (tok) => {
+          // Any text means the tool step is done and the answer is flowing.
+          setToolStatus(null)
+          setMessages((m) => {
+            const copy = [...m]
+            const i = copy.length - 1
+            copy[i] = { role: 'assistant', content: copy[i]!.content + tok }
+            return copy
+          })
+        },
+        (toolName) => setToolStatus(TOOL_LABELS[toolName] ?? 'Working on it…')
+      )
     } catch {
       setMessages((m) => {
         const copy = [...m]
@@ -62,6 +79,7 @@ export function ChatWidget() {
       })
     } finally {
       setLoading(false)
+      setToolStatus(null)
     }
   }
 
@@ -123,10 +141,11 @@ export function ChatWidget() {
               ) : (
                 <div key={i} className="flex justify-start">
                   <div className="max-w-[92%] rounded-2xl bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-800">
-                    {m.content ? (
-                      <Markdown text={m.content} onNavigate={navigate} />
+                    {m.content && <Markdown text={m.content} onNavigate={navigate} />}
+                    {i === messages.length - 1 && toolStatus ? (
+                      <ToolStatus label={toolStatus} className={m.content ? 'mt-2' : ''} />
                     ) : (
-                      <ThinkingDots />
+                      !m.content && <ThinkingDots />
                     )}
                   </div>
                 </div>
@@ -162,6 +181,21 @@ export function ChatWidget() {
         </div>
       )}
     </>
+  )
+}
+
+/** Live "what it's doing" indicator, shown only while a real tool is running. */
+function ToolStatus({ label, className }: { label: string; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-charcoal-mid ring-1 ring-[#D8D6C9]',
+        className
+      )}
+    >
+      <Search className="h-3.5 w-3.5 shrink-0 animate-pulse text-brand" />
+      {label}
+    </span>
   )
 }
 

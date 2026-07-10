@@ -451,10 +451,11 @@ export class InsightsService implements OnModuleInit {
     userId: string,
     message: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
-    onToken: (t: string) => void
+    onToken: (t: string) => void,
+    onTool: (name: string) => void = () => {}
   ): Promise<void> {
     const system = this.chatSystem(await this.buildChatContext(userId))
-    await this.streamAssistant(userId, system, history.slice(-8), message, onToken)
+    await this.streamAssistant(userId, system, history.slice(-8), message, onToken, onTool)
     this.audit.log(userId, 'insight.chat', { chars: message.length, stream: true })
   }
 
@@ -595,18 +596,19 @@ ${context}`
     system: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
     message: string,
-    onToken: (t: string) => void
+    onToken: (t: string) => void,
+    onTool: (name: string) => void
   ): Promise<void> {
     // GLM is the default; Anthropic is the fallback. Both support the
     // transaction tool (GLM via OpenAI-compatible function calling).
     const glmKey = process.env['GLM_API_KEY']
     if (glmKey) {
-      await this.streamWithGlm(glmKey, userId, system, history, message, onToken)
+      await this.streamWithGlm(glmKey, userId, system, history, message, onToken, onTool)
       return
     }
     const anthropicKey = process.env['ANTHROPIC_API_KEY']
     if (anthropicKey) {
-      await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken)
+      await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken, onTool)
       return
     }
     onToken('The assistant is not available right now. Please try again later.')
@@ -618,7 +620,8 @@ ${context}`
     system: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
     message: string,
-    onToken: (t: string) => void
+    onToken: (t: string) => void,
+    onTool: (name: string) => void
   ): Promise<void> {
     const client = new Anthropic({ apiKey })
     const messages: Anthropic.MessageParam[] = [
@@ -630,7 +633,7 @@ ${context}`
     for (let step = 0; step < 3; step++) {
       const stream = client.messages.stream({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 4096,
         system,
         tools: [TRANSACTION_TOOL],
         messages,
@@ -641,11 +644,13 @@ ${context}`
       const toolUses = final.content.filter(
         (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
       )
+      this.logger.log(`Anthropic chat step=${step} tools=${toolUses.length} stop=${final.stop_reason}`)
       if (toolUses.length === 0) return
 
       messages.push({ role: 'assistant', content: final.content })
       const results: Anthropic.ToolResultBlockParam[] = []
       for (const tu of toolUses) {
+        onTool(tu.name)
         const out = await this.runChatTool(userId, tu.name, tu.input as Record<string, unknown>)
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out) })
       }
@@ -659,7 +664,8 @@ ${context}`
     system: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
     message: string,
-    onToken: (t: string) => void
+    onToken: (t: string) => void,
+    onTool: (name: string) => void
   ): Promise<void> {
     const baseUrl = process.env['GLM_BASE_URL'] ?? 'https://api.z.ai/api/paas/v4'
     const model = process.env['GLM_MODEL'] ?? 'glm-5.2'
@@ -684,7 +690,7 @@ ${context}`
         const res = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${glmKey}` },
-          body: JSON.stringify({ model, max_tokens: 1024, stream: true, tools, messages }),
+          body: JSON.stringify({ model, max_tokens: 4096, stream: true, tools, messages }),
         })
         if (!res.ok || !res.body) {
           this.logger.warn(`GLM stream failed: ${res.status}`)
@@ -698,6 +704,8 @@ ${context}`
         // Accumulate any streamed tool call(s) by index.
         const toolCalls: Record<number, { id: string; name: string; args: string }> = {}
         let streamDone = false
+        let finishReason: string | null = null
+        let contentChars = 0
         while (!streamDone) {
           const { done, value } = await reader.read()
           if (done) break
@@ -715,6 +723,7 @@ ${context}`
             try {
               const j = JSON.parse(data) as {
                 choices?: Array<{
+                  finish_reason?: string | null
                   delta?: {
                     content?: string
                     tool_calls?: Array<{
@@ -725,8 +734,13 @@ ${context}`
                   }
                 }>
               }
-              const delta = j.choices?.[0]?.delta
-              if (delta?.content) onToken(delta.content)
+              const choice = j.choices?.[0]
+              if (choice?.finish_reason) finishReason = choice.finish_reason
+              const delta = choice?.delta
+              if (delta?.content) {
+                contentChars += delta.content.length
+                onToken(delta.content)
+              }
               for (const tc of delta?.tool_calls ?? []) {
                 const idx = tc.index ?? 0
                 const e = toolCalls[idx] ?? { id: '', name: '', args: '' }
@@ -742,6 +756,12 @@ ${context}`
         }
 
         const calls = Object.values(toolCalls).filter((c) => c.name)
+        // Diagnostics: how each streaming step ended. A stream that stops with no
+        // [DONE] (streamDone=false) is a dropped connection; finish_reason
+        // 'length' is a max_tokens truncation; 'stop' is a clean finish.
+        this.logger.log(
+          `GLM chat step=${step} calls=${calls.length} chars=${contentChars} finish=${finishReason ?? 'none'} clean=${streamDone}`
+        )
         if (calls.length === 0) return // model answered directly (already streamed)
 
         messages.push({
@@ -760,6 +780,7 @@ ${context}`
           } catch {
             /* leave empty */
           }
+          onTool(c.name)
           const out = await this.runChatTool(userId, c.name, input)
           messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(out) })
         }
@@ -769,7 +790,7 @@ ${context}`
       // If nothing was streamed yet, fall back to Anthropic (also tool-capable).
       const anthropicKey = process.env['ANTHROPIC_API_KEY']
       if (anthropicKey) {
-        await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken)
+        await this.streamWithAnthropic(anthropicKey, userId, system, history, message, onToken, onTool)
       } else {
         onToken('The assistant is not available right now. Please try again later.')
       }

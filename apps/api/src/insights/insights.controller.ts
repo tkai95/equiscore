@@ -138,7 +138,8 @@ export class InsightsController {
         dbUser.id,
         body.message.slice(0, 2000),
         (body.history ?? []).slice(-8),
-        (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`)
+        (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`),
+        (tool) => res.write(`data: ${JSON.stringify({ tool })}\n\n`)
       )
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`)
     } catch {
