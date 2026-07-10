@@ -509,6 +509,11 @@ ${context}`
       )
       const last = p.monthly[p.monthly.length - 1]
       if (last) lines.push(`Latest month ${last.month}: money in £${last.income}, out £${last.spend}, net £${last.net}.`)
+      if (p.externalAccounts.length) {
+        lines.push(
+          `Other accounts implied by this statement (not connected — a partial picture): ${p.externalAccounts.map((a) => `${a.label}${a.provider ? ` (${a.provider})` : ''} — ${a.reason}`).join('; ')} Suggest connecting them on Connections for a complete profile.`
+        )
+      }
       if (p.unusual.length) {
         lines.push(
           `Flagged for context (surfaced to explain, not counted against them): ${p.unusual.map((u) => `£${u.amount} ${u.direction === 'debit' ? 'to' : 'from'} ${u.counterparty} on ${u.date} (${u.reason})`).join('; ')}.`

@@ -12,6 +12,7 @@ import type {
 } from './types'
 import { detectRecurringStreams } from './recurrence'
 import { analyzeIncome, incomeEligibleKeys } from './income'
+import { detectExternalAccounts } from './external-accounts'
 import { analyzeExpenses, resolveCategory } from './expenses'
 import { analyzeCommitments } from './commitments'
 import { analyzeAffordability } from './affordability'
@@ -69,6 +70,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
 
   const monthly = computeMonthly(txns, incomeKeys)
   const affordability = analyzeAffordability(income, expenses, commitments, paymentBehaviour)
+  const externalAccounts = detectExternalAccounts(txns, { accountHolderName: ctx.accountHolderName, months })
   const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
 
   return {
@@ -87,6 +89,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     overall,
     monthly,
     affordability,
+    externalAccounts,
     summary,
     source: ctx.source,
   }

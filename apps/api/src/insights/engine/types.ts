@@ -1,4 +1,5 @@
 import type { TransactionCategory } from '@prisma/client'
+import type { InferredAccount } from './external-accounts'
 
 /**
  * Insight-profile engine — types.
@@ -282,6 +283,8 @@ export interface InsightProfile {
   monthly: MonthlyPoint[]
   /** Deterministic affordability read (ratios, max affordable rent, stress test). */
   affordability: AffordabilityProfile
+  /** Other accounts the statement implies the person holds but we can't see. */
+  externalAccounts: InferredAccount[]
   /** Plain-English, deterministic summary of the whole profile. */
   summary: string
   source: ProfileContext['source']

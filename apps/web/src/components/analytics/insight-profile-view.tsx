@@ -10,7 +10,13 @@ import {
   ShieldCheck,
   Clock,
   ChevronRight,
+  PiggyBank,
+  CreditCard,
+  Landmark,
+  TrendingUp,
+  ArrowRight,
 } from 'lucide-react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { TIER_LABELS } from '@equiscore/shared'
@@ -92,6 +98,15 @@ interface InsightProfile {
     rating: AffordabilityRating
     notes: string[]
   }
+  externalAccounts: Array<{
+    type: 'savings' | 'investment' | 'credit' | 'own_current'
+    label: string
+    provider: string | null
+    direction: 'outflow' | 'inflow' | 'both'
+    monthlyFlow: number
+    confidence: 'high' | 'medium'
+    reason: string
+  }>
   summary: string
   source: Source
 }
@@ -515,6 +530,67 @@ export function InsightProfileView() {
           ))}
         </ul>
       </div>
+
+      {/* ── Other accounts we spotted ─────────────────────────────────────── */}
+      {profile.externalAccounts.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-lg font-semibold text-gray-900">Other accounts we spotted</h2>
+              <InfoTooltip label="How this is detected">
+                Money moving to and from this account reveals others you hold — a savings pot, a
+                credit card, or another account in your name. Connecting them gives a complete
+                picture and usually strengthens your profile.
+              </InfoTooltip>
+            </div>
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
+              Partial picture
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            This profile is built from one account. These look like accounts we can&apos;t see yet.
+          </p>
+
+          <div className="mt-4 space-y-2">
+            {profile.externalAccounts.map((a, i) => {
+              const Icon =
+                a.type === 'savings'
+                  ? PiggyBank
+                  : a.type === 'investment'
+                    ? TrendingUp
+                    : a.type === 'credit'
+                      ? CreditCard
+                      : Landmark
+              return (
+                <div key={i} className="flex items-start gap-3 rounded-lg bg-gray-50 px-4 py-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-gray-100">
+                    <Icon className="h-4 w-4 text-brand" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">{a.label}</p>
+                      {a.confidence === 'medium' && (
+                        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                          likely
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-sm text-gray-600">{a.reason}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <Link
+            href="/dashboard/connections"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
+          >
+            Add your other accounts
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
 
       {/* ── 3. Follow-up questions ────────────────────────────────────────── */}
       {profile.questions.length > 0 && (
