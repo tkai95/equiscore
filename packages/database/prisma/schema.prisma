@@ -15,6 +15,10 @@ model User {
   email          String   @unique
   authProviderId String   @unique @map("auth_provider_id")
   status         UserStatus @default(active)
+  // Gates the Compass module (financial-coaching layer). Flipped on for
+  // subscribers; default off. Read via /auth/me and enforced by the API guard.
+  // Migration target once real billing exists: Clerk Billing has({plan}).
+  compassEnabled Boolean  @default(false) @map("compass_enabled")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

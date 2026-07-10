@@ -15,6 +15,7 @@ import {
   User,
   Settings,
   ChevronDown,
+  Compass,
   LifeBuoy,
   Lock,
   PanelLeftClose,
@@ -26,6 +27,7 @@ import {
 import { cn } from '@/lib/utils'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { useActionItems } from '@/lib/use-action-items'
+import { useMe } from '@/lib/use-me'
 
 type Leaf = { href: string; label: string; icon: LucideIcon }
 type Group = { id: string; label: string; icon: LucideIcon; children: Leaf[] }
@@ -74,6 +76,7 @@ function SidebarNav({
 }) {
   const pathname = usePathname()
   const { count } = useActionItems()
+  const { data: me } = useMe()
 
   return (
     <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
@@ -95,6 +98,18 @@ function SidebarNav({
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
+      {/* Compass — the coaching layer, shown only to entitled subscribers.
+          The API guard is the real boundary; hiding the link is UX. */}
+      {me?.compassEnabled && (
+        <NavLink
+          href="/dashboard/compass"
+          label="Compass"
+          icon={Compass}
+          pathname={pathname}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      )}
 
       <div className="pt-2" />
       {GROUPS.map((group) => (

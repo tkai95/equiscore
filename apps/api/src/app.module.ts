@@ -12,6 +12,7 @@ import { SharingModule } from './sharing/sharing.module'
 import { AuditModule } from './audit/audit.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { InsightsModule } from './insights/insights.module'
+import { CompassModule } from './compass/compass.module'
 
 @Module({
   controllers: [HealthController],
@@ -27,6 +28,7 @@ import { InsightsModule } from './insights/insights.module'
     AuditModule,
     AnalyticsModule,
     InsightsModule,
+    CompassModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

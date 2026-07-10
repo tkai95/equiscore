@@ -1,4 +1,17 @@
+import type { CompassPayload } from './compass-types'
+
+export type { CompassPayload }
+
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000/api/v1'
+
+/** Shape of GET /auth/me — the current user row (plus profile + counts). */
+export interface Me {
+  id: string
+  email: string
+  compassEnabled: boolean
+  status: string
+  profile: { fullName: string | null; profileStage: string } | null
+}
 
 export type ImportJobStatus = 'processing' | 'completed' | 'failed' | 'cancelled'
 
@@ -148,7 +161,7 @@ export async function streamChat(
 export const api = {
   auth: {
     sync: (token: string) => apiFetch('/auth/sync', { method: 'POST' }, token),
-    me: (token: string) => apiFetch('/auth/me', {}, token),
+    me: (token: string) => apiFetch<Me>('/auth/me', {}, token),
   },
   profile: {
     get: (token: string) => apiFetch('/profile', {}, token),
@@ -283,5 +296,8 @@ export const api = {
     revoke: (token: string, id: string) =>
       apiFetch(`/share-links/${id}`, { method: 'DELETE' }, token),
     getPublic: (shareToken: string) => apiFetch(`/public/profile/${shareToken}`),
+  },
+  compass: {
+    get: (token: string) => apiFetch<CompassPayload>('/compass', {}, token),
   },
 }
