@@ -12,7 +12,7 @@ type Msg = { role: 'user' | 'assistant'; content: string }
 const SUGGESTIONS = [
   'How much do I spend on subscriptions?',
   'Can I afford £1,400 a month rent?',
-  'Why is my Trust Profile a C?',
+  'Why is my Trust Portfolio a C?',
   'What can I do to raise my score?',
 ]
 
@@ -97,8 +97,8 @@ export function ChatWidget() {
             {messages.length === 0 && (
               <div>
                 <p className="text-sm text-gray-500">
-                  Ask about your payments, affordability, or Trust Profile — or how to do anything on
-                  EquiScore. Answers use your own data.
+                  Ask about your payments, affordability, or Trust Portfolio — or how to do anything
+                  on EquiScore. Answers use your own data.
                 </p>
                 <div className="mt-3 space-y-2">
                   {SUGGESTIONS.map((s) => (

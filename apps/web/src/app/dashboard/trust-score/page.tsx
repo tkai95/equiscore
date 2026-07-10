@@ -1,6 +1,6 @@
 import { TrustScoreView } from '@/components/trust-score/trust-score-view'
 
-export const metadata = { title: 'My Trust Score' }
+export const metadata = { title: 'Assessment' }
 
 export default function TrustScorePage() {
   return <TrustScoreView />

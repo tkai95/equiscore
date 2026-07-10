@@ -75,7 +75,7 @@ export function AnalyticsOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Financial insights</h1>
         <p className="mt-1 text-base text-gray-500">
           What your bank data says about your income, spending, and reliability, from Open Banking or
           an uploaded statement.

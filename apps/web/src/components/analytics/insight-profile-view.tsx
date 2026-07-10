@@ -99,7 +99,8 @@ interface InsightProfile {
     notes: string[]
   }
   externalAccounts: Array<{
-    type: 'savings' | 'investment' | 'credit' | 'own_current'
+    type: 'savings' | 'investment' | 'credit' | 'own_current' | 'unknown'
+    key: string
     label: string
     provider: string | null
     direction: 'outflow' | 'inflow' | 'both'
@@ -316,7 +317,7 @@ export function InsightProfileView() {
           <div className="mt-2">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-4xl font-bold text-gray-900">
-                Trust Profile: {score.overallTier}
+                Trust Portfolio: Tier {score.overallTier}
               </span>
               <span className="rounded-lg bg-gray-100 px-3 py-1 text-lg font-semibold tabular-nums text-gray-700">
                 {score.overallScore}
@@ -335,11 +336,11 @@ export function InsightProfileView() {
           </p>
         ) : (
           <p className="mt-2 text-base text-gray-500">
-            Generate your Trust Score on{' '}
+            Generate your assessment on the{' '}
             <a href="/dashboard/trust-score" className="font-medium text-brand hover:underline">
-              My Trust Score
+              Assessment
             </a>{' '}
-            to see it here.
+            page to see it here.
           </p>
         )}
         <p className="mt-0.5 text-base text-gray-500">{evidence.verified}</p>
@@ -560,7 +561,9 @@ export function InsightProfileView() {
                     ? TrendingUp
                     : a.type === 'credit'
                       ? CreditCard
-                      : Landmark
+                      : a.type === 'unknown'
+                        ? HelpCircle
+                        : Landmark
               return (
                 <div key={i} className="flex items-start gap-3 rounded-lg bg-gray-50 px-4 py-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-gray-100">
@@ -569,10 +572,16 @@ export function InsightProfileView() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-gray-900">{a.label}</p>
-                      {a.confidence === 'medium' && (
-                        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-                          likely
+                      {a.type === 'unknown' ? (
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          confirm below
                         </span>
+                      ) : (
+                        a.confidence === 'medium' && (
+                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                            likely
+                          </span>
+                        )
                       )}
                     </div>
                     <p className="mt-0.5 text-sm text-gray-600">{a.reason}</p>

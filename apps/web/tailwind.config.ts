@@ -35,6 +35,30 @@ export default {
           DEFAULT: '#123C35',
           dark: '#0B2F29',
           mid: '#3D6658',
+          // Tints for subtle backgrounds / active nav states (canonical brand green)
+          100: '#E4EFEB',
+          50: '#F1F7F4',
+        },
+        // Semantic status tokens — one source of truth for meaning → colour.
+        // success = verified/complete, warn = needs attention/incomplete,
+        // danger = genuine adverse result. "Not assessed" uses neutral greys.
+        success: {
+          DEFAULT: '#15805F',
+          fg: '#0C4A37',
+          bg: '#E8F6F0',
+          border: '#BFE6D6',
+        },
+        warn: {
+          DEFAULT: '#A86812',
+          fg: '#7A4B0C',
+          bg: '#FBF1DC',
+          border: '#EAD3A0',
+        },
+        danger: {
+          DEFAULT: '#B04A57',
+          fg: '#822E39',
+          bg: '#FBEBED',
+          border: '#EFC9CE',
         },
         sage: {
           DEFAULT: '#8FA491',
@@ -43,6 +67,13 @@ export default {
         cream: {
           DEFAULT: '#F7F3EA',
           surface: '#FFFDF7',
+        },
+        // Surface levels for card hierarchy (page → card → inset).
+        surface: {
+          page: '#F7F6F2',
+          card: '#FFFDF7',
+          sidebar: '#FBFAF6',
+          subtle: '#F4F5F2',
         },
         sand: {
           DEFAULT: '#C7A66A',

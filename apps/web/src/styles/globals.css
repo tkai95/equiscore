@@ -57,4 +57,18 @@
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+  /* Accessibility: a visible keyboard focus ring on interactive elements.
+     Mouse clicks don't trigger :focus-visible, so this only shows for keyboard
+     users — meets the 3:1 contrast requirement for interface components. */
+  a:focus-visible,
+  button:focus-visible,
+  [role='button']:focus-visible,
+  [tabindex]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #123c35;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }

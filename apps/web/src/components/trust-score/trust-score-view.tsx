@@ -100,7 +100,7 @@ const DIM_META: Record<DimKey, { assessed: string[]; improve: string[] }> = {
   },
   rentalReliabilityScore: {
     assessed: ['Whether rent is detected and paid consistently', 'Returned or missed payments', 'Reliability of essential bill payments'],
-    improve: ['Ensure rent is paid from the connected account', 'Explain any flagged rent-like transfers on Analytics'],
+    improve: ['Ensure rent is paid from the connected account', 'Explain any flagged rent-like transfers on Financial insights'],
   },
   identityConfidenceScore: {
     assessed: ['Match between your name and the bank account holder', 'Address confidence from evidence'],
@@ -194,11 +194,11 @@ export function TrustScoreView() {
   if (!score) {
     return (
       <div className="mx-auto max-w-6xl">
-        <h1 className="text-3xl font-semibold text-gray-900">My Trust Profile</h1>
+        <h1 className="text-3xl font-semibold text-gray-900">Assessment</h1>
         <div className="mt-6 rounded-xl border border-[#D8D6C9] bg-white p-8 text-center">
           <p className="font-semibold text-gray-900">No assessment yet</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-gray-600">
-            Your Trust Profile is built from real financial evidence. Connect a bank or upload a
+            Your Trust Portfolio is built from real financial evidence. Connect a bank or upload a
             statement, then generate your assessment.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -226,9 +226,15 @@ export function TrustScoreView() {
     FINANCIAL_DIMS.reduce((s, k) => s + (score[k] as number), 0) / FINANCIAL_DIMS.length
   )
   const verificationWeak = score.identityConfidenceScore < 50 || score.verificationStrengthScore < 50
+  // Only claim a name mismatch when the score actually recorded one — a low
+  // identity score is usually just missing evidence (no ID), not a bad name.
+  const nameMismatch = score.reasonCodes.some((r) => r.code === 'NAME_MISMATCH')
+  const financiallyStrong = financialAvg >= 60
   const decision = verificationWeak
-    ? 'Financially strong. Verification incomplete.'
-    : financialAvg >= 70
+    ? financiallyStrong
+      ? 'Financially strong. Verification incomplete.'
+      : 'Verification incomplete.'
+    : financiallyStrong
       ? 'Financially strong and verified.'
       : 'Assessment complete.'
   const financialRating = assessment(financialAvg)
@@ -252,7 +258,7 @@ export function TrustScoreView() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-semibold leading-tight text-gray-900">My Trust Profile</h1>
+          <h1 className="text-[28px] font-semibold leading-tight text-gray-900">Assessment</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-gray-500">
             <span>Last assessed {formatDate(score.computedAt)}</span>
             {score.validUntil && (
@@ -275,7 +281,7 @@ export function TrustScoreView() {
             href="/dashboard/share"
             className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Share profile
+            Share portfolio
           </Link>
           <button
             onClick={() => recompute.mutate()}
@@ -312,7 +318,7 @@ export function TrustScoreView() {
           <h2 className="text-2xl font-semibold text-gray-900">{decision}</h2>
           <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-gray-600">
             {verificationWeak
-              ? `Your affordability, financial stability and rental history are strong. Your profile is currently limited to Tier ${score.overallTier} because your identity and evidence could not be fully verified.`
+              ? `Your profile is currently limited to Tier ${score.overallTier} because your identity and evidence could not be fully verified${financiallyStrong ? ', even though your financial behaviour is strong' : ''}. Verifying unlocks a higher tier.`
               : 'Your financial behaviour and verified evidence support this assessment.'}
           </p>
 
@@ -350,9 +356,11 @@ export function TrustScoreView() {
             <div>
               <p className="font-semibold text-amber-900">Complete verification to unlock a higher tier</p>
               <p className="mt-0.5 text-sm text-amber-800">
-                {score.identityConfidenceScore < 50
+                {nameMismatch
                   ? 'The name connected to your bank account does not fully match your EquiScore profile. Resolving this raises your verification confidence.'
-                  : 'Your evidence is statement-only. Connecting Open Banking or adding a document strengthens verification.'}
+                  : score.identityConfidenceScore < 50
+                    ? 'Add a government photo ID so we can verify your identity — the biggest lever on your tier. A verified ID confirms your name and date of birth.'
+                    : 'Your evidence is statement-only. Connecting Open Banking or adding a document strengthens verification.'}
               </p>
             </div>
           </div>
