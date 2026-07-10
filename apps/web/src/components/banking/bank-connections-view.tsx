@@ -215,8 +215,20 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
     }
   }
 
-  const isBusy =
-    startPdfMut.isPending || importCsvMut.isPending || activeJob?.status === 'processing'
+  // Upload is a two-step flow, and each step gets exactly one indicator:
+  //   1. uploading  — the file is being sent (fast; the PDF POST returns as soon
+  //                    as the background job is created, the CSV as soon as parsed)
+  //   2. processing — the background read is running (can take a couple of minutes)
+  // `pdfProcessing` optimistically holds the processing state from the moment the
+  // job id is known until the poll confirms it, so the UI never flickers back to an
+  // idle "Upload" button in the gap between the POST resolving and the first poll.
+  const uploading = startPdfMut.isPending || importCsvMut.isPending
+  const pdfProcessing =
+    activeJobId !== null && (activeJob === undefined || activeJob.status === 'processing')
+  const csvDone = importCsvMut.isSuccess && !!importCsvMut.data
+  const jobDone = activeJob?.status === 'completed' && !!activeJob.result
+  const hasResult = jobDone || csvDone
+  const busy = uploading || pdfProcessing
 
   const connections = groupByConnection(accounts)
   const hasAccounts = accounts.length > 0
@@ -468,38 +480,29 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 e.target.value = ''
               }}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isBusy}
-              className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
-            >
-              {isBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              {startPdfMut.isPending
-                ? 'Uploading…'
-                : importCsvMut.isPending
-                  ? 'Reading your statement…'
-                  : activeJob?.status === 'processing'
-                    ? 'Reading your statement…'
-                    : 'Upload a statement (PDF or CSV)'}
-            </button>
+            {/* One phase, one indicator. Step 1 uploads the file; step 2 reads it. */}
 
-            {/* PDF job is running in the background — the user is free to leave. */}
-            {activeJob?.status === 'processing' && (
+            {/* Step 1 — the file is being sent. */}
+            {uploading && (
+              <div className="mt-3 flex items-center gap-2.5 rounded-lg bg-white px-3.5 py-2.5 text-sm font-medium text-charcoal-mid ring-1 ring-[#D8D6C9]">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+                {startPdfMut.isPending ? 'Uploading your statement…' : 'Reading your statement…'}
+              </div>
+            )}
+
+            {/* Step 2 — the background read is running. The user is free to leave. */}
+            {!uploading && pdfProcessing && (
               <div className="mt-3 rounded-lg bg-white px-3.5 py-2.5 text-sm text-charcoal-mid ring-1 ring-[#D8D6C9]">
                 <p className="flex items-center gap-2 font-medium">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
-                  Reading your statement…
+                  Statement uploaded — reading it now
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  Reading a full statement can take a couple of minutes. You can leave this page or
-                  close the tab, and we&apos;ll show a ✓ up top when it&apos;s done.
+                  This can take a couple of minutes. You can leave this page or close the tab, and
+                  we&apos;ll show a ✓ up top when it&apos;s done.
                 </p>
                 <button
-                  onClick={() => cancelMut.mutate(activeJob.id)}
+                  onClick={() => activeJobId && cancelMut.mutate(activeJobId)}
                   disabled={cancelMut.isPending}
                   className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
                 >
@@ -509,10 +512,9 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
               </div>
             )}
 
-            {/* Completed PDF job */}
-            {activeJob?.status === 'completed' && activeJob.result && (
-              <ImportSummary data={activeJob.result} />
-            )}
+            {/* Terminal states */}
+            {jobDone && <ImportSummary data={activeJob!.result!} />}
+            {csvDone && <ImportSummary data={importCsvMut.data!} />}
             {activeJob?.status === 'failed' && (
               <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
                 {activeJob.error || "We couldn't read that statement. Try a clearer copy or a CSV export."}
@@ -523,16 +525,22 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 Import cancelled. Nothing was saved — you can upload again whenever you&apos;re ready.
               </div>
             )}
-
-            {/* Synchronous CSV result */}
-            {importCsvMut.isSuccess && importCsvMut.data && <ImportSummary data={importCsvMut.data} />}
-
-            {/* Failure to even start the import (bad file, network, PDF reader off) */}
             {(startPdfMut.isError || importCsvMut.isError) && (
               <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
                 {((startPdfMut.error ?? importCsvMut.error) as Error)?.message ||
                   "We couldn't read that file. Make sure it's a CSV export or a clear PDF."}
               </div>
+            )}
+
+            {/* Action — hidden while a file is uploading or being read. */}
+            {!busy && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                {hasResult ? 'Upload another statement' : 'Upload a statement (PDF or CSV)'}
+              </button>
             )}
           </div>
         </div>
