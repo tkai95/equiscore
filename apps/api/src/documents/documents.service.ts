@@ -109,10 +109,15 @@ export class DocumentsService {
         new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: mimeType })
       )
     } catch (err) {
-      // Real cause (bad bucket, region, or credentials) goes to the log; the
-      // client gets a clean, actionable message.
-      this.logger.error(`Document store failed for bucket "${this.bucket}" key "${key}": ${String(err)}`)
-      throw new ServiceUnavailableException('We could not store that document. Please try again shortly.')
+      // The S3 error name (SignatureDoesNotMatch / NoSuchBucket /
+      // InvalidAccessKeyId …) pins the cause. It carries no secret, so surface
+      // it to the client to make the config problem diagnosable; full detail
+      // (region, endpoint) goes to the server log.
+      const code = (err as { name?: string; Code?: string })?.name ?? 'unknown error'
+      this.logger.error(
+        `Document store failed — bucket="${this.bucket}" region="${this.config.get<string>('SUPABASE_S3_REGION') ?? 'eu-west-1'}" key="${key}": ${String(err)}`
+      )
+      throw new ServiceUnavailableException(`We could not store that document (${code}).`)
     }
 
     return this.confirmUpload(userId, documentType, key, mimeType, file.size)
