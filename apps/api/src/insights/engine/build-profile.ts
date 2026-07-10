@@ -45,6 +45,12 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   // netted set; coverage (period) and per-account integrity use the full set.
   const internalTxns = detectInternalTransfers(txns)
   const netTxns = internalTxns.size > 0 ? txns.filter((t) => !internalTxns.has(t)) : txns
+  // Money moving between the user's own connected accounts, per month — surfaced
+  // so the assistant can describe it correctly (it is NOT income or spending).
+  const internalTransfersMonthly = round2(
+    [...internalTxns].filter((t) => t.direction === 'debit').reduce((s, t) => s + t.amount, 0) /
+      Math.max(1, months)
+  )
 
   const creditStreams = detectRecurringStreams(netTxns, 'credit')
   const debitStreams = detectRecurringStreams(netTxns, 'debit')
@@ -120,6 +126,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     monthly,
     affordability,
     externalAccounts,
+    internalTransfersMonthly,
     summary,
     source: ctx.source,
   }

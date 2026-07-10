@@ -464,7 +464,8 @@ export class InsightsService implements OnModuleInit {
 
 RULES:
 - Answer general questions (score, tier, why a tier, totals, affordability, how-to) from the SNAPSHOT below. Be specific with figures and always use £. Never invent numbers.
-- For questions that need exact underlying evidence — a specific month, a category like gambling, a merchant, the biggest/smallest payments, or explaining one transaction — call the get_transactions tool to fetch the real transactions, then answer from what it returns. Do not guess at specifics the snapshot doesn't contain.
+- CRITICAL — internal transfers: money the user moves between their OWN accounts (e.g. salary account → expenses account → savings account) is NOT income and NOT spending. The Income figure in the snapshot already nets these out. NEVER add transfer credits to income, never call an internal transfer "income", "inflow", or "earnings", and never report a "gross inflow" that sums money moving between the user's own accounts. When asked how money moves, describe transfers between their own accounts as internal movement, explicitly separate from their genuine income. The genuine income is the snapshot Income figure — treat it as canonical.
+- For questions that need exact underlying evidence — a specific month, a category like gambling, a merchant, the biggest/smallest payments, or explaining one transaction — call the get_transactions tool to fetch the real transactions, then answer from what it returns. Do not guess at specifics the snapshot doesn't contain. If you sum raw transactions yourself, exclude transfers between the user's own accounts from any income total.
 - Be warm, concise, and genuinely helpful. Format with Markdown: short paragraphs, **bold** for key figures, and bullet lists where it helps. Do not use headings larger than bold.
 - When you recommend an action, include a Markdown link to the exact page so they can act in one click. Paths: Dashboard [/dashboard], My Trust Score [/dashboard/trust-score], Analytics [/dashboard/analytics], Connections (connect a bank or upload a statement) [/dashboard/connections], Documents (upload ID / proof of address) [/dashboard/documents], Share Profile [/dashboard/share], My Profile [/dashboard/profile]. For example: "[Upload your documents](/dashboard/documents)".
 
@@ -494,8 +495,13 @@ ${context}`
         `Evidence: ${p.source}, ${p.period.months} months, ${p.period.transactionCount} transactions (${p.period.from} to ${p.period.to}).`
       )
       lines.push(
-        `Income: about £${p.income.averageMonthlyIncome}/month, ${p.income.primaryCharacter}, ${p.income.consistency}${p.income.recurringSalaryDetected ? ', recurring salary detected' : ''}. Sources: ${p.income.sources.map((s) => `${s.name} £${s.monthlyAverage}/mo`).join(', ')}.`
+        `Income (genuine external income — transfers between the user's own accounts are already excluded): about £${p.income.averageMonthlyIncome}/month, ${p.income.primaryCharacter}, ${p.income.consistency}${p.income.recurringSalaryDetected ? ', recurring salary detected' : ''}. Sources: ${p.income.sources.map((s) => `${s.name} £${s.monthlyAverage}/mo`).join(', ')}. This is the canonical income figure — do NOT add internal transfers to it.`
       )
+      if (p.internalTransfersMonthly > 0) {
+        lines.push(
+          `Internal transfers between the user's OWN connected accounts: about £${p.internalTransfersMonthly}/month. This is money moving between their own accounts (e.g. salary account to expenses/savings) — it is NOT income and NOT spending, and is already excluded from both figures above.`
+        )
+      }
       lines.push(
         `Spending: about £${p.expenses.averageMonthlySpend}/month, ${Math.round(p.expenses.essentialShare * 100)}% essential. Categories: ${p.expenses.categories.slice(0, 8).map((c) => `${c.label} £${c.monthlyAverage}/mo`).join(', ')}.`
       )

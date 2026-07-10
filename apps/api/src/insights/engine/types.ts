@@ -288,6 +288,9 @@ export interface InsightProfile {
   affordability: AffordabilityProfile
   /** Other accounts the statement implies the person holds but we can't see. */
   externalAccounts: InferredAccount[]
+  /** Money per month moving between the user's own connected accounts (netted
+   *  out of income and spending). 0 when only one account is present. */
+  internalTransfersMonthly: number
   /** Plain-English, deterministic summary of the whole profile. */
   summary: string
   source: ProfileContext['source']
