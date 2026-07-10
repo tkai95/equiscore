@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { FileText, Upload, Trash2, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
@@ -157,6 +157,24 @@ export function DocumentsView() {
         ? 3000
         : false,
   })
+
+  // When a document finishes verifying, the server has recomputed the score —
+  // refresh every score-derived view so the Assessment page reflects it without
+  // a manual reload. (Verification is async, so this fires on the poll that sees
+  // a document leave the 'pending' state.)
+  const prevPending = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const nowPending = new Set(
+      documents.filter((d) => d.verificationStatus === 'pending').map((d) => d.id)
+    )
+    const finished = [...prevPending.current].some((id) => !nowPending.has(id))
+    prevPending.current = nowPending
+    if (finished) {
+      for (const key of [['score'], ['score-improvements'], ['insight-profile'], ['analytics-summary']]) {
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+    }
+  }, [documents, queryClient])
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
