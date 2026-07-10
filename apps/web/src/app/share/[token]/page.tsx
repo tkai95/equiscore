@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { api } from '@/lib/api'
-import { formatDate, formatCurrency, TIER_COLORS } from '@/lib/utils'
+import { formatDate, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
 import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle, Clock, Home, Wallet } from 'lucide-react'
@@ -106,6 +106,9 @@ const SCORE_DIMENSIONS = [
 function recipientPhrasing(message: string): string {
   return message.replace(/your profile/gi, "the applicant's profile")
 }
+
+/** Whole pounds — a shared report reads cleaner without pennies. */
+const poundsWhole = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value)
@@ -250,13 +253,13 @@ export default async function PublicProfilePage({ params }: { params: { token: s
             </div>
             <p className="mt-1 text-sm text-gray-500">
               Assessed from the applicant&apos;s take-home income of{' '}
-              {formatCurrency(profile.insight.income.monthlyAverage)}/month and their real outgoings.
+              {poundsWhole(profile.insight.income.monthlyAverage)}/month and their real outgoings.
             </p>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {profile.insight.affordability.rentToIncome !== null && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3">
-                  <p className="text-xs text-gray-500">Rent to income</p>
+                  <p className="text-xs text-gray-500">Current rent to income</p>
                   <p className="mt-0.5 text-xl font-semibold tabular-nums text-gray-900">
                     {Math.round(profile.insight.affordability.rentToIncome * 100)}%
                   </p>
@@ -265,16 +268,30 @@ export default async function PublicProfilePage({ params }: { params: { token: s
               <div className="rounded-xl bg-gray-50 px-4 py-3">
                 <p className="text-xs text-gray-500">Disposable after essentials</p>
                 <p className="mt-0.5 text-xl font-semibold tabular-nums text-gray-900">
-                  {formatCurrency(profile.insight.affordability.disposableIncome)}
+                  {poundsWhole(profile.insight.affordability.disposableIncome)}
                 </p>
               </div>
               <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-xs text-gray-500">Could sustain rent up to</p>
+                <p className="text-xs text-gray-500">Could sustain total rent up to</p>
                 <p className="mt-0.5 text-xl font-semibold tabular-nums text-brand">
-                  {formatCurrency(profile.insight.affordability.maxAffordableRent)}
+                  {poundsWhole(profile.insight.affordability.maxAffordableRent)}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-tight text-gray-400">
+                  total monthly rent, not on top of current
                 </p>
               </div>
             </div>
+
+            {profile.insight.affordability.currentRent !== null && (
+              <p className="mt-3 text-sm text-gray-600">
+                Currently pays{' '}
+                <span className="font-medium text-gray-900">
+                  {poundsWhole(profile.insight.affordability.currentRent)}/month
+                </span>
+                . The figure above is the <span className="font-medium">total</span> rent they could
+                sustain at a new tenancy — it replaces their current rent, not in addition to it.
+              </p>
+            )}
 
             <div
               className={`mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ring-1 ${
@@ -292,7 +309,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
                 <span className="font-medium">Stress test: </span>
                 if income dropped {profile.insight.affordability.stressTest.incomeDropPct}%,{' '}
                 {profile.insight.affordability.stressTest.stillPositive
-                  ? `there would still be about ${formatCurrency(Math.abs(profile.insight.affordability.stressTest.surplusUnderStress))}/month spare.`
+                  ? `there would still be about ${poundsWhole(Math.abs(profile.insight.affordability.stressTest.surplusUnderStress))}/month spare.`
                   : profile.insight.affordability.stressTest.essentialsCovered
                     ? 'the monthly surplus would be gone, but essential costs would still be covered.'
                     : 'essential costs would no longer be fully covered.'}
@@ -320,7 +337,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
             <p className="text-sm text-gray-700">
               Income of about{' '}
               <span className="font-semibold">
-                {formatCurrency(profile.insight.income.monthlyAverage)}/month
+                {poundsWhole(profile.insight.income.monthlyAverage)}/month
               </span>{' '}
               from {CHARACTER_LABEL[profile.insight.income.character] ?? 'various sources'},{' '}
               {profile.insight.income.consistency === 'very_consistent'
