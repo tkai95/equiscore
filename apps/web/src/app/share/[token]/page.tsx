@@ -4,6 +4,7 @@ import { formatDate, formatCurrency, TIER_COLORS } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TIER_LABELS } from '@equiscore/shared'
 import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, Info, XCircle, Clock, Home, Wallet } from 'lucide-react'
+import { EquiScoreLogo } from '@/components/brand/logo'
 
 type AffordabilityRating = 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
 
@@ -100,6 +101,12 @@ const SCORE_DIMENSIONS = [
   { key: 'rentalReliability', label: 'Rental Reliability' },
 ] as const
 
+/** Reason-code messages are written for the applicant ("your profile"). On a
+ *  recipient's report, rephrase to the third person so it reads correctly. */
+function recipientPhrasing(message: string): string {
+  return message.replace(/your profile/gi, "the applicant's profile")
+}
+
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value)
   const color =
@@ -127,7 +134,13 @@ export default async function PublicProfilePage({ params }: { params: { token: s
   }
 
   const tierColorClass = TIER_COLORS[profile.trustTier]
-  const positiveReasons = profile.reasonCodes.filter((r) => r.sentiment === 'positive').slice(0, 5)
+  const positiveAll = profile.reasonCodes.filter((r) => r.sentiment === 'positive')
+  // A verified photo ID produces two near-identical lines (one for identity, one
+  // for verification strength) — show just the clearer one to a recipient.
+  const hasIdDoc = positiveAll.some((r) => r.code === 'IDENTITY_DOCUMENT')
+  const positiveReasons = positiveAll
+    .filter((r) => !(hasIdDoc && r.code === 'DOCUMENT_UPLOADED'))
+    .slice(0, 5)
   const negativeReasons = profile.reasonCodes.filter((r) => r.sentiment === 'negative').slice(0, 3)
   const badge = STATUS_BADGE[profile.status]
 
@@ -136,10 +149,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
       {/* Header */}
       <header className="border-b border-[#D8D6C9] bg-cream-surface px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-brand" />
-            <span className="text-lg font-bold text-gray-900">Equiscore</span>
-          </div>
+          <EquiScoreLogo width={132} />
           <span className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${badge.className}`}>
             {badge.label}
           </span>
@@ -335,10 +345,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
 
             {profile.insight.contextClear && (
               <p className="mt-4 border-t border-gray-100 pt-4 text-sm text-emerald-700">
-                No unusual transaction patterns were found
-                {profile.insight.clearedTypologies.length > 0
-                  ? ` (checked and absent: ${profile.insight.clearedTypologies.join(', ')}).`
-                  : '.'}
+                No unusual or high-risk transaction patterns were found.
               </p>
             )}
           </div>
@@ -370,13 +377,13 @@ export default async function PublicProfilePage({ params }: { params: { token: s
               {positiveReasons.map((r) => (
                 <div key={r.code} className="flex items-start gap-2.5 rounded-xl bg-emerald-50 px-3.5 py-2.5">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                  <span className="text-sm text-gray-700">{r.message}</span>
+                  <span className="text-sm text-gray-700">{recipientPhrasing(r.message)}</span>
                 </div>
               ))}
               {negativeReasons.map((r) => (
                 <div key={r.code} className="flex items-start gap-2.5 rounded-xl bg-red-50 px-3.5 py-2.5">
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                  <span className="text-sm text-gray-700">{r.message}</span>
+                  <span className="text-sm text-gray-700">{recipientPhrasing(r.message)}</span>
                 </div>
               ))}
             </div>
