@@ -1,9 +1,9 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException, BadRequestException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { Prisma } from '@prisma/client'
 import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
-import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import type { DocumentType } from '@equiscore/shared'
 import { AuditService } from '../audit/audit.service'
 import { ScoringService } from '../scoring/scoring.service'
@@ -77,6 +77,45 @@ export class DocumentsService {
       this.logger.error(`Presigned upload URL generation failed for bucket "${this.bucket}": ${String(err)}`)
       throw new ServiceUnavailableException('Could not prepare the upload. Please try again shortly.')
     }
+  }
+
+  private static readonly ACCEPTED_MIME = new Set([
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+  ])
+
+  /**
+   * Store a document server-side (the API holds the S3 credentials), then
+   * register + verify it. This is the reliable path: the browser never signs a
+   * request, so there's no presigned-POST SignatureDoesNotMatch to hit.
+   */
+  async uploadDocument(userId: string, documentType: DocumentType, file: Express.Multer.File) {
+    const mimeType = file.mimetype
+    if (!DocumentsService.ACCEPTED_MIME.has(mimeType)) {
+      throw new BadRequestException('Only PDF, JPEG, PNG, and WebP files are accepted.')
+    }
+    const required = ['SUPABASE_PROJECT_REF', 'SUPABASE_S3_ACCESS_KEY_ID', 'SUPABASE_S3_SECRET_ACCESS_KEY']
+    const missing = required.filter((k) => !this.config.get<string>(k))
+    if (missing.length > 0) {
+      this.logger.error(`Document storage not configured — missing env: ${missing.join(', ')}`)
+      throw new ServiceUnavailableException('Document uploads are not available right now.')
+    }
+
+    const key = `users/${userId}/documents/${documentType}/${Date.now()}`
+    try {
+      await this.s3.send(
+        new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: mimeType })
+      )
+    } catch (err) {
+      // Real cause (bad bucket, region, or credentials) goes to the log; the
+      // client gets a clean, actionable message.
+      this.logger.error(`Document store failed for bucket "${this.bucket}" key "${key}": ${String(err)}`)
+      throw new ServiceUnavailableException('We could not store that document. Please try again shortly.')
+    }
+
+    return this.confirmUpload(userId, documentType, key, mimeType, file.size)
   }
 
   async confirmUpload(

@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -29,6 +41,25 @@ export class DocumentsController {
   ) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
     return this.documentsService.getUploadPresignedUrl(userId, body.documentType, body.mimeType)
+  }
+
+  /**
+   * Upload a document through the API (server-side store to Supabase). Avoids
+   * the browser presigned-POST path, which Supabase's S3 gateway rejects with
+   * SignatureDoesNotMatch. Mirrors the statement-import upload that already works.
+   */
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Upload a document (server-side store) and register it' })
+  async upload(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { documentType?: DocumentType },
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    if (!file) throw new BadRequestException('No file was received.')
+    if (!body?.documentType) throw new BadRequestException('documentType is required.')
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    return this.documentsService.uploadDocument(userId, body.documentType, file)
   }
 
   @Post('confirm')

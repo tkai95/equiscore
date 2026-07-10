@@ -181,27 +181,9 @@ export function DocumentsView() {
     try {
       const token = await getToken()
 
-      const { uploadUrl, fields, key } = await api.documents.getUploadUrl(token!, selectedType, file.type)
-
-      const formData = new FormData()
-      // Every policy field first; the file MUST be the last part in an S3 POST.
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v))
-      formData.append('file', file)
-
-      const uploadRes = await fetch(uploadUrl, { method: 'POST', body: formData })
-      if (!uploadRes.ok) {
-        const detail = await uploadRes.text().catch(() => '')
-        // Storage returns an XML error (e.g. AccessDenied, a policy mismatch).
-        // Surface enough to diagnose instead of a generic failure.
-        throw new Error(`Storage rejected the upload (${uploadRes.status}). ${detail.slice(0, 200)}`.trim())
-      }
-
-      await api.documents.confirmUpload(token!, {
-        documentType: selectedType,
-        fileKey: key,
-        mimeType: file.type,
-        fileSizeBytes: file.size,
-      })
+      // Server-side store: send the file to our API, which holds the storage
+      // credentials. No browser signing → no presigned-POST rejections.
+      await api.documents.upload(token!, selectedType, file)
 
       void queryClient.invalidateQueries({ queryKey: ['documents'] })
       setSelectedType('')

@@ -169,12 +169,22 @@ export const api = {
   },
   documents: {
     list: (token: string) => apiFetch('/documents', {}, token),
-    getUploadUrl: (token: string, documentType: string, mimeType: string) =>
-      apiFetch<{ uploadUrl: string; fields: Record<string, string>; key: string }>(
-        '/documents/upload-url',
-        { method: 'POST', body: JSON.stringify({ documentType, mimeType }) },
-        token
-      ),
+    // Server-side upload: the browser never signs a storage request.
+    upload: async (token: string, documentType: string, file: File) => {
+      const form = new FormData()
+      form.append('documentType', documentType)
+      form.append('file', file)
+      const res = await fetch(`${API_URL}/documents/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      if (!res.ok) {
+        const error = (await res.json().catch(() => ({ message: res.statusText }))) as { message?: string }
+        throw new Error(error.message ?? 'Upload failed')
+      }
+      return res.json()
+    },
     confirmUpload: (token: string, data: unknown) =>
       apiFetch('/documents/confirm', { method: 'POST', body: JSON.stringify(data) }, token),
     delete: (token: string, id: string) =>
