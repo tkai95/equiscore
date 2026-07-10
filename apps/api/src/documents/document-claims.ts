@@ -48,6 +48,8 @@ export interface ExtractedFields {
   postcode: string | null
   documentNumber: string | null
   expiryDate: string | null // ISO YYYY-MM-DD
+  /** The date printed on the document (bill date, statement date, issue date). */
+  documentDate: string | null // ISO YYYY-MM-DD
   employerName: string | null
   payDate: string | null // ISO YYYY-MM-DD
   netPay: number | null

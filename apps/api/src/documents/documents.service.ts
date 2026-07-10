@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { db } from '@equiscore/database'
+import { Prisma } from '@prisma/client'
 import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
@@ -8,6 +9,7 @@ import { AuditService } from '../audit/audit.service'
 import { ScoringService } from '../scoring/scoring.service'
 import { extractDocumentFields } from './document-extractor'
 import { matchDocument, verdictFor, type ProfileFacts } from './document-claims'
+import { detectAnomalies, hasBlockingAnomaly, type AnomalyContext } from './document-anomalies'
 
 @Injectable()
 export class DocumentsService {
@@ -126,11 +128,21 @@ export class DocumentsService {
   async processDocumentQuietly(userId: string, documentId: string): Promise<void> {
     try {
       const apiKey = process.env['ANTHROPIC_API_KEY']
-      const [doc, user] = await Promise.all([
+      const [doc, user, connections] = await Promise.all([
         db.uploadedDocument.findFirst({ where: { id: documentId, userId } }),
         db.user.findUnique({
           where: { id: userId },
           include: { profile: true, addresses: { where: { isCurrent: true }, take: 1 } },
+        }),
+        // The connected bank feed — used to corroborate the document against
+        // independent evidence (does the name / pay actually line up?).
+        db.bankConnection.findMany({
+          where: { userId, connectionStatus: 'active' },
+          include: {
+            bankAccounts: {
+              include: { transactions: { where: { direction: 'credit' }, orderBy: { bookedAt: 'desc' }, take: 500 } },
+            },
+          },
         }),
       ])
       if (!doc || !apiKey) return
@@ -148,7 +160,23 @@ export class DocumentsService {
         postcode: address?.postcode ?? null,
       }
       const match = matchDocument(fields, profileFacts)
-      const verdict = verdictFor(doc.documentType, fields, match)
+
+      // Cross-source anomaly checks — "things that don't line up".
+      const accounts = connections.flatMap((c) => c.bankAccounts)
+      const bankCredits = accounts.flatMap((a) => a.transactions).map((t) => Math.abs(t.amount))
+      const anomalyCtx: AnomalyContext = {
+        profile: profileFacts,
+        bankAccountHolderName: accounts.find((a) => a.accountHolderName)?.accountHolderName ?? null,
+        bankCredits,
+        hasBankData: bankCredits.length > 0,
+        now: new Date(),
+      }
+      const anomalies = detectAnomalies(doc.documentType, fields, anomalyCtx)
+
+      // A document that reads and matches but fails a serious cross-check can't be
+      // trusted as "verified" — hold it for review instead.
+      let verdict = verdictFor(doc.documentType, fields, match)
+      if (verdict === 'verified' && hasBlockingAnomaly(anomalies)) verdict = 'needs_review'
 
       await db.uploadedDocument.update({
         where: { id: doc.id },
@@ -156,7 +184,7 @@ export class DocumentsService {
           verificationStatus: verdict,
           reviewedAt: new Date(),
           // Persist the read + the checks, so the UI can say *what* was verified
-          // and the feature engineer can score by claim.
+          // (or what didn't line up) and the feature engineer can score by claim.
           extractedMetadata: {
             detectedDocumentType: fields.detectedDocumentType,
             looksAuthentic: fields.looksAuthentic,
@@ -168,11 +196,12 @@ export class DocumentsService {
             dobMatch: match.dobMatch,
             addressMatch: match.addressMatch,
             expired: match.expired,
-          },
+            anomalies: anomalies.map((a) => ({ code: a.code, severity: a.severity, message: a.message })),
+          } as Prisma.InputJsonValue,
         },
       })
 
-      this.audit.log(userId, 'document.verified', { documentId: doc.id, verdict })
+      this.audit.log(userId, 'document.verified', { documentId: doc.id, verdict, anomalies: anomalies.map((a) => a.code) })
     } catch (err) {
       this.logger.warn(`Document processing failed for ${documentId}: ${String(err)}`)
     } finally {

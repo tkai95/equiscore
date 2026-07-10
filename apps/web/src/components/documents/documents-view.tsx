@@ -48,6 +48,12 @@ const DOCUMENT_CATEGORIES = [
 
 const ACCEPTED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 
+interface DocAnomaly {
+  code: string
+  severity: 'high' | 'medium' | 'low'
+  message: string
+}
+
 interface DocMetadata {
   readable?: boolean
   looksAuthentic?: boolean
@@ -55,6 +61,7 @@ interface DocMetadata {
   dobMatch?: boolean | null
   addressMatch?: boolean | null
   expired?: boolean
+  anomalies?: DocAnomaly[]
 }
 
 interface UploadedDocument {
@@ -78,21 +85,34 @@ const STATUS_CONFIG = {
 const IDENTITY_TYPES = ['passport', 'national_id', 'biometric_residence_permit', 'driving_licence']
 const ADDRESS_TYPES = ['utility_bill', 'tenancy_agreement', 'bank_statement', 'driving_licence', 'biometric_residence_permit']
 
+const SEVERITY_RANK = { high: 0, medium: 1, low: 2 } as const
+
+/** The most serious "doesn't line up" finding, if any. */
+function topAnomaly(m: DocMetadata | null): DocAnomaly | null {
+  const list = m?.anomalies ?? []
+  if (list.length === 0) return null
+  return [...list].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])[0]!
+}
+
 /** A plain-English line for what the read actually confirmed (or why it didn't). */
 function verificationDetail(doc: UploadedDocument): string | null {
   const m = doc.extractedMetadata
   const isId = IDENTITY_TYPES.includes(doc.documentType)
   const isAddr = ADDRESS_TYPES.includes(doc.documentType)
+  const anomaly = topAnomaly(m)
 
   if (doc.verificationStatus === 'pending') return 'Reading and checking your document…'
   if (doc.verificationStatus === 'rejected')
     return 'We couldn’t read this as a valid document. Try a clearer photo or PDF.'
   if (doc.verificationStatus === 'verified') {
+    // A minor caveat can survive verification (e.g. a slightly old bill).
+    if (anomaly) return anomaly.message
     if (isId) return m?.dobMatch ? 'Name and date of birth confirmed against your profile.' : 'Name confirmed against your profile.'
     if (isAddr) return 'Address confirmed against your profile.'
     return 'Confirmed as genuine income evidence.'
   }
-  // needs_review
+  // needs_review — lead with a cross-check that didn't line up.
+  if (anomaly) return anomaly.message
   if (m?.expired) return 'This document has expired — please upload a current one.'
   if (m?.nameMatch === false) return 'The name on this document didn’t match your profile.'
   if (m?.addressMatch === false) return 'The address didn’t match your current address on file.'

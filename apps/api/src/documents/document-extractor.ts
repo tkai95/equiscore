@@ -45,6 +45,7 @@ Return ONLY a JSON object, no markdown, no commentary, in exactly this shape:
   "postcode": string | null,               // UK postcode, if present
   "documentNumber": string | null,         // passport/licence/BRP number, if present
   "expiryDate": "YYYY-MM-DD" | null,
+  "documentDate": "YYYY-MM-DD" | null,     // the date printed on the document (bill date, statement date, issue date)
   "employerName": string | null,           // for payslips / employment documents
   "payDate": "YYYY-MM-DD" | null,
   "netPay": number | null,                 // take-home amount on a payslip, plain number
@@ -140,6 +141,7 @@ export async function extractDocumentFields(
     postcode: toStr(p.postcode),
     documentNumber: toStr(p.documentNumber),
     expiryDate: toStr(p.expiryDate),
+    documentDate: toStr(p.documentDate),
     employerName: toStr(p.employerName),
     payDate: toStr(p.payDate),
     netPay: toNumber(p.netPay),
@@ -158,6 +160,7 @@ function unreadable(): ExtractedFields {
     postcode: null,
     documentNumber: null,
     expiryDate: null,
+    documentDate: null,
     employerName: null,
     payDate: null,
     netPay: null,

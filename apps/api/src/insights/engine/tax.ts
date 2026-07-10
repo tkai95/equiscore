@@ -49,6 +49,12 @@ function netFromGross(gross: number): number {
   return gross - annualIncomeTax(gross) - annualEmployeeNI(gross)
 }
 
+/** The most take-home an annual gross could produce (before any voluntary
+ *  deductions like pension). Used to flag a payslip whose net is impossibly high. */
+export function expectedNetFromGross(grossAnnual: number): number {
+  return Math.round(netFromGross(Math.max(0, grossAnnual)))
+}
+
 /**
  * Invert net → gross. `netFromGross` is monotonic, so a bisection converges
  * quickly and avoids hard-coding band-by-band algebra.
