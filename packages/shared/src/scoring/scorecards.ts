@@ -125,6 +125,11 @@ export function scoreIncomeStability(features: TrustFeatures): ScorecardResult {
   const codes: ReasonCode[] = []
   let total = 0
 
+  // Every positive income signal below requires actual income evidence. Without
+  // it, a zeroed volatility (0 < 0.2) would otherwise read as "low variance" and
+  // award points for having no data at all.
+  const hasIncomeData = features.averageMonthlyIncome > 0
+
   if (features.recurringSalaryDetected) {
     total += 30
     codes.push(REASON_CODES.SALARY_RECURRING)
@@ -136,7 +141,7 @@ export function scoreIncomeStability(features: TrustFeatures): ScorecardResult {
     codes.push(REASON_CODES.GIG_INCOME_CONSISTENT)
   }
 
-  if (features.incomeVolatility < 0.2) {
+  if (hasIncomeData && features.incomeVolatility < 0.2) {
     total += 20
     codes.push(REASON_CODES.LOW_INCOME_VARIANCE)
   } else if (features.incomeVolatility > 0.5) {
@@ -167,6 +172,11 @@ export function scoreAffordability(features: TrustFeatures): ScorecardResult {
   const codes: ReasonCode[] = []
   let total = 0
 
+  // "Clean record" signals (no overdraft use, no returned payments) are only
+  // meaningful when we have transactions to observe. Without bank history, a
+  // zeroed feature is the absence of evidence, not a good record.
+  const hasBankData = features.monthsOfBankHistory > 0
+
   // Rent-to-income ratio (healthy = < 40%)
   if (features.rentToIncomeRatio > 0 && features.rentToIncomeRatio < 0.4) {
     total += 25
@@ -188,7 +198,7 @@ export function scoreAffordability(features: TrustFeatures): ScorecardResult {
     codes.push(REASON_CODES.SAVINGS_BUFFER)
   }
 
-  if (features.overdraftDependency < 0.1) {
+  if (hasBankData && features.overdraftDependency < 0.1) {
     total += 15
     codes.push(REASON_CODES.LOW_OVERDRAFT)
   } else if (features.overdraftDependency > 0.3) {
@@ -196,7 +206,7 @@ export function scoreAffordability(features: TrustFeatures): ScorecardResult {
     codes.push(REASON_CODES.OVERDRAFT_DEPENDENT)
   }
 
-  if (features.missedPaymentIndicators === 0) {
+  if (hasBankData && features.missedPaymentIndicators === 0) {
     total += 15
     codes.push(REASON_CODES.NO_RETURNED_PAYMENTS)
   }
@@ -243,6 +253,11 @@ export function scoreFinancialStability(features: TrustFeatures): ScorecardResul
   const codes: ReasonCode[] = []
   let total = 0
 
+  // As with affordability, steadiness signals need observed transactions —
+  // otherwise zeroed volatility and a zeroed missed-payment count would award
+  // points to a profile with no financial evidence at all.
+  const hasBankData = features.monthsOfBankHistory > 0
+
   if (features.savingsMonthsBuffer > 0) {
     total += 25
     codes.push(REASON_CODES.SAVINGS_TREND_UP)
@@ -253,12 +268,12 @@ export function scoreFinancialStability(features: TrustFeatures): ScorecardResul
     codes.push(REASON_CODES.INCOME_CONTINUITY)
   }
 
-  if (features.incomeVolatility < 0.25) {
+  if (hasBankData && features.incomeVolatility < 0.25) {
     total += 20
     codes.push(REASON_CODES.LOW_SPEND_VOLATILITY)
   }
 
-  if (features.missedPaymentIndicators === 0 && features.overdraftDependency < 0.15) {
+  if (hasBankData && features.missedPaymentIndicators === 0 && features.overdraftDependency < 0.15) {
     total += 20
     codes.push(REASON_CODES.DEBT_SERVICING_STABLE)
   }
