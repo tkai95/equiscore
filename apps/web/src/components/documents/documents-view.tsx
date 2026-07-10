@@ -57,6 +57,7 @@ interface DocAnomaly {
 interface DocMetadata {
   readable?: boolean
   looksAuthentic?: boolean
+  detectedDocumentType?: string | null
   nameMatch?: boolean | null
   dobMatch?: boolean | null
   addressMatch?: boolean | null
@@ -102,8 +103,15 @@ function verificationDetail(doc: UploadedDocument): string | null {
   const anomaly = topAnomaly(m)
 
   if (doc.verificationStatus === 'pending') return 'Reading and checking your document…'
-  if (doc.verificationStatus === 'rejected')
+  if (doc.verificationStatus === 'rejected') {
+    // Two very different causes hide behind "rejected": we couldn't READ it, or
+    // we read it but it didn't look like a genuine document of this kind.
+    if (m && m.readable === false)
+      return 'We couldn’t read the details clearly — try a sharper photo, good lighting, or the original PDF.'
+    if (m && m.looksAuthentic === false)
+      return `We read this but it didn’t look like a genuine ${DOCUMENT_TYPE_LABELS[doc.documentType]?.toLowerCase() ?? 'document'}${m.detectedDocumentType ? ` (it scanned as: ${m.detectedDocumentType})` : ''}. Upload a real, unedited photo or PDF — sample or specimen documents are rejected.`
     return 'We couldn’t read this as a valid document. Try a clearer photo or PDF.'
+  }
   if (doc.verificationStatus === 'verified') {
     // A minor caveat can survive verification (e.g. a slightly old bill).
     if (anomaly) return anomaly.message
