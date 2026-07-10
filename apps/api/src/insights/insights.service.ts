@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@equiscore/database'
-import { buildInsightProfile } from './engine'
+import { buildInsightProfile, detectInternalTransfers } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
 import { extractTransactionsFromPdf } from './ingest/pdf-extractor'
@@ -22,7 +22,7 @@ const GAMBLING =
 const TRANSACTION_TOOL: Anthropic.Tool = {
   name: 'get_transactions',
   description:
-    "Retrieve the user's ACTUAL transactions for exact evidence. Use this whenever the question needs specific underlying data — a particular month, a category (e.g. gambling), a merchant, the biggest/smallest payments, or explaining one transaction. For general questions answerable from the snapshot (score, totals, affordability, why a tier), do NOT call this.",
+    "Retrieve the user's ACTUAL transactions for exact evidence. Use this whenever the question needs specific underlying data — a particular month, a category (e.g. gambling), a merchant, the biggest/smallest payments, or explaining one transaction. For general questions answerable from the snapshot (score, totals, affordability, why a tier), do NOT call this. The result tags each transaction with internal:true when it is a transfer between the user's OWN accounts; those are never income or spending. Use the returned genuineIncomeTotal and genuineSpendTotal for income/spend sums, and internalTransferTotal for own-account movement.",
   input_schema: {
     type: 'object',
     properties: {
@@ -815,6 +815,10 @@ ${context}`
   /** Exact-evidence transaction lookup for the assistant's tool. */
   private async queryTransactions(userId: string, f: Record<string, unknown>) {
     const txns = await this.loadNormalizedTxns(userId)
+    // Deterministically identify transfers between the user's own accounts so the
+    // assistant can never mistake them for income or spending — each row is
+    // tagged, and the totals separate genuine flows from internal movement.
+    const internal = detectInternalTransfers(txns)
     let rows = txns
 
     if (typeof f['month'] === 'string') rows = rows.filter((t) => monthKey(toDate(t.date)) === f['month'])
@@ -839,14 +843,25 @@ ${context}`
     else rows = [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
     const limit = Math.min(typeof f['limit'] === 'number' ? (f['limit'] as number) : 20, 50)
+
+    // Totals split three ways so any income/spend sum excludes internal movement.
+    const externalCredits = rows.filter((t) => t.direction === 'credit' && !internal.has(t))
+    const externalDebits = rows.filter((t) => t.direction === 'debit' && !internal.has(t))
+    const internalRows = rows.filter((t) => internal.has(t))
+
     return {
       count: rows.length,
       total: round2(rows.reduce((s, t) => s + t.amount, 0)),
+      genuineIncomeTotal: round2(externalCredits.reduce((s, t) => s + t.amount, 0)),
+      genuineSpendTotal: round2(externalDebits.reduce((s, t) => s + t.amount, 0)),
+      internalTransferTotal: round2(internalRows.reduce((s, t) => s + t.amount, 0)),
+      note: "Rows with internal:true are transfers between the user's OWN accounts. They are NOT income and NOT spending — never include them in an income or spending total. Use genuineIncomeTotal / genuineSpendTotal for those.",
       transactions: rows.slice(0, limit).map((t) => ({
         date: t.date,
         amount: round2(t.amount),
         direction: t.direction,
         description: (t.merchantName || t.description || '').trim(),
+        internal: internal.has(t),
       })),
     }
   }
@@ -907,7 +922,14 @@ ${context}`
     const rows = await db.bankTransaction.findMany({
       where: { bankAccount: { bankConnection: { userId } } },
       orderBy: { bookedAt: 'desc' },
-      select: { bookedAt: true, amount: true, direction: true, description: true, merchantName: true },
+      select: {
+        bookedAt: true,
+        amount: true,
+        direction: true,
+        description: true,
+        merchantName: true,
+        bankAccountId: true,
+      },
     })
     return rows.map((t) => ({
       date: t.bookedAt.toISOString().slice(0, 10),
@@ -915,6 +937,7 @@ ${context}`
       direction: t.direction,
       description: t.description,
       merchantName: t.merchantName,
+      accountId: t.bankAccountId,
       balance: null,
     }))
   }
