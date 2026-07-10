@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  Bell,
   CalendarClock,
+  Check,
   CheckCircle2,
   CircleDollarSign,
   Layers,
@@ -12,10 +15,14 @@ import {
   PiggyBank,
   Repeat,
   Sparkles,
+  Target,
+  TrendingDown,
   TrendingUp,
   Wallet,
+  X,
 } from 'lucide-react'
 import type { CompassPayload } from '@/lib/compass-types'
+import type { CompassActions } from '@/lib/use-compass'
 import type { DrawerSpec } from '@/components/analytics/breakdown-drawer'
 import { ReasonCodeList } from '@/components/trust-score/reason-code-list'
 import { formatDate, TIER_COLORS, cn } from '@/lib/utils'
@@ -26,14 +33,30 @@ type Drill = (spec: DrawerSpec) => void
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
 const signed = (n: number) => `${n >= 0 ? '+' : '-'}${money(Math.abs(n))}`
+const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
+
+/** True only while the reminder with this id is being mutated (per-row spinner). */
+function reminderBusy(actions: CompassActions, id: string): boolean {
+  return actions.updateReminder.isPending && actions.updateReminder.variables?.id === id
+}
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-export function OverviewSection({ data, onDrill }: { data: CompassPayload; onDrill: Drill }) {
+export function OverviewSection({
+  data,
+  onDrill,
+  actions,
+}: {
+  data: CompassPayload
+  onDrill: Drill
+  actions: CompassActions
+}) {
   const o = data.overview
   const surplusTone = o.monthlySurplus >= 0 ? 'in' : 'out'
+  const dueReminders = data.reminders.filter((r) => r.due)
   return (
     <div className="space-y-6">
+      {dueReminders.length > 0 && <RemindersStrip reminders={dueReminders} actions={actions} />}
       <Card>
         <CardTitle title="Your monthly money picture" subtitle="Averaged across your available history, with transfers between your own accounts removed." />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -121,7 +144,80 @@ function MonthlyReviewCard({ data, onDrill }: { data: CompassPayload; onDrill: D
         <StatTile label="Essentials" value={money(r.essentialSpend)} />
         <StatTile label="Net" value={signed(r.net)} tone={r.net >= 0 ? 'in' : 'out'} hint={`${signed(r.vsAverage.net)} vs usual`} />
       </div>
+      {r.drivers.length > 0 && (
+        <div className="mt-4">
+          <Label>What moved</Label>
+          <div className="mt-2 space-y-1.5">
+            {r.drivers.map((d) => (
+              <div key={d.label} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-gray-700">
+                  {d.direction === 'up' ? (
+                    <TrendingUp className="h-3.5 w-3.5 text-rose-400" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />
+                  )}
+                  {d.label}
+                </span>
+                <span className={cn('font-semibold tabular-nums', d.direction === 'up' ? 'text-rose-600' : 'text-emerald-600')}>
+                  {signed(d.delta)} vs last month
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
+  )
+}
+
+function RemindersStrip({
+  reminders,
+  actions,
+}: {
+  reminders: CompassPayload['reminders']
+  actions: CompassActions
+}) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <Bell className="h-4 w-4 text-amber-600" />
+        <p className="text-sm font-semibold text-amber-900">Reminders</p>
+      </div>
+      <div className="space-y-2">
+        {reminders.map((rem) => (
+          <div key={rem.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/70 p-2.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-800">{rem.title}</p>
+              <p className="text-xs text-gray-500">
+                {rem.daysUntilDue > 0
+                  ? `Due in ${rem.daysUntilDue} day${rem.daysUntilDue === 1 ? '' : 's'} (${formatDate(rem.dueDate)})`
+                  : `Was due ${formatDate(rem.dueDate)}`}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'completed' })}
+                disabled={reminderBusy(actions, rem.id)}
+                className="rounded-lg p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-40"
+                aria-label="Mark done"
+                title="Mark done"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'dismissed' })}
+                disabled={reminderBusy(actions, rem.id)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 disabled:opacity-40"
+                aria-label="Dismiss"
+                title="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -350,7 +446,15 @@ export function SpendingSection({ data, onDrill }: { data: CompassPayload; onDri
 
 // ─── Bills & commitments ──────────────────────────────────────────────────────
 
-export function BillsSection({ data, onDrill }: { data: CompassPayload; onDrill: Drill }) {
+export function BillsSection({
+  data,
+  onDrill,
+  actions,
+}: {
+  data: CompassPayload
+  onDrill: Drill
+  actions: CompassActions
+}) {
   const pb = data.paymentBehaviour
   const commitments = [...data.commitments].sort((a, b) => b.monthlyEquivalent - a.monthlyEquivalent)
   return (
@@ -372,42 +476,166 @@ export function BillsSection({ data, onDrill }: { data: CompassPayload; onDrill:
         </div>
       </Card>
 
+      {data.reminders.length > 0 && (
+        <Card>
+          <CardTitle title="Upcoming reminders" subtitle="We will surface these when they are due so you can review before anything renews." />
+          <div className="space-y-2">
+            {data.reminders.map((rem) => (
+              <div key={rem.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-800">{rem.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {rem.type === 'renewal' ? 'Renews' : 'Due'} {formatDate(rem.dueDate)}
+                    {rem.daysUntilDue > 0 ? ` · in ${days(rem.daysUntilDue)}` : ' · now due'}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {rem.due && <Pill tone="warn">Due</Pill>}
+                  <button
+                    onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'completed' })}
+                    disabled={reminderBusy(actions, rem.id)}
+                    className="rounded-lg p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-40"
+                    aria-label="Mark done"
+                    title="Mark done"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'dismissed' })}
+                    disabled={reminderBusy(actions, rem.id)}
+                    className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 disabled:opacity-40"
+                    aria-label="Remove"
+                    title="Remove"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
-        <CardTitle title="Recurring commitments" subtitle="Detected by behaviour, not just labels. Tap any to see its full payment history." />
+        <CardTitle title="Recurring commitments" subtitle="Detected by behaviour, not just labels. Confirm one, set a renewal date, or open it to see its full history." />
         {commitments.length === 0 ? (
           <EmptyState icon={<CalendarClock className="h-8 w-8" />} title="No recurring commitments detected yet" body="Once we can see a few months of regular payments, your rent, bills and subscriptions will appear here." />
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="space-y-2">
             {commitments.map((c) => (
-              <DrillRow key={c.key} onClick={() => onDrill({ type: 'commitment', key: c.key, title: c.name, subtitle: 'Payment history' })}>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-gray-800">{c.name}</span>
-                    {c.essential && <Pill tone="neutral">Essential</Pill>}
-                    {c.returnedCount > 0 && <Pill tone="warn">{c.returnedCount} returned</Pill>}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-gray-500">
-                    {money(c.amount)} · {c.cadence.replace('_', ' ')}
-                    {c.typicalDayOfMonth ? ` · around the ${ordinal(c.typicalDayOfMonth)}` : ''}
-                    {' · '}
-                    {c.occurrences - c.missedCount}/{c.occurrences} on time
-                  </span>
-                  {c.nextExpected && (
-                    <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500">
-                      <CalendarClock className="h-3 w-3" />
-                      Next expected {formatDate(c.nextExpected.date)}
-                      {c.nextExpected.inDays >= 0 ? ` (in ${c.nextExpected.inDays} day${c.nextExpected.inDays === 1 ? '' : 's'})` : ''}
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block text-sm font-semibold tabular-nums text-gray-900">{money(c.monthlyEquivalent)}/mo</span>
-                </span>
-              </DrillRow>
+              <CommitmentRow key={c.key} c={c} onDrill={onDrill} actions={actions} />
             ))}
           </div>
         )}
       </Card>
+    </div>
+  )
+}
+
+function CommitmentRow({
+  c,
+  onDrill,
+  actions,
+}: {
+  c: CompassPayload['commitments'][number]
+  onDrill: Drill
+  actions: CompassActions
+}) {
+  const [renewOpen, setRenewOpen] = useState(false)
+  const [date, setDate] = useState(c.setting?.renewalDate?.slice(0, 10) ?? '')
+  const [remind, setRemind] = useState(true)
+  const acting = actions.confirmCommitment.variables?.key === c.key
+  const busy = actions.confirmCommitment.isPending && acting
+  const failed = actions.confirmCommitment.isError && acting
+
+  const save = () => {
+    if (!date) return
+    actions.confirmCommitment.mutate(
+      { key: c.key, status: 'active', name: c.name, renewalDate: new Date(date).toISOString(), remind },
+      { onSuccess: () => setRenewOpen(false) },
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-100">
+      <button
+        onClick={() => onDrill({ type: 'commitment', key: c.key, title: c.name, subtitle: 'Payment history' })}
+        className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-medium text-gray-800">{c.name}</span>
+            {c.essential && <Pill tone="neutral">Essential</Pill>}
+            {c.setting?.confirmed && <Pill tone="good">Confirmed</Pill>}
+            {c.returnedCount > 0 && <Pill tone="warn">{c.returnedCount} returned</Pill>}
+          </span>
+          <span className="mt-0.5 block text-xs text-gray-500">
+            {money(c.amount)} · {c.cadence.replace('_', ' ')}
+            {c.typicalDayOfMonth ? ` · around the ${ordinal(c.typicalDayOfMonth)}` : ''}
+            {' · '}
+            {c.occurrences - c.missedCount}/{c.occurrences} on time
+          </span>
+          {c.reminder ? (
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-700">
+              <Bell className="h-3 w-3" />
+              Renewal reminder set for {formatDate(c.reminder.dueDate)}
+            </span>
+          ) : (
+            c.nextExpected && (
+              <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500">
+                <CalendarClock className="h-3 w-3" />
+                Next expected {formatDate(c.nextExpected.date)}
+                {c.nextExpected.inDays >= 0 ? ` (in ${c.nextExpected.inDays} day${c.nextExpected.inDays === 1 ? '' : 's'})` : ''}
+              </span>
+            )
+          )}
+        </span>
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{money(c.monthlyEquivalent)}/mo</span>
+      </button>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-gray-50 px-3 py-2">
+        <button
+          onClick={() => setRenewOpen((o) => !o)}
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brand-50"
+        >
+          <CalendarClock className="h-3.5 w-3.5" />
+          {c.setting?.renewalDate ? 'Edit renewal' : 'Add renewal date'}
+        </button>
+        <button
+          onClick={() => actions.confirmCommitment.mutate({ key: c.key, status: 'inactive' })}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+        >
+          <X className="h-3.5 w-3.5" />
+          No longer active
+        </button>
+      </div>
+
+      {renewOpen && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-gray-50 bg-gray-50/60 px-3 py-3">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            Renews on
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="rounded-md border border-gray-200 px-2 py-1 text-sm focus:border-brand focus:outline-none"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-gray-600">
+            <input type="checkbox" checked={remind} onChange={(e) => setRemind(e.target.checked)} className="accent-brand" />
+            Remind me before it renews
+          </label>
+          <button
+            onClick={save}
+            disabled={busy || !date}
+            className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+          {failed && <span className="text-xs text-rose-600">Couldn&apos;t save. Try again.</span>}
+        </div>
+      )}
     </div>
   )
 }
@@ -560,10 +788,13 @@ function Signal({ ok, label }: { ok: boolean; label: string }) {
 
 const EFFORT_LABEL: Record<string, string> = { low: 'Easy win', medium: 'Some effort', high: 'Bigger project' }
 
-export function SavingsSection({ data }: { data: CompassPayload }) {
+export function SavingsSection({ data, actions }: { data: CompassPayload; actions: CompassActions }) {
   const ops = data.opportunities
   return (
     <div className="space-y-6">
+      {/* key by goal id so the edit form re-seeds when the goal changes (e.g. suggested -> saved). */}
+      {data.goal && <GoalCard key={data.goal.id} goal={data.goal} actions={actions} />}
+
       <Card>
         <CardTitle title="Ways to save and strengthen your position" subtitle="Based on your transaction history. These are prompts to review, not automatic switches." />
         {ops.length === 0 ? (
@@ -571,8 +802,17 @@ export function SavingsSection({ data }: { data: CompassPayload }) {
         ) : (
           <div className="space-y-3">
             {ops.map((o) => (
-              <div key={o.id} className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-start justify-between gap-3">
+              <div key={o.id} className="relative rounded-xl border border-gray-200 p-4">
+                <button
+                  onClick={() => actions.dismissOpportunity.mutate(o.id)}
+                  disabled={actions.dismissOpportunity.isPending && actions.dismissOpportunity.variables === o.id}
+                  className="absolute right-2 top-2 rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500 disabled:opacity-40"
+                  aria-label="Dismiss this suggestion"
+                  title="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="flex items-start justify-between gap-3 pr-6">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{o.title}</p>
                     <p className="mt-1 text-sm text-gray-600">{o.description}</p>
@@ -599,10 +839,130 @@ export function SavingsSection({ data }: { data: CompassPayload }) {
           </div>
         )}
         <p className="mt-4 text-xs text-gray-400">
-          Renewal reminders and provider comparisons are coming soon. For now, these highlight where a review may pay off.
+          Provider comparisons are coming later. For now, these highlight where a review may pay off.
         </p>
       </Card>
     </div>
+  )
+}
+
+function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>; actions: CompassActions }) {
+  const [editing, setEditing] = useState(false)
+  const [target, setTarget] = useState(String(goal.targetAmount))
+  const [contribution, setContribution] = useState(goal.monthlyContribution ? String(goal.monthlyContribution) : '')
+  const [months, setMonths] = useState(goal.targetMonths ? String(goal.targetMonths) : '')
+  const progress = goal.targetAmount > 0 ? goal.currentSaved / goal.targetAmount : 0
+  const busy = actions.upsertGoal.isPending
+  const failed = actions.upsertGoal.isError
+
+  const save = () => {
+    const targetAmount = Number(target)
+    if (!targetAmount || targetAmount <= 0) return
+    actions.upsertGoal.mutate(
+      {
+        type: goal.type,
+        label: goal.label ?? undefined,
+        targetAmount,
+        monthlyContribution: contribution ? Number(contribution) : undefined,
+        targetMonths: months ? Number(months) : undefined,
+      },
+      { onSuccess: () => setEditing(false) },
+    )
+  }
+
+  return (
+    <Card>
+      <CardTitle
+        title={goal.label ?? 'Savings goal'}
+        subtitle={goal.suggested ? 'A suggested target. Set it to start tracking your progress.' : 'Your active savings goal.'}
+        right={
+          <button
+            onClick={() => setEditing((e) => !e)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Target className="h-3.5 w-3.5" />
+            {goal.suggested ? 'Set goal' : 'Adjust'}
+          </button>
+        }
+      />
+
+      <div className="flex items-end justify-between">
+        <p className="text-2xl font-semibold tabular-nums text-gray-900">
+          {money(goal.currentSaved)}
+          <span className="ml-1 text-base font-normal text-gray-500">of {money(goal.targetAmount)}</span>
+        </p>
+        {goal.monthsToGoal != null && (
+          <p className="text-sm text-gray-500">
+            {goal.monthsToGoal === 0
+              ? 'Target reached'
+              : `about ${goal.monthsToGoal} month${goal.monthsToGoal === 1 ? '' : 's'} to go`}
+          </p>
+        )}
+      </div>
+      <div className="mt-3">
+        <Bar value={progress} tone={progress >= 1 ? 'brand' : 'amber'} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span>Gap {money(goal.gap)}</span>
+        {goal.monthlyContribution != null && <span>Saving {money(goal.monthlyContribution)}/mo</span>}
+        {goal.onTrack != null && (
+          <Pill tone={goal.onTrack ? 'good' : 'warn'}>{goal.onTrack ? 'On track' : 'Behind target'}</Pill>
+        )}
+      </div>
+
+      {editing && (
+        <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-4">
+          <label className="text-xs text-gray-600">
+            Target amount
+            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
+              <span className="text-sm text-gray-400">£</span>
+              <input
+                type="number"
+                min="1"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                className="w-28 px-1 py-1 text-sm focus:outline-none"
+              />
+            </div>
+          </label>
+          <label className="text-xs text-gray-600">
+            Monthly saving (optional)
+            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
+              <span className="text-sm text-gray-400">£</span>
+              <input
+                type="number"
+                min="0"
+                value={contribution}
+                onChange={(e) => setContribution(e.target.value)}
+                placeholder="auto"
+                className="w-28 px-1 py-1 text-sm focus:outline-none"
+              />
+            </div>
+          </label>
+          <label className="text-xs text-gray-600">
+            Reach it within (months, optional)
+            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
+              <input
+                type="number"
+                min="1"
+                value={months}
+                onChange={(e) => setMonths(e.target.value)}
+                placeholder="e.g. 12"
+                className="w-24 px-1 py-1 text-sm focus:outline-none"
+              />
+            </div>
+          </label>
+          <button
+            onClick={save}
+            disabled={busy}
+            className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save goal'}
+          </button>
+          {failed && <span className="text-xs text-rose-600">Couldn&apos;t save. Try again.</span>}
+        </div>
+      )}
+    </Card>
   )
 }
 

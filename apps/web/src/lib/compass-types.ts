@@ -43,6 +43,35 @@ export interface CompassCommitment {
   returnedCount: number
   essential: boolean
   nextExpected: { date: string; inDays: number } | null
+  setting: { status: string; renewalDate: string | null; confirmed: boolean } | null
+  reminder: { id: string; triggerAt: string; due: boolean; dueDate: string } | null
+}
+
+export interface CompassReminder {
+  id: string
+  commitmentKey: string | null
+  type: string
+  title: string
+  dueDate: string
+  triggerAt: string
+  status: string
+  due: boolean
+  daysUntilDue: number
+}
+
+export interface CompassGoal {
+  id: string
+  type: string
+  label: string | null
+  targetAmount: number
+  targetMonths: number | null
+  monthlyContribution: number | null
+  status: string
+  currentSaved: number
+  gap: number
+  monthsToGoal: number | null
+  onTrack: boolean | null
+  suggested: boolean
 }
 
 export interface CompassOpportunity {
@@ -71,6 +100,7 @@ export interface CompassMonthlyReview {
   surplusAfterEssentials: number
   vsAverage: { income: number; spend: number; net: number }
   headline: string
+  drivers: Array<{ label: string; delta: number; direction: 'up' | 'down' }>
 }
 
 export interface CompassPayload {
@@ -224,4 +254,6 @@ export interface CompassPayload {
   }
 
   opportunities: CompassOpportunity[]
+  reminders: CompassReminder[]
+  goal: CompassGoal | null
 }

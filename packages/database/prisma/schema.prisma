@@ -34,6 +34,10 @@ model User {
   statementImportJobs StatementImportJob[]
   insightQuestionAnswers InsightQuestionAnswer[]
   auditEvents    AuditEvent[]
+  commitmentSettings CommitmentSetting[]
+  reminders      Reminder[]
+  savingsGoals   SavingsGoal[]
+  compassDismissals CompassDismissal[]
 
   @@map("users")
 }
@@ -584,4 +588,121 @@ model AuditEvent {
   @@index([userId, createdAt])
   @@index([eventType])
   @@map("audit_events")
+}
+
+// ─── Compass (financial-coaching module) ──────────────────────────────────────
+
+/// User's confirmation/correction of a detected recurring commitment, keyed by
+/// the engine's normalized counterparty key. Backs the bills register and
+/// renewal-date capture. Inactive commitments are hidden from Compass.
+model CommitmentSetting {
+  id            String           @id @default(cuid())
+  userId        String           @map("user_id")
+  commitmentKey String           @map("commitment_key")
+  status        CommitmentStatus @default(active)
+  renewalDate   DateTime?        @map("renewal_date")
+  confirmedAt   DateTime?        @map("confirmed_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commitmentKey])
+  @@map("commitment_settings")
+}
+
+enum CommitmentStatus {
+  active
+  inactive
+  unknown
+
+  @@map("commitment_status")
+}
+
+/// A renewal/review reminder. Fires by being surfaced in-app once now >=
+/// triggerAt (no scheduler needed for MVP; email is a later hook).
+model Reminder {
+  id            String         @id @default(cuid())
+  userId        String         @map("user_id")
+  commitmentKey String?        @map("commitment_key")
+  type          ReminderType   @default(renewal)
+  title         String
+  dueDate       DateTime       @map("due_date")
+  triggerAt     DateTime       @map("trigger_at")
+  offsetDays    Int[]          @map("offset_days")
+  status        ReminderStatus @default(scheduled)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("reminders")
+}
+
+enum ReminderType {
+  renewal
+  review
+  free_trial
+  custom
+
+  @@map("reminder_type")
+}
+
+enum ReminderStatus {
+  scheduled
+  completed
+  dismissed
+
+  @@map("reminder_status")
+}
+
+/// A savings goal (emergency buffer or custom). Progress and timeline are
+/// computed against the user's liquid balance and monthly savings.
+model SavingsGoal {
+  id                  String     @id @default(cuid())
+  userId              String     @map("user_id")
+  type                GoalType   @default(emergency_buffer)
+  label               String?
+  targetAmount        Float      @map("target_amount")
+  targetMonths        Int?       @map("target_months")
+  monthlyContribution Float?     @map("monthly_contribution")
+  status              GoalStatus @default(active)
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("savings_goals")
+}
+
+enum GoalType {
+  emergency_buffer
+  custom
+
+  @@map("goal_type")
+}
+
+enum GoalStatus {
+  active
+  achieved
+  archived
+
+  @@map("goal_status")
+}
+
+/// A dismissed Compass suggestion (e.g. a savings opportunity), so it does not
+/// keep returning. Keyed by kind + the suggestion's stable id.
+model CompassDismissal {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  kind      String
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, key])
+  @@map("compass_dismissals")
 }

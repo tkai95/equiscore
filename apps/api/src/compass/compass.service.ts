@@ -1,17 +1,23 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
+import type { CommitmentSetting, Reminder, SavingsGoal } from '@prisma/client'
 import { InsightsService } from '../insights/insights.service'
 import { ScoringService } from '../scoring/scoring.service'
 import type { InsightProfile } from '../insights/engine'
+import type { ConfirmCommitmentDto, CreateReminderDto, UpsertGoalDto } from './compass.dto'
 import type {
   CompassAccount,
   CompassCommitment,
+  CompassGoal,
   CompassMoneyFlow,
   CompassMonthlyReview,
   CompassOpportunity,
   CompassPayload,
   CompassPriority,
+  CompassReminder,
 } from './compass.types'
+
+const RENEWAL_OFFSETS = [60, 30, 7]
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -54,13 +60,28 @@ export class CompassService {
   async getForUser(userId: string): Promise<CompassPayload> {
     const profile = await this.insights.getProfileForUser(userId)
     const accounts = await this.loadAccounts(userId)
-    const [scoreRow, improvements] = await Promise.all([
+    const [scoreRow, improvements, settings, reminderRows, goalRow, dismissals] = await Promise.all([
       this.scoring.getLatestScoreWithStatus(userId).catch(() => null),
       this.scoring
         .getImprovements(userId)
         .then((r) => r.improvements)
         .catch(() => []),
+      db.commitmentSetting.findMany({ where: { userId } }),
+      db.reminder.findMany({ where: { userId, status: 'scheduled' }, orderBy: { triggerAt: 'asc' } }),
+      db.savingsGoal.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' } }),
+      db.compassDismissal.findMany({ where: { userId } }),
     ])
+
+    const now = Date.now()
+    const settingByKey = new Map(settings.map((s) => [s.commitmentKey, s]))
+    // Drop reminders whose commitment the user has marked inactive — they would
+    // otherwise be orphans (the commitment is hidden from the register).
+    const inactiveKeys = new Set(settings.filter((s) => s.status === 'inactive').map((s) => s.commitmentKey))
+    const activeReminders = reminderRows.filter((r) => !r.commitmentKey || !inactiveKeys.has(r.commitmentKey))
+    const reminderByKey = new Map(
+      activeReminders.filter((r) => r.commitmentKey).map((r) => [r.commitmentKey as string, r]),
+    )
+    const dismissedOpps = new Set(dismissals.filter((d) => d.kind === 'opportunity').map((d) => d.key))
 
     const hasData = profile.period.transactionCount > 0
 
@@ -77,10 +98,14 @@ export class CompassService {
     const monthlySavings = r0(this.externalSavingsFlow(profile) + connectedSavings)
     const internalShuffling = r0(Math.max(0, profile.internalTransfersMonthly - connectedSavings))
     const surplus = r0(profile.affordability.surplusAfterAll)
+    const liquid = this.liquidBalance(accounts, profile)
 
-    const opportunities = this.deriveOpportunities(profile, monthlySavings, monthlyIncome)
-    const resilience = this.buildResilience(profile, accounts, monthlySavings)
+    const opportunities = this.deriveOpportunities(profile, monthlySavings, monthlyIncome).filter(
+      (o) => !dismissedOpps.has(o.id),
+    )
+    const resilience = this.buildResilience(profile, monthlySavings, liquid)
     const monthlyReview = this.buildMonthlyReview(profile)
+    if (monthlyReview) monthlyReview.drivers = await this.computeDrivers(userId, monthlyReview.month, profile)
 
     const topCommitments = [...profile.commitments]
       .sort((a, b) => this.monthlyEquiv(b) - this.monthlyEquiv(a))
@@ -109,7 +134,7 @@ export class CompassService {
       moneyMap: this.buildMoneyMap(profile, accounts, monthlySavings, internalShuffling),
       income: this.buildIncome(profile),
       spending: this.buildSpending(profile),
-      commitments: this.buildCommitments(profile),
+      commitments: this.buildCommitments(profile, settingByKey, reminderByKey, now),
       paymentBehaviour: {
         onTimeRatio: r2(profile.paymentBehaviour.onTimeRatio),
         returnedPayments: profile.paymentBehaviour.returnedPayments,
@@ -138,6 +163,8 @@ export class CompassService {
       },
 
       opportunities,
+      reminders: activeReminders.map((r) => this.toReminder(r, now)),
+      goal: this.buildGoal(goalRow, profile, liquid, monthlySavings),
     }
   }
 
@@ -393,23 +420,50 @@ export class CompassService {
     return c.amount * (c.occurrences / Math.max(1, c.monthsCovered))
   }
 
-  private buildCommitments(profile: InsightProfile): CompassCommitment[] {
-    return profile.commitments.map((c) => ({
-      name: c.name,
-      key: c.key,
-      category: c.category,
-      amount: r0(c.amount),
-      cadence: c.cadence,
-      monthlyEquivalent: r0(this.monthlyEquiv(c)),
-      typicalDayOfMonth: c.typicalDayOfMonth,
-      consistency: c.consistency,
-      occurrences: c.occurrences,
-      monthsCovered: c.monthsCovered,
-      missedCount: c.missedCount,
-      returnedCount: c.returnedCount,
-      essential: ESSENTIAL_COMMITMENT_CATEGORIES.has(c.category),
-      nextExpected: this.projectNextDue(c.cadence, c.typicalDayOfMonth),
-    }))
+  private buildCommitments(
+    profile: InsightProfile,
+    settingByKey: Map<string, CommitmentSetting>,
+    reminderByKey: Map<string, Reminder>,
+    now: number,
+  ): CompassCommitment[] {
+    return profile.commitments
+      // A commitment the user marked inactive is hidden from the register.
+      .filter((c) => settingByKey.get(c.key)?.status !== 'inactive')
+      .map((c) => {
+        const s = settingByKey.get(c.key)
+        const rem = reminderByKey.get(c.key)
+        return {
+          name: c.name,
+          key: c.key,
+          category: c.category,
+          amount: r0(c.amount),
+          cadence: c.cadence,
+          monthlyEquivalent: r0(this.monthlyEquiv(c)),
+          typicalDayOfMonth: c.typicalDayOfMonth,
+          consistency: c.consistency,
+          occurrences: c.occurrences,
+          monthsCovered: c.monthsCovered,
+          missedCount: c.missedCount,
+          returnedCount: c.returnedCount,
+          essential: ESSENTIAL_COMMITMENT_CATEGORIES.has(c.category),
+          nextExpected: this.projectNextDue(c.cadence, c.typicalDayOfMonth),
+          setting: s
+            ? {
+                status: s.status,
+                renewalDate: s.renewalDate ? s.renewalDate.toISOString() : null,
+                confirmed: s.confirmedAt != null,
+              }
+            : null,
+          reminder: rem
+            ? {
+                id: rem.id,
+                triggerAt: rem.triggerAt.toISOString(),
+                due: now >= rem.triggerAt.getTime(),
+                dueDate: rem.dueDate.toISOString(),
+              }
+            : null,
+        }
+      })
   }
 
   /** Project the next payment date from the typical day-of-month (monthly only). */
@@ -436,15 +490,14 @@ export class CompassService {
 
   private buildResilience(
     profile: InsightProfile,
-    accounts: Awaited<ReturnType<CompassService['loadAccounts']>>,
     monthlySavings: number,
+    liquid: number | null,
   ): CompassPayload['resilience'] {
     const aff = profile.affordability
     const income = r0(aff.monthlyIncome)
     const essentials = r0(aff.essentialOutgoings)
     const savingsRate = income > 0 ? r2(monthlySavings / income) : 0
 
-    const liquid = this.liquidBalance(accounts, profile)
     const overdrawn = liquid != null && liquid < 0
     // Never show negative "months covered"; an overdrawn balance is zero buffer.
     const monthsCovered = liquid != null && essentials > 0 ? Math.max(0, r2(liquid / essentials)) : null
@@ -557,6 +610,43 @@ export class CompassService {
       surplusAfterEssentials: r0(latest.surplusAfterEssentials),
       vsAverage,
       headline: this.reviewHeadline(vsAverage, priors.length > 0),
+      drivers: [], // filled in by computeDrivers() in getForUser
+    }
+  }
+
+  /**
+   * Categories that moved most between the review month and the month before it.
+   * Both totals come from the SAME month breakdown, so the delta is measured on
+   * one consistent basis (comparing to the profile-wide average would mix two
+   * different classifications and produce wrong deltas). Month-over-month.
+   */
+  private async computeDrivers(
+    userId: string,
+    month: string,
+    profile: InsightProfile,
+  ): Promise<CompassMonthlyReview['drivers']> {
+    const months = this.completeMonths(profile)
+    const idx = months.findIndex((m) => m.month === month)
+    const prior = idx > 0 ? months[idx - 1]!.month : null
+    if (!prior) return []
+    try {
+      const monthCats = (m: { categories?: Array<{ label: string; total: number }> }) =>
+        new Map((m.categories ?? []).map((c) => [c.label, c.total]))
+      const [thisM, prevM] = await Promise.all([
+        this.insights.getBreakdown(userId, 'month', month) as Promise<{ categories?: Array<{ label: string; total: number }> }>,
+        this.insights.getBreakdown(userId, 'month', prior) as Promise<{ categories?: Array<{ label: string; total: number }> }>,
+      ])
+      const now = monthCats(thisM)
+      const prev = monthCats(prevM)
+      const labels = new Set([...now.keys(), ...prev.keys()])
+      const drivers: CompassMonthlyReview['drivers'] = []
+      for (const label of labels) {
+        const delta = r0((now.get(label) ?? 0) - (prev.get(label) ?? 0))
+        if (Math.abs(delta) >= 25) drivers.push({ label, delta, direction: delta >= 0 ? 'up' : 'down' })
+      }
+      return drivers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 3)
+    } catch {
+      return []
     }
   }
 
@@ -726,5 +816,191 @@ export class CompassService {
     else out.push('Surplus is tight, which limits affordability headroom.')
     if (!profile.stability.noOverdraftDependency) out.push('Overdraft reliance may hold your profile back.')
     return out.slice(0, 4)
+  }
+
+  // ─── Reminders (MVP 2) ──────────────────────────────────────────────────────
+
+  private toReminder(r: Reminder, now: number): CompassReminder {
+    const trigger = r.triggerAt.getTime()
+    return {
+      id: r.id,
+      commitmentKey: r.commitmentKey,
+      type: r.type,
+      title: r.title,
+      dueDate: r.dueDate.toISOString(),
+      triggerAt: r.triggerAt.toISOString(),
+      status: r.status,
+      due: now >= trigger,
+      daysUntilDue: Math.ceil((r.dueDate.getTime() - now) / DAY),
+    }
+  }
+
+  /** Confirm / correct a detected commitment and optionally set a renewal reminder. */
+  async confirmCommitment(userId: string, key: string, dto: ConfirmCommitmentDto): Promise<{ ok: true }> {
+    const renewalDate = dto.renewalDate ? new Date(dto.renewalDate) : null
+    await db.commitmentSetting.upsert({
+      where: { userId_commitmentKey: { userId, commitmentKey: key } },
+      update: { status: dto.status, renewalDate, confirmedAt: new Date() },
+      create: { userId, commitmentKey: key, status: dto.status, renewalDate, confirmedAt: new Date() },
+    })
+    // Retire any existing renewal reminder; recreate it only if still wanted.
+    // Atomic so a retry can't leave two scheduled reminders for one commitment.
+    const retire = db.reminder.updateMany({
+      where: { userId, commitmentKey: key, type: 'renewal', status: 'scheduled' },
+      data: { status: 'dismissed' as const },
+    })
+    if (dto.remind && renewalDate) {
+      const maxOffset = Math.max(...RENEWAL_OFFSETS)
+      await db.$transaction([
+        retire,
+        db.reminder.create({
+          data: {
+            userId,
+            commitmentKey: key,
+            type: 'renewal',
+            title: `${dto.name ?? 'A commitment'} renews`,
+            dueDate: renewalDate,
+            triggerAt: new Date(renewalDate.getTime() - maxOffset * DAY),
+            offsetDays: RENEWAL_OFFSETS,
+            status: 'scheduled',
+          },
+        }),
+      ])
+    } else {
+      await retire
+    }
+    return { ok: true }
+  }
+
+  async createReminder(userId: string, dto: CreateReminderDto): Promise<CompassReminder> {
+    const dueDate = new Date(dto.dueDate)
+    const offsets = dto.offsetDays?.length ? dto.offsetDays : [7]
+    const maxOffset = Math.max(...offsets)
+    const created = await db.reminder.create({
+      data: {
+        userId,
+        commitmentKey: dto.commitmentKey ?? null,
+        type: dto.type ?? 'custom',
+        title: dto.title,
+        dueDate,
+        triggerAt: new Date(dueDate.getTime() - maxOffset * DAY),
+        offsetDays: offsets,
+        status: 'scheduled',
+      },
+    })
+    return this.toReminder(created, Date.now())
+  }
+
+  async setReminderStatus(userId: string, id: string, status: 'completed' | 'dismissed'): Promise<{ ok: true }> {
+    const res = await db.reminder.updateMany({ where: { id, userId }, data: { status } })
+    if (res.count === 0) throw new NotFoundException('Reminder not found')
+    return { ok: true }
+  }
+
+  // ─── Savings goal (MVP 4) ───────────────────────────────────────────────────
+
+  private buildGoal(
+    goalRow: SavingsGoal | null,
+    profile: InsightProfile,
+    liquid: number | null,
+    monthlySavings: number,
+  ): CompassGoal | null {
+    const essentials = r0(profile.affordability.essentialOutgoings)
+    // Liquid balance only stands in as "saved" for an emergency buffer, which is
+    // literally cash on hand. A custom goal ("new car") has no earmarked balance
+    // we can see, so we track it from contributions only (currentSaved 0 for now).
+    const bufferSaved = Math.max(0, r0(liquid ?? 0))
+
+    if (!goalRow) {
+      // Suggest (but do not persist) a 3-month emergency buffer.
+      if (essentials <= 0) return null
+      const targetAmount = r0(essentials * 3)
+      const contribution = monthlySavings > 0 ? monthlySavings : Math.max(0, r0(profile.affordability.surplusAfterAll))
+      const gap = Math.max(0, targetAmount - bufferSaved)
+      return {
+        id: 'suggested',
+        type: 'emergency_buffer',
+        label: '3-month emergency buffer',
+        targetAmount,
+        targetMonths: null,
+        monthlyContribution: contribution > 0 ? contribution : null,
+        status: 'suggested',
+        currentSaved: bufferSaved,
+        gap,
+        monthsToGoal: gap === 0 ? 0 : contribution > 0 ? Math.ceil(gap / contribution) : null,
+        onTrack: null,
+        suggested: true,
+      }
+    }
+
+    const isBuffer = goalRow.type === 'emergency_buffer'
+    const currentSaved = isBuffer ? bufferSaved : 0
+    const contribution = goalRow.monthlyContribution ?? (isBuffer && monthlySavings > 0 ? monthlySavings : 0)
+    const gap = Math.max(0, r0(goalRow.targetAmount - currentSaved))
+    const monthsToGoal = gap === 0 ? 0 : contribution > 0 ? Math.ceil(gap / contribution) : null
+    const onTrack = goalRow.targetMonths != null && monthsToGoal != null ? monthsToGoal <= goalRow.targetMonths : null
+    return {
+      id: goalRow.id,
+      type: goalRow.type,
+      label: goalRow.label,
+      targetAmount: r0(goalRow.targetAmount),
+      targetMonths: goalRow.targetMonths,
+      monthlyContribution: contribution > 0 ? r0(contribution) : null,
+      status: goalRow.status,
+      currentSaved,
+      gap,
+      monthsToGoal,
+      onTrack,
+      suggested: false,
+    }
+  }
+
+  async upsertGoal(userId: string, dto: UpsertGoalDto): Promise<{ ok: true }> {
+    const existing = await db.savingsGoal.findFirst({ where: { userId, status: 'active' } })
+    if (existing) {
+      // Partial update: only overwrite fields the client actually sent, so an
+      // edit that omits e.g. targetMonths doesn't silently wipe it.
+      const patch: {
+        type?: 'emergency_buffer' | 'custom'
+        label?: string | null
+        targetAmount?: number
+        targetMonths?: number | null
+        monthlyContribution?: number | null
+      } = {}
+      if (dto.type !== undefined) patch.type = dto.type
+      if (dto.label !== undefined) patch.label = dto.label
+      if (dto.targetAmount !== undefined) patch.targetAmount = dto.targetAmount
+      if (dto.targetMonths !== undefined) patch.targetMonths = dto.targetMonths
+      if (dto.monthlyContribution !== undefined) patch.monthlyContribution = dto.monthlyContribution
+      await db.savingsGoal.update({ where: { id: existing.id }, data: patch })
+    } else {
+      await db.savingsGoal.create({
+        data: {
+          userId,
+          type: dto.type ?? 'emergency_buffer',
+          label: dto.label ?? null,
+          targetAmount: dto.targetAmount,
+          targetMonths: dto.targetMonths ?? null,
+          monthlyContribution: dto.monthlyContribution ?? null,
+        },
+      })
+    }
+    return { ok: true }
+  }
+
+  async archiveGoal(userId: string, id: string): Promise<{ ok: true }> {
+    await db.savingsGoal.updateMany({ where: { id, userId }, data: { status: 'archived' } })
+    return { ok: true }
+  }
+
+  // ─── Opportunity dismissal ──────────────────────────────────────────────────
+
+  async dismissOpportunity(userId: string, id: string): Promise<{ ok: true }> {
+    await db.compassDismissal.upsert({
+      where: { userId_kind_key: { userId, kind: 'opportunity', key: id } },
+      update: {},
+      create: { userId, kind: 'opportunity', key: id },
+    })
+    return { ok: true }
   }
 }

@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api'
 import type { CompassPayload } from '@/lib/compass-types'
 import { useMe } from '@/lib/use-me'
+import { useCompassActions } from '@/lib/use-compass'
 import { cn } from '@/lib/utils'
 import { BreakdownDrawer, type DrawerSpec } from '@/components/analytics/breakdown-drawer'
 import { Card, EmptyState } from './compass-ui'
@@ -57,6 +58,7 @@ const FRESHNESS_LABEL: Record<string, string> = {
 export function CompassView() {
   const { getToken } = useAuth()
   const { data: me, isLoading: meLoading } = useMe()
+  const actions = useCompassActions()
   const [tab, setTab] = useState<TabId>('overview')
   const [drawer, setDrawer] = useState<DrawerSpec | null>(null)
 
@@ -111,13 +113,13 @@ export function CompassView() {
         <NoData />
       ) : (
         <div>
-          {tab === 'overview' && <OverviewSection data={data} onDrill={setDrawer} />}
+          {tab === 'overview' && <OverviewSection data={data} onDrill={setDrawer} actions={actions} />}
           {tab === 'money-map' && <MoneyMapSection data={data} />}
           {tab === 'income' && <IncomeSection data={data} onDrill={setDrawer} />}
           {tab === 'spending' && <SpendingSection data={data} onDrill={setDrawer} />}
-          {tab === 'bills' && <BillsSection data={data} onDrill={setDrawer} />}
+          {tab === 'bills' && <BillsSection data={data} onDrill={setDrawer} actions={actions} />}
           {tab === 'resilience' && <ResilienceSection data={data} />}
-          {tab === 'savings' && <SavingsSection data={data} />}
+          {tab === 'savings' && <SavingsSection data={data} actions={actions} />}
           {tab === 'impact' && <ImpactSection data={data} />}
         </div>
       )}

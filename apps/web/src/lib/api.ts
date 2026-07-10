@@ -299,5 +299,33 @@ export const api = {
   },
   compass: {
     get: (token: string) => apiFetch<CompassPayload>('/compass', {}, token),
+    confirmCommitment: (
+      token: string,
+      key: string,
+      data: { status: 'active' | 'inactive' | 'unknown'; name?: string; renewalDate?: string; remind?: boolean }
+    ) =>
+      apiFetch<{ ok: true }>(
+        `/compass/commitments/${encodeURIComponent(key)}/confirm`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    createReminder: (
+      token: string,
+      data: { title: string; dueDate: string; type?: string; commitmentKey?: string; offsetDays?: number[] }
+    ) => apiFetch('/compass/reminders', { method: 'POST', body: JSON.stringify(data) }, token),
+    updateReminder: (token: string, id: string, status: 'completed' | 'dismissed') =>
+      apiFetch<{ ok: true }>(
+        `/compass/reminders/${id}`,
+        { method: 'PATCH', body: JSON.stringify({ status }) },
+        token
+      ),
+    upsertGoal: (
+      token: string,
+      data: { type?: string; label?: string; targetAmount: number; targetMonths?: number; monthlyContribution?: number }
+    ) => apiFetch<{ ok: true }>('/compass/goal', { method: 'PUT', body: JSON.stringify(data) }, token),
+    archiveGoal: (token: string, id: string) =>
+      apiFetch<{ ok: true }>(`/compass/goal/${id}`, { method: 'DELETE' }, token),
+    dismissOpportunity: (token: string, id: string) =>
+      apiFetch<{ ok: true }>(`/compass/opportunities/${id}/dismiss`, { method: 'POST' }, token),
   },
 }

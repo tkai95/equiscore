@@ -51,6 +51,42 @@ export interface CompassCommitment {
   essential: boolean
   /** Projected next payment from the typical payment day (monthly cadence only). */
   nextExpected: { date: string; inDays: number } | null
+  /** The user's saved confirmation/correction for this commitment, if any. */
+  setting: { status: string; renewalDate: string | null; confirmed: boolean } | null
+  /** A renewal reminder the user set for this commitment, if any. */
+  reminder: { id: string; triggerAt: string; due: boolean; dueDate: string } | null
+}
+
+export interface CompassReminder {
+  id: string
+  commitmentKey: string | null
+  type: string
+  title: string
+  dueDate: string
+  triggerAt: string
+  status: string
+  /** now >= triggerAt: the reminder window is open. */
+  due: boolean
+  daysUntilDue: number
+}
+
+export interface CompassGoal {
+  id: string
+  type: string
+  label: string | null
+  targetAmount: number
+  targetMonths: number | null
+  monthlyContribution: number | null
+  status: string
+  /** Liquid balance currently counted toward the goal. */
+  currentSaved: number
+  gap: number
+  /** Months to reach the target at the (chosen or detected) contribution. */
+  monthsToGoal: number | null
+  /** Whether monthsToGoal fits within targetMonths (null if no target set). */
+  onTrack: boolean | null
+  /** True when this is a suggested goal we have not persisted yet. */
+  suggested: boolean
 }
 
 export interface CompassOpportunity {
@@ -81,6 +117,8 @@ export interface CompassMonthlyReview {
   vsAverage: { income: number; spend: number; net: number }
   /** Plain, deterministic sentence describing the biggest change. */
   headline: string
+  /** Categories that moved most vs the trailing average. */
+  drivers: Array<{ label: string; delta: number; direction: 'up' | 'down' }>
 }
 
 export interface CompassPayload {
@@ -234,4 +272,6 @@ export interface CompassPayload {
   }
 
   opportunities: CompassOpportunity[]
+  reminders: CompassReminder[]
+  goal: CompassGoal | null
 }
