@@ -60,6 +60,10 @@ export class DocumentsService {
       const { url, fields } = await createPresignedPost(this.s3, {
         Bucket: this.bucket,
         Key: key,
+        // The policy fixes the content type, so the form MUST submit a matching
+        // Content-Type field. Return it in `fields` so the client sends it —
+        // without this the POST can never satisfy the policy and storage 403s.
+        Fields: { 'Content-Type': mimeType },
         Conditions: [
           ['content-length-range', 0, 10 * 1024 * 1024], // 10 MB max
           ['eq', '$Content-Type', mimeType],
