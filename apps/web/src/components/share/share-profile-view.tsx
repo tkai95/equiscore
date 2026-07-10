@@ -287,7 +287,7 @@ export function ShareProfileView() {
                   expired ? 'ring-gray-100 opacity-60' : 'ring-gray-100'
                 )}
               >
-                <div className="flex flex-wrap items-start gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {link.targetName && (
