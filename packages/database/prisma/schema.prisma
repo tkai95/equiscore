@@ -483,6 +483,9 @@ model SharedProfile {
   lastViewedAt  DateTime? @map("last_viewed_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   revokedAt     DateTime? @map("revoked_at")
+  // Recipient insight frozen at share time — a share link is a point-in-time
+  // snapshot and must never change as the applicant's later evidence changes.
+  insightSnapshot Json?   @map("insight_snapshot")
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   trustScore TrustScore @relation(fields: [trustScoreId], references: [id])

@@ -82,6 +82,12 @@ export class SharingService {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + SHARE_TTL_DAYS)
 
+    // Freeze the recipient insight at share time. A share link is a point-in-time
+    // snapshot: whatever the applicant's evidence shows NOW is what the recipient
+    // sees for the life of this link, regardless of later changes. To share an
+    // updated picture, the applicant creates a new link.
+    const insightSnapshot = await this.buildRecipientInsight(userId)
+
     const link = await db.sharedProfile.create({
       data: {
         userId,
@@ -90,6 +96,7 @@ export class SharingService {
         expiresAt,
         targetType,
         targetName,
+        insightSnapshot: insightSnapshot ?? undefined,
       },
     })
 
@@ -159,9 +166,11 @@ export class SharingService {
     if (shared.revokedAt) throw new ForbiddenException('The applicant has revoked access to this profile')
     if (shared.expiresAt < new Date()) throw new ForbiddenException('This share link has expired')
 
+    // The score frozen at share time — the exact TrustScore the applicant chose
+    // to share, NOT their latest. The link is a snapshot; the applicant reshares
+    // to publish an updated score.
     const score = await db.trustScore.findFirst({
-      where: { userId: shared.userId },
-      orderBy: { computedAt: 'desc' },
+      where: { id: shared.trustScoreId, userId: shared.userId },
     })
     if (!score) throw new NotFoundException('This applicant does not have a score yet')
 
@@ -181,7 +190,11 @@ export class SharingService {
       now: new Date(),
     })
 
-    const insight = await this.buildRecipientInsight(shared.userId)
+    // Use the insight frozen at share time. Fall back to a live build only for
+    // links created before snapshots existed, so old links keep working.
+    const insight =
+      (shared.insightSnapshot as Awaited<ReturnType<typeof this.buildRecipientInsight>>) ??
+      (await this.buildRecipientInsight(shared.userId))
 
     // Coverage caveat — tells a recipient the picture may be partial without
     // leaking the applicant's specific hidden accounts/liabilities. Reuses the
