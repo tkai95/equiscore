@@ -38,7 +38,8 @@ export function scoreVerificationStrength(features: TrustFeatures): ScorecardRes
     codes.push(REASON_CODES.NAME_MATCH)
   }
 
-  if (features.hasUploadedDocuments) {
+  // A verified photo ID (contents read and name matched) — not merely an upload.
+  if (features.identityDocumentVerified) {
     total += 10
     codes.push(REASON_CODES.DOCUMENT_UPLOADED)
   }
@@ -46,6 +47,15 @@ export function scoreVerificationStrength(features: TrustFeatures): ScorecardRes
   if (features.addressMatchConfidence > 0.7) {
     total += 10
     codes.push(REASON_CODES.ADDRESS_VERIFIED)
+  }
+
+  // A document was uploaded but hasn't verified against the profile yet.
+  if (
+    features.hasUploadedDocuments &&
+    !features.identityDocumentVerified &&
+    features.addressMatchConfidence <= 0.7
+  ) {
+    codes.push(REASON_CODES.DOCUMENT_UNVERIFIED)
   }
 
   if (features.connectedAccountsCount >= 1) {
@@ -67,9 +77,16 @@ export function scoreIdentityConfidence(features: TrustFeatures): ScorecardResul
   const codes: ReasonCode[] = []
   let total = 0
 
-  if (features.documentCount > 0) {
+  // A verified government photo ID whose name matched the profile.
+  if (features.identityDocumentVerified) {
     total += 25
     codes.push(REASON_CODES.IDENTITY_DOCUMENT)
+  }
+
+  // Date of birth independently confirmed by that ID.
+  if (features.dobVerified) {
+    total += 10
+    codes.push(REASON_CODES.DOB_VERIFIED)
   }
 
   if (features.addressMatchConfidence > 0.8) {
@@ -158,6 +175,12 @@ export function scoreIncomeStability(features: TrustFeatures): ScorecardResult {
     codes.push(REASON_CODES.NO_RECURRING_INCOME)
   }
 
+  // A payslip / P60 / employment document that corroborates income.
+  if (features.incomeDocumentVerified) {
+    total += 10
+    codes.push(REASON_CODES.INCOME_DOC_VERIFIED)
+  }
+
   // Up to +5 for multiple income sources
   if (features.verifiedSourcesCount > 1) {
     total += 5
@@ -239,7 +262,8 @@ export function scoreRentalReliability(features: TrustFeatures): ScorecardResult
     codes.push(REASON_CODES.RENT_HISTORY_6M)
   }
 
-  if (features.documentCount > 0 && features.hasUploadedDocuments) {
+  // A verified address document (e.g. a tenancy agreement) supports the rental claim.
+  if (features.addressDocumentVerified) {
     total += 15
     codes.push(REASON_CODES.TENANCY_DOCUMENT)
   }

@@ -2,10 +2,12 @@ import { Injectable, Logger, NotFoundException, ServiceUnavailableException } fr
 import { db } from '@equiscore/database'
 import { ConfigService } from '@nestjs/config'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
-import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import type { DocumentType } from '@equiscore/shared'
 import { AuditService } from '../audit/audit.service'
 import { ScoringService } from '../scoring/scoring.service'
+import { extractDocumentFields } from './document-extractor'
+import { matchDocument, verdictFor, type ProfileFacts } from './document-claims'
 
 @Injectable()
 export class DocumentsService {
@@ -107,10 +109,89 @@ export class DocumentsService {
       mimeType,
     })
 
-    // Adding evidence changes the score — recompute so the profile stays truthful.
-    await this.recomputeQuietly(userId, 'document upload')
+    // Read the document and verify it against the profile in the background:
+    // extraction is a Claude call (seconds), so we return immediately with the
+    // document still "pending" and let the client poll for the verified/needs-
+    // review/rejected outcome. Processing recomputes the score itself when done.
+    void this.processDocumentQuietly(userId, doc.id)
 
     return doc
+  }
+
+  /**
+   * Read an uploaded document, decide whether it genuinely corroborates the
+   * profile, and persist the verdict + extracted fields. Best-effort: any
+   * failure leaves the document 'pending' and still recomputes the score.
+   */
+  async processDocumentQuietly(userId: string, documentId: string): Promise<void> {
+    try {
+      const apiKey = process.env['ANTHROPIC_API_KEY']
+      const [doc, user] = await Promise.all([
+        db.uploadedDocument.findFirst({ where: { id: documentId, userId } }),
+        db.user.findUnique({
+          where: { id: userId },
+          include: { profile: true, addresses: { where: { isCurrent: true }, take: 1 } },
+        }),
+      ])
+      if (!doc || !apiKey) return
+
+      const base64 = await this.getObjectBase64(doc.fileKey)
+      if (!base64) return
+
+      const fields = await extractDocumentFields(apiKey, base64, doc.mimeType ?? 'application/pdf', doc.documentType)
+
+      const address = user?.addresses[0]
+      const profileFacts: ProfileFacts = {
+        fullName: user?.profile?.fullName ?? null,
+        dob: user?.profile?.dob ?? null,
+        addressLine1: address?.addressLine1 ?? null,
+        postcode: address?.postcode ?? null,
+      }
+      const match = matchDocument(fields, profileFacts)
+      const verdict = verdictFor(doc.documentType, fields, match)
+
+      await db.uploadedDocument.update({
+        where: { id: doc.id },
+        data: {
+          verificationStatus: verdict,
+          reviewedAt: new Date(),
+          // Persist the read + the checks, so the UI can say *what* was verified
+          // and the feature engineer can score by claim.
+          extractedMetadata: {
+            detectedDocumentType: fields.detectedDocumentType,
+            looksAuthentic: fields.looksAuthentic,
+            readable: fields.readable,
+            hasName: fields.fullName !== null,
+            hasDob: fields.dateOfBirth !== null,
+            hasAddress: fields.address !== null || fields.postcode !== null,
+            nameMatch: match.nameMatch,
+            dobMatch: match.dobMatch,
+            addressMatch: match.addressMatch,
+            expired: match.expired,
+          },
+        },
+      })
+
+      this.audit.log(userId, 'document.verified', { documentId: doc.id, verdict })
+    } catch (err) {
+      this.logger.warn(`Document processing failed for ${documentId}: ${String(err)}`)
+    } finally {
+      // The document's evidence value has changed either way — reflect it.
+      await this.recomputeQuietly(userId, 'document processing')
+    }
+  }
+
+  /** Fetch a stored object as base64 for the extractor. Returns null on failure. */
+  private async getObjectBase64(fileKey: string): Promise<string | null> {
+    try {
+      const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }))
+      const bytes = await res.Body?.transformToByteArray()
+      if (!bytes) return null
+      return Buffer.from(bytes).toString('base64')
+    } catch (err) {
+      this.logger.warn(`Could not fetch document ${fileKey} for extraction: ${String(err)}`)
+      return null
+    }
   }
 
   async getDocuments(userId: string) {

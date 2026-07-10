@@ -150,23 +150,25 @@ export class ScoringService {
             dimension: 'Verification Strength',
           })
       }
-      if (features.documentCount === 0) {
+      if (!features.identityDocumentVerified) {
+        // The realistic outcome of uploading a matching photo ID: we read it and
+        // confirm the name (and date of birth) against the profile.
         const mod: Partial<TrustFeatures> = {
-          documentCount: 1,
-          hasUploadedDocuments: true,
+          identityDocumentVerified: true,
+          dobVerified: true,
           verifiedSourcesCount: features.verifiedSourcesCount + 1,
         }
         const g = gainFrom(mod)
         if (g > 0)
           improvements.push({
             id: 'documents',
-            title: 'Upload proof of identity or address',
+            title: 'Verify your identity with a photo ID',
             detail:
-              'A passport, driving licence, or recent utility bill adds verified evidence to your profile.',
+              'Upload a passport or driving licence — we read it and confirm your name and date of birth against your profile, raising your identity and verification scores.',
             href: '/dashboard/documents',
             estimatedGain: g,
             reachesTier: tierAt(mod),
-            dimension: 'Verification Strength',
+            dimension: 'Identity Confidence',
           })
       }
       if (features.profileFieldsComplete < 1) {

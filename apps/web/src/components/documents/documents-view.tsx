@@ -48,21 +48,56 @@ const DOCUMENT_CATEGORIES = [
 
 const ACCEPTED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 
+interface DocMetadata {
+  readable?: boolean
+  looksAuthentic?: boolean
+  nameMatch?: boolean | null
+  dobMatch?: boolean | null
+  addressMatch?: boolean | null
+  expired?: boolean
+}
+
 interface UploadedDocument {
   id: string
   documentType: string
   fileUrl: string
   mimeType: string
   fileSizeBytes: number | null
-  verificationStatus: 'pending' | 'verified' | 'rejected' | 'requires_review'
+  verificationStatus: 'pending' | 'verified' | 'rejected' | 'needs_review'
+  extractedMetadata: DocMetadata | null
   uploadedAt: string
 }
 
 const STATUS_CONFIG = {
-  pending: { icon: Clock, label: 'Pending review', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  pending: { icon: Clock, label: 'Checking…', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
   verified: { icon: CheckCircle, label: 'Verified', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  rejected: { icon: XCircle, label: 'Rejected', className: 'bg-red-50 text-red-700 ring-red-200' },
-  requires_review: { icon: AlertCircle, label: 'Requires review', className: 'bg-cream text-charcoal-mid ring-[#D8D6C9]' },
+  rejected: { icon: XCircle, label: 'Couldn’t verify', className: 'bg-red-50 text-red-700 ring-red-200' },
+  needs_review: { icon: AlertCircle, label: 'Needs review', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
+}
+
+const IDENTITY_TYPES = ['passport', 'national_id', 'biometric_residence_permit', 'driving_licence']
+const ADDRESS_TYPES = ['utility_bill', 'tenancy_agreement', 'bank_statement', 'driving_licence', 'biometric_residence_permit']
+
+/** A plain-English line for what the read actually confirmed (or why it didn't). */
+function verificationDetail(doc: UploadedDocument): string | null {
+  const m = doc.extractedMetadata
+  const isId = IDENTITY_TYPES.includes(doc.documentType)
+  const isAddr = ADDRESS_TYPES.includes(doc.documentType)
+
+  if (doc.verificationStatus === 'pending') return 'Reading and checking your document…'
+  if (doc.verificationStatus === 'rejected')
+    return 'We couldn’t read this as a valid document. Try a clearer photo or PDF.'
+  if (doc.verificationStatus === 'verified') {
+    if (isId) return m?.dobMatch ? 'Name and date of birth confirmed against your profile.' : 'Name confirmed against your profile.'
+    if (isAddr) return 'Address confirmed against your profile.'
+    return 'Confirmed as genuine income evidence.'
+  }
+  // needs_review
+  if (m?.expired) return 'This document has expired — please upload a current one.'
+  if (m?.nameMatch === false) return 'The name on this document didn’t match your profile.'
+  if (m?.addressMatch === false) return 'The address didn’t match your current address on file.'
+  if (isId && m?.nameMatch == null) return 'We couldn’t read a name to match against your profile.'
+  return 'Uploaded — awaiting a manual review.'
 }
 
 function formatBytes(bytes: number | null) {
@@ -87,6 +122,12 @@ export function DocumentsView() {
       const token = await getToken()
       return api.documents.list(token!) as Promise<UploadedDocument[]>
     },
+    // Verification runs in the background (a Claude read), so poll while any
+    // document is still being checked, then go quiet.
+    refetchInterval: (query) =>
+      (query.state.data as UploadedDocument[] | undefined)?.some((d) => d.verificationStatus === 'pending')
+        ? 3000
+        : false,
   })
 
   const deleteMutation = useMutation({
@@ -249,10 +290,11 @@ export function DocumentsView() {
                 {groupedDocs[cat.label]!.map((doc) => {
                   const status = STATUS_CONFIG[doc.verificationStatus] ?? STATUS_CONFIG.pending
                   const StatusIcon = status.icon
+                  const detail = verificationDetail(doc)
                   return (
                     <div
                       key={doc.id}
-                      className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100"
+                      className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50">
                         <FileText className="h-5 w-5 text-gray-400" />
@@ -265,6 +307,22 @@ export function DocumentsView() {
                           {formatDate(doc.uploadedAt)}
                           {doc.fileSizeBytes != null && ` · ${formatBytes(doc.fileSizeBytes)}`}
                         </p>
+                        {detail && (
+                          <p
+                            className={cn(
+                              'mt-1 text-xs',
+                              doc.verificationStatus === 'verified'
+                                ? 'text-emerald-700'
+                                : doc.verificationStatus === 'rejected'
+                                  ? 'text-red-600'
+                                  : doc.verificationStatus === 'needs_review'
+                                    ? 'text-amber-700'
+                                    : 'text-gray-500'
+                            )}
+                          >
+                            {detail}
+                          </p>
+                        )}
                       </div>
                       <span
                         className={cn(
@@ -272,7 +330,7 @@ export function DocumentsView() {
                           status.className
                         )}
                       >
-                        <StatusIcon className="h-3 w-3" />
+                        <StatusIcon className={cn('h-3 w-3', doc.verificationStatus === 'pending' && 'animate-spin')} />
                         {status.label}
                       </span>
                       <button

@@ -4,6 +4,7 @@ import type { TrustFeatures } from '@equiscore/shared'
 import { DEFAULT_FEATURES } from '@equiscore/shared'
 import { buildInsightProfile } from '../insights/engine'
 import type { NormalizedTxn } from '../insights/engine'
+import { IDENTITY_DOCS, ADDRESS_CAPABLE_DOCS, INCOME_DOCS } from '../documents/document-claims'
 
 export interface EvidenceExclusion {
   connectionIds?: string[]
@@ -155,34 +156,53 @@ export class FeatureEngineeringService {
         accountNames.some((name) => this.nameMatchScore(profileName, name) > 0.7)
     }
 
-    // ── Documents ─────────────────────────────────────────────────────────────
+    // ── Documents (read + matched against the profile) ────────────────────────
+    // A document only counts once its contents corroborate the user: extraction
+    // fills extractedMetadata with per-claim match flags, and verificationStatus
+    // is 'verified' only when the claim the document type carries matched.
+    const identitySet = new Set<string>(IDENTITY_DOCS)
+    const addressSet = new Set<string>(ADDRESS_CAPABLE_DOCS)
+    const incomeSet = new Set<string>(INCOME_DOCS)
+    const meta = (d: (typeof documents)[number]) =>
+      (d.extractedMetadata ?? {}) as Record<string, unknown>
+
     features.documentCount = documents.length
     features.hasUploadedDocuments = documents.length > 0
-    // Count all submitted documents as sources — when OCR verification lands,
-    // swap the filter back to verificationStatus === 'verified' and adjust weights.
+
+    features.identityDocumentVerified = documents.some(
+      (d) => identitySet.has(d.documentType) && d.verificationStatus === 'verified'
+    )
+    features.dobVerified = documents.some(
+      (d) => identitySet.has(d.documentType) && meta(d).dobMatch === true
+    )
+    features.addressDocumentVerified = documents.some(
+      (d) =>
+        addressSet.has(d.documentType) &&
+        d.verificationStatus === 'verified' &&
+        meta(d).addressMatch === true
+    )
+    features.incomeDocumentVerified = documents.some(
+      (d) => incomeSet.has(d.documentType) && d.verificationStatus === 'verified'
+    )
+
+    // Only genuinely verified documents (contents read and matched) count as
+    // verified sources — an unread/mismatched upload is not verification.
     features.verifiedSourcesCount =
       (features.openBankingConnected ? 1 : 0) +
-      documents.filter((d) => d.verificationStatus !== 'rejected').length
+      documents.filter((d) => d.verificationStatus === 'verified').length
 
     // ── Self-declared check ───────────────────────────────────────────────────
     features.selfDeclaredOnly = !features.openBankingConnected && features.documentCount === 0
 
     // ── Address confidence ────────────────────────────────────────────────────
-    const ADDRESS_DOC_TYPES = ['utility_bill', 'bank_statement', 'tenancy_agreement']
+    // High only when an address document was read and its address matched the
+    // declared address. A declared address with no matching evidence sits at 0.4.
     const currentAddress = user?.addresses[0]
-    const addressDocVerified = documents.some(
-      (d) => ADDRESS_DOC_TYPES.includes(d.documentType) && d.verificationStatus === 'verified'
-    )
-    const addressDocSubmitted = documents.some(
-      (d) => ADDRESS_DOC_TYPES.includes(d.documentType) && d.verificationStatus !== 'rejected'
-    )
-    // 0.85 = OCR-verified address doc, 0.65 = submitted/pending (onboard-and-hold phase),
-    // 0.4 = declared only, 0 = nothing provided.
-    features.addressMatchConfidence =
-      currentAddress && addressDocVerified ? 0.85
-      : currentAddress && addressDocSubmitted ? 0.65
-      : currentAddress ? 0.4
-      : 0
+    features.addressMatchConfidence = features.addressDocumentVerified
+      ? 0.9
+      : currentAddress
+        ? 0.4
+        : 0
 
     return features
   }

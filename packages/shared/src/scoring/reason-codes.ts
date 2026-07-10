@@ -16,8 +16,9 @@ export const REASON_CODES = {
   TXN_HISTORY_6M: rc('TXN_HISTORY_6M', 'verificationStrength', 'positive', '6+ months of transaction history available', 10),
   TXN_HISTORY_3M: rc('TXN_HISTORY_3M', 'verificationStrength', 'positive', '3+ months of transaction history available', 5),
   NAME_MATCH: rc('NAME_MATCH', 'verificationStrength', 'positive', 'Account holder name matches profile', 15),
-  DOCUMENT_UPLOADED: rc('DOCUMENT_UPLOADED', 'verificationStrength', 'positive', 'Supporting document uploaded', 10),
-  ADDRESS_VERIFIED: rc('ADDRESS_VERIFIED', 'verificationStrength', 'positive', 'Address evidence verified', 10),
+  DOCUMENT_UPLOADED: rc('DOCUMENT_UPLOADED', 'verificationStrength', 'positive', 'Identity document verified against your profile', 10),
+  ADDRESS_VERIFIED: rc('ADDRESS_VERIFIED', 'verificationStrength', 'positive', 'Address confirmed by a matching document', 10),
+  DOCUMENT_UNVERIFIED: rc('DOCUMENT_UNVERIFIED', 'verificationStrength', 'neutral', 'A document is awaiting verification or did not match your profile', 0),
   SELF_DECLARED_ONLY: rc('SELF_DECLARED_ONLY', 'verificationStrength', 'negative', 'Profile currently relies on self-declared information only', 0),
 
   // Income stability
@@ -26,6 +27,7 @@ export const REASON_CODES = {
   LOW_INCOME_VARIANCE: rc('LOW_INCOME_VARIANCE', 'incomeStability', 'positive', 'Monthly income is stable with low variance', 20),
   NET_INFLOW_POSITIVE: rc('NET_INFLOW_POSITIVE', 'incomeStability', 'positive', '3+ months of positive net cash inflow', 15),
   HIGH_INCOME_VARIANCE: rc('HIGH_INCOME_VARIANCE', 'incomeStability', 'negative', 'Income pattern is highly variable month to month', -10),
+  INCOME_DOC_VERIFIED: rc('INCOME_DOC_VERIFIED', 'incomeStability', 'positive', 'Income corroborated by a payslip, P60 or employment document', 10),
   NO_RECURRING_INCOME: rc('NO_RECURRING_INCOME', 'incomeStability', 'negative', 'No recurring income pattern currently detected', 0),
 
   // Affordability
@@ -54,7 +56,8 @@ export const REASON_CODES = {
 
   // Identity confidence
   PROFILE_CONSISTENT: rc('PROFILE_CONSISTENT', 'identityConfidence', 'positive', 'Profile details are internally consistent across sources', 30),
-  IDENTITY_DOCUMENT: rc('IDENTITY_DOCUMENT', 'identityConfidence', 'positive', 'Government-issued identity document provided', 25),
+  IDENTITY_DOCUMENT: rc('IDENTITY_DOCUMENT', 'identityConfidence', 'positive', 'Government-issued photo ID verified and matches your profile', 25),
+  DOB_VERIFIED: rc('DOB_VERIFIED', 'identityConfidence', 'positive', 'Date of birth confirmed by an identity document', 10),
   ADDRESS_CONSISTENT: rc('ADDRESS_CONSISTENT', 'identityConfidence', 'positive', 'Address information is consistent across sources', 20),
   NAME_MISMATCH: rc('NAME_MISMATCH', 'identityConfidence', 'negative', 'Name on bank account does not fully match profile name', -20),
   RESIDENCY_STATUS_PROVIDED: rc('RESIDENCY_STATUS_PROVIDED', 'identityConfidence', 'positive', 'Residency status is on record', 8),

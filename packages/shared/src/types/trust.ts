@@ -57,6 +57,13 @@ export interface TrustFeatures {
   documentCount: number
   verifiedSourcesCount: number
 
+  // Document-evidence signals (extracted + matched against the profile, so a
+  // document only counts once its contents corroborate the user)
+  identityDocumentVerified: boolean  // a readable photo ID whose name matches the profile
+  dobVerified: boolean               // an ID whose date of birth matched the profile
+  addressDocumentVerified: boolean   // an address document whose address matched the profile
+  incomeDocumentVerified: boolean    // a payslip/P60/etc. read as genuine income evidence
+
   // Profile signals
   profileFieldsComplete: number      // 0–1 fraction
   selfDeclaredOnly: boolean
