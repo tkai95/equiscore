@@ -30,14 +30,14 @@ function familyGuidance(type: DocumentType): string {
 }
 
 function buildPrompt(type: DocumentType): string {
-  return `You are extracting fields from an uploaded UK "${type}" document (an image or PDF).
+  return `You are extracting fields from an uploaded "${type}" document (an image or PDF). It may be issued by any country, not only the UK.
 
 ${familyGuidance(type)}
 
 Return ONLY a JSON object, no markdown, no commentary, in exactly this shape:
 {
   "detectedDocumentType": string | null,   // what kind of document this actually appears to be
-  "looksAuthentic": boolean,               // true only if this is a genuine, complete document of a recognised kind (NOT a blank template, a selfie, a random photo, or an unrelated screenshot)
+  "looksAuthentic": boolean,               // Is this actually a document of roughly the expected kind? A normal photo, scan or PDF of a real document is fine — you are NOT judging whether it is forged, and you cannot verify security features. Set true for any plausible ${type} (from any country). Set false ONLY when the file clearly is NOT that kind of document: a selfie, a person's face, a blank/empty template, a screenshot of an app or website, or unrelated content.
   "readable": boolean,                     // true if the key fields could be read; false if too blurry/cropped/dark
   "fullName": string | null,               // the person's full name as printed
   "dateOfBirth": "YYYY-MM-DD" | null,
@@ -56,7 +56,7 @@ Rules:
 - Only report a field you can actually read on the document. If it is not present or not legible, use null. NEVER guess or infer a value.
 - Convert any date to ISO YYYY-MM-DD.
 - For amounts, output a plain number with no currency symbol or commas.
-- Set "looksAuthentic": false if the file is clearly not the kind of document expected (e.g. a selfie, a blank form, or unrelated content).
+- "looksAuthentic" is only false for a file that is clearly not this kind of document (a selfie, a blank template, an app screenshot, unrelated content). A real photo or scan of the document — including a passport from any country — is authentic for this purpose. Do not mark a real document false just because you cannot confirm its security features.
 - Output only the JSON object.`
 }
 
@@ -96,7 +96,7 @@ export async function extractDocumentFields(
 
   if (!source) {
     // A type we can't hand to the model (unlikely — uploads are pdf/image).
-    return unreadable()
+    return unreadable('error')
   }
 
   let message
@@ -112,12 +112,12 @@ export async function extractDocumentFields(
     )
     message = await stream.finalMessage()
   } catch {
-    return unreadable()
+    return unreadable('error')
   } finally {
     clearTimeout(timeout)
   }
 
-  if (message.stop_reason === 'refusal') return unreadable()
+  if (message.stop_reason === 'refusal') return unreadable('refusal')
 
   const text = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -128,13 +128,14 @@ export async function extractDocumentFields(
   try {
     p = JSON.parse(extractJson(text)) as Record<string, unknown>
   } catch {
-    return unreadable()
+    return unreadable('error')
   }
 
   return {
     detectedDocumentType: toStr(p.detectedDocumentType),
     looksAuthentic: p.looksAuthentic === true,
     readable: p.readable === true,
+    failureReason: null,
     fullName: toStr(p.fullName),
     dateOfBirth: toStr(p.dateOfBirth),
     address: toStr(p.address),
@@ -149,11 +150,12 @@ export async function extractDocumentFields(
   }
 }
 
-function unreadable(): ExtractedFields {
+function unreadable(reason: 'refusal' | 'error'): ExtractedFields {
   return {
     detectedDocumentType: null,
     looksAuthentic: false,
     readable: false,
+    failureReason: reason,
     fullName: null,
     dateOfBirth: null,
     address: null,

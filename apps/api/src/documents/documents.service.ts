@@ -225,6 +225,13 @@ export class DocumentsService {
       // trusted as "verified" — hold it for review instead.
       let verdict = verdictFor(doc.documentType, fields, match)
       if (verdict === 'verified' && hasBlockingAnomaly(anomalies)) verdict = 'needs_review'
+      // A model refusal or a transport error is not the user's fault — never let
+      // it read as "rejected" (which implies a fake/bad document); hold for review.
+      if (fields.failureReason) verdict = 'needs_review'
+
+      this.logger.log(
+        `Document ${doc.id} (${doc.documentType}): verdict=${verdict} readable=${fields.readable} authentic=${fields.looksAuthentic} detected="${fields.detectedDocumentType ?? ''}" failure=${fields.failureReason ?? 'none'}`
+      )
 
       await db.uploadedDocument.update({
         where: { id: doc.id },

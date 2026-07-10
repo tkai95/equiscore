@@ -60,6 +60,9 @@ export interface ExtractedFields {
   looksAuthentic: boolean
   /** False when the file was too poor to read the key fields. */
   readable: boolean
+  /** Why extraction produced nothing usable, if it did: a model refusal or a
+   *  transport/parse error is NOT the user's fault and must not read as "fake". */
+  failureReason?: 'refusal' | 'error' | null
 }
 
 export interface ProfileFacts {
