@@ -74,7 +74,7 @@ const DESCRIPTION_RULES: Array<[RegExp, TransactionCategory, 'credit' | 'debit' 
   [/\b(student loans company|slc|student loan|tuition fee|university fee|school fee|college fee|coursera|udemy|skillshare|linkedin learning|duolingo|chegg)\b/i, TransactionCategory.education, null],
 
   // ── Savings / investments ───────────────────────────────────────────────────
-  [/\b(isa transfer|savings transfer|monzo pot|starling space|revolut vault|plum save|chip save|vanguard|hargreaves lansdown|freetrade|trading 212|nutmeg|wealthify|moneyfarm)\b/i, TransactionCategory.savings_transfer, null],
+  [/\b(isa transfer|savings transfer|savings account|savings acc\b|to .*savings|\bsaver\b|instant saver|easy access saver|cash isa|lifetime isa|help to buy isa|nest egg|monzo pot|starling space|revolut vault|plum save|chip save|vanguard|hargreaves lansdown|freetrade|trading 212|nutmeg|wealthify|moneyfarm)\b/i, TransactionCategory.savings_transfer, null],
 
   // ── Cash withdrawals ────────────────────────────────────────────────────────
   [/\b(atm withdrawal|cash machine|cashpoint|link atm|barclays atm|lloyds atm|natwest atm|hsbc atm|cashback at)\b/i, TransactionCategory.cash_withdrawal, null],

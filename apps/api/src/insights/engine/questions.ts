@@ -1,5 +1,6 @@
 import type { FollowUpQuestion, IncomeProfile, ExpenseProfile, UnusualTransaction } from './types'
 import type { RecurringStream } from './recurrence'
+import type { InferredAccount } from './external-accounts'
 import { classify } from './classify'
 import { looksLikePerson } from './normalize'
 
@@ -16,10 +17,31 @@ export function generateQuestions(input: {
   expenses: ExpenseProfile
   unusual: UnusualTransaction[]
   debitStreams: RecurringStream[]
+  externalAccounts: InferredAccount[]
   resolvedIds: Set<string>
 }): FollowUpQuestion[] {
-  const { income, expenses, unusual, debitStreams, resolvedIds } = input
+  const { income, expenses, unusual, debitStreams, externalAccounts, resolvedIds } = input
   const out: FollowUpQuestion[] = []
+
+  // 0. Regular outgoing transfers detected by pattern. Ask whenever we're not
+  // certain — an 'unknown' destination, or an own-account guess from initials
+  // alone. We never assume it's the customer's own account without confirming.
+  const externalKeys = new Set(externalAccounts.map((a) => a.key))
+  for (const a of externalAccounts) {
+    const uncertain = a.type === 'unknown' || (a.type === 'own_current' && a.confidence !== 'high')
+    if (!uncertain) continue
+    const id = `transfer:${a.key}`
+    if (resolvedIds.has(id)) continue
+    out.push({
+      id,
+      question: `You send about £${a.monthlyFlow.toLocaleString('en-GB')} to ${a.provider ?? 'the same place'} on a regular schedule — who is this?`,
+      detail:
+        "If it's your own account, we won't count it as spending. If it's rent, it counts toward rental reliability.",
+      options: ['My own account', 'My rent', 'Someone I support', 'A regular bill', 'Someone else'],
+      relatedTxnIds: [],
+      clarifies: 'Spending & account coverage',
+    })
+  }
 
   // 1. Unusual one-off / international transactions.
   for (const u of unusual) {
@@ -51,7 +73,12 @@ export function generateQuestions(input: {
   const familyUnconfirmed = expenses.categories.some((c) => c.key === 'family_support' && c.unconfirmed)
   if (familyUnconfirmed && !resolvedIds.has('expense:family_support')) {
     const personStream = debitStreams.find(
-      (s) => looksLikePerson(s.key) && classify(s.txns[0]!) === 'other' && (s.cadence === 'monthly' || s.cadence === 'four_weekly')
+      (s) =>
+        looksLikePerson(s.key) &&
+        classify(s.txns[0]!) === 'other' &&
+        (s.cadence === 'monthly' || s.cadence === 'four_weekly') &&
+        // Not already covered by the "who do you send this to?" transfer question.
+        !externalKeys.has(s.key)
     )
     if (personStream) {
       out.push({

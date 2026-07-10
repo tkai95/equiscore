@@ -134,8 +134,8 @@ export default async function PublicProfilePage({ params }: { params: { token: s
   return (
     <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="border-b border-[#D8D6C9] bg-cream-surface px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
+      <header className="border-b border-[#D8D6C9] bg-cream-surface px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-brand" />
             <span className="text-lg font-bold text-gray-900">Equiscore</span>
@@ -146,7 +146,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6 sm:py-10">
         {/* Freshness banner — impossible to miss when the score is not current */}
         {!profile.isCurrent && (
           <div className="flex items-start gap-3 rounded-2xl bg-gray-100 px-5 py-4 ring-1 ring-gray-300">
@@ -193,9 +193,9 @@ export default async function PublicProfilePage({ params }: { params: { token: s
 
         {/* Hero */}
         <div
-          className={`rounded-2xl border-2 p-8 ${tierColorClass} ${!profile.isCurrent ? 'opacity-60' : ''}`}
+          className={`rounded-2xl border-2 p-6 sm:p-8 ${tierColorClass} ${!profile.isCurrent ? 'opacity-60' : ''}`}
         >
-          <p className="mb-1 text-sm font-medium text-gray-500">Trust profile for</p>
+          <p className="mb-1 text-sm font-medium text-gray-500">Trust Portfolio for</p>
           <h1 className="mb-4 text-2xl font-bold text-gray-900">
             {profile.applicantName ?? 'Applicant'}
           </h1>
@@ -205,7 +205,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
               <div className="text-3xl font-bold">{profile.trustTier}</div>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Trust Profile</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">EquiScore Trust Portfolio</p>
               <p className="text-lg font-semibold text-gray-900">{TIER_LABELS[profile.trustTier]}</p>
               <p className="mt-0.5 text-sm font-medium tabular-nums text-gray-600">
                 Score {Math.round(profile.overallScore)} / 100
@@ -348,7 +348,7 @@ export default async function PublicProfilePage({ params }: { params: { token: s
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
           <div className="mb-1 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-brand" />
-            <h2 className="font-semibold text-gray-900">Score breakdown</h2>
+            <h2 className="font-semibold text-gray-900">Assessment breakdown</h2>
           </div>
           <p className="mb-6 text-sm text-gray-500">Each dimension is scored 0–100.</p>
           <div className="space-y-4">

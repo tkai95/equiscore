@@ -44,13 +44,35 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   const incomeKeys = incomeEligibleKeys(txns, creditStreams)
   const income = analyzeIncome(txns, creditStreams, resolvedIds, incomeKeys)
   const recurringDebitKeys = new Set(debitStreams.map((s) => s.key))
-  const expenses = analyzeExpenses(txns, resolvedIds, months, ctx.answers, recurringDebitKeys)
+
+  // Counterparties the customer has confirmed are their own account (via the
+  // "who do you send this to?" question) — these transfers are internal, not
+  // spending, so they're netted out of expenses.
+  const ownAccountKeys = new Set<string>(
+    Object.entries(ctx.answers ?? {})
+      .filter(([id, ans]) => id.startsWith('transfer:') && /own account|my own|myself/i.test(ans))
+      .map(([id]) => id.slice('transfer:'.length))
+  )
+  // The day salary lands — used to spot money swept out just after payday.
+  const salaryDayOfMonth =
+    creditStreams
+      .filter((s) => (s.cadence === 'monthly' || s.cadence === 'four_weekly') && s.occurrences >= 3)
+      .sort((a, b) => b.amount - a.amount)[0]?.typicalDayOfMonth ?? null
+
+  const externalAccounts = detectExternalAccounts(txns, debitStreams, {
+    accountHolderName: ctx.accountHolderName,
+    months,
+    salaryDayOfMonth,
+    ownAccountKeys,
+  })
+
+  const expenses = analyzeExpenses(txns, resolvedIds, months, ctx.answers, recurringDebitKeys, ownAccountKeys)
   const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, txns, ctx.answers)
   const integrity = checkBalanceContinuity(txns)
   const risk = detectRisk(txns, recurringKeys, paymentBehaviour.overdraftMonths, resolvedIds, integrity)
 
   const transactionClarity = computeClarity(txns, resolvedIds, recurringKeys)
-  const questions = generateQuestions({ income, expenses, unusual: risk.unusual, debitStreams, resolvedIds })
+  const questions = generateQuestions({ income, expenses, unusual: risk.unusual, debitStreams, externalAccounts, resolvedIds })
   const stability = deriveStability(income, expenses, paymentBehaviour, commitments, months)
   const nameMatch = nameMatchScore(ctx.profileName, ctx.accountHolderName) > 0.7
 
@@ -68,9 +90,8 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     pendingQuestionCount: risk.unusual.filter((u) => u.status === 'pending_context').length,
   })
 
-  const monthly = computeMonthly(txns, incomeKeys)
+  const monthly = computeMonthly(txns, incomeKeys, ownAccountKeys)
   const affordability = analyzeAffordability(income, expenses, commitments, paymentBehaviour)
-  const externalAccounts = detectExternalAccounts(txns, { accountHolderName: ctx.accountHolderName, months })
   const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
 
   return {
@@ -100,7 +121,11 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
  * transfers are not "spend"), and the essential portion of that spend so we can
  * show surplus-after-essentials, best/tightest month, and the latest month.
  */
-function computeMonthly(txns: NormalizedTxn[], incomeKeys: Set<string>): MonthlyPoint[] {
+function computeMonthly(
+  txns: NormalizedTxn[],
+  incomeKeys: Set<string>,
+  ownAccountKeys: Set<string>
+): MonthlyPoint[] {
   const map = new Map<string, { income: number; spend: number; essentialSpend: number }>()
   for (const t of txns) {
     const key = monthKey(toDate(t.date))
@@ -111,7 +136,11 @@ function computeMonthly(txns: NormalizedTxn[], incomeKeys: Set<string>): Monthly
       if (incomeKeys.has(normalizeCounterparty(t))) m.income += t.amount
     } else {
       const base = classify(t)
-      if (base !== 'savings_transfer' && base !== 'investment') {
+      // Transfers to savings/investments and to the customer's own account are
+      // internal movement, not spending.
+      const internal =
+        base === 'savings_transfer' || base === 'investment' || ownAccountKeys.has(normalizeCounterparty(t))
+      if (!internal) {
         m.spend += t.amount
         if (resolveCategory(t, base).essential) m.essentialSpend += t.amount
       }

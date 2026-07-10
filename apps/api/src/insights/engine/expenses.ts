@@ -59,7 +59,10 @@ export function analyzeExpenses(
   answers?: Record<string, string>,
   // Keys of recurring debit streams — the reclassification only applies to
   // regular person-payments, never a one-off transfer that happens to be flagged.
-  recurringDebitKeys?: Set<string>
+  recurringDebitKeys?: Set<string>,
+  // Counterparties confirmed as the customer's own account — internal transfers,
+  // not spending.
+  ownAccountKeys?: Set<string>
 ): ExpenseProfile {
   const debits = txns.filter((t) => t.direction === 'debit')
 
@@ -79,8 +82,9 @@ export function analyzeExpenses(
     if (base === 'other' && personTransferOverride && looksLikePerson(key) && recurringDebitKeys?.has(key)) {
       base = personTransferOverride
     }
-    // Savings/investment outflows are not spending — exclude, like the analytics summary does.
-    if (base === 'savings_transfer' || base === 'investment') continue
+    // Savings/investment outflows and confirmed own-account transfers are not
+    // spending — exclude, like the analytics summary does.
+    if (base === 'savings_transfer' || base === 'investment' || ownAccountKeys?.has(key)) continue
     const def = resolveCategory(t, base)
     const b = buckets.get(def.key) ?? { def, total: 0 }
     b.total += t.amount
