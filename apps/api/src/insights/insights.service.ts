@@ -841,6 +841,7 @@ ${context}`
           direction: true,
           description: true,
           merchantName: true,
+          bankAccountId: true,
         },
       }),
       db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
@@ -855,6 +856,7 @@ ${context}`
       direction: t.direction,
       description: t.description,
       merchantName: t.merchantName,
+      accountId: t.bankAccountId,
       // The Open Banking feed carries no per-transaction running balance;
       // parsed statements do, and will populate this.
       balance: null,

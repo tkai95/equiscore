@@ -20,6 +20,9 @@ export interface NormalizedTxn {
   direction: 'credit' | 'debit'
   description: string | null
   merchantName?: string | null
+  /** Which of the user's accounts this belongs to — lets us net out transfers
+   *  between two of their own connected accounts. Absent for a single source. */
+  accountId?: string | null
   /** Running balance after this transaction, if the source provides it (statements do). */
   balance?: number | null
 }

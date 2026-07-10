@@ -13,6 +13,7 @@ import type {
 import { detectRecurringStreams } from './recurrence'
 import { analyzeIncome, incomeEligibleKeys } from './income'
 import { detectExternalAccounts } from './external-accounts'
+import { detectInternalTransfers } from './internal-transfers'
 import { analyzeExpenses, resolveCategory } from './expenses'
 import { analyzeCommitments } from './commitments'
 import { analyzeAffordability } from './affordability'
@@ -37,12 +38,20 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   const period = computePeriod(txns)
   const months = new Set(txns.map((t) => monthKey(toDate(t.date)))).size
 
-  const creditStreams = detectRecurringStreams(txns, 'credit')
-  const debitStreams = detectRecurringStreams(txns, 'debit')
+  // Net out transfers between the user's own connected accounts before any
+  // behavioural analysis: a £400 standing order that leaves the salary account
+  // and lands in the savings account is one internal movement, not £400 of both
+  // income and spending. Everything income/spend/commitment-related runs on the
+  // netted set; coverage (period) and per-account integrity use the full set.
+  const internalTxns = detectInternalTransfers(txns)
+  const netTxns = internalTxns.size > 0 ? txns.filter((t) => !internalTxns.has(t)) : txns
+
+  const creditStreams = detectRecurringStreams(netTxns, 'credit')
+  const debitStreams = detectRecurringStreams(netTxns, 'debit')
   const recurringKeys = new Set([...creditStreams, ...debitStreams].map((s) => s.key))
 
-  const incomeKeys = incomeEligibleKeys(txns, creditStreams)
-  const income = analyzeIncome(txns, creditStreams, resolvedIds, incomeKeys)
+  const incomeKeys = incomeEligibleKeys(netTxns, creditStreams)
+  const income = analyzeIncome(netTxns, creditStreams, resolvedIds, incomeKeys)
   const recurringDebitKeys = new Set(debitStreams.map((s) => s.key))
 
   // Counterparties the customer has confirmed are their own account (via the
@@ -59,19 +68,19 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
       .filter((s) => (s.cadence === 'monthly' || s.cadence === 'four_weekly') && s.occurrences >= 3)
       .sort((a, b) => b.amount - a.amount)[0]?.typicalDayOfMonth ?? null
 
-  const externalAccounts = detectExternalAccounts(txns, debitStreams, {
+  const externalAccounts = detectExternalAccounts(netTxns, debitStreams, {
     accountHolderName: ctx.accountHolderName,
     months,
     salaryDayOfMonth,
     ownAccountKeys,
   })
 
-  const expenses = analyzeExpenses(txns, resolvedIds, months, ctx.answers, recurringDebitKeys, ownAccountKeys)
-  const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, txns, ctx.answers)
+  const expenses = analyzeExpenses(netTxns, resolvedIds, months, ctx.answers, recurringDebitKeys, ownAccountKeys)
+  const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, netTxns, ctx.answers)
   const integrity = checkBalanceContinuity(txns)
-  const risk = detectRisk(txns, recurringKeys, paymentBehaviour.overdraftMonths, resolvedIds, integrity)
+  const risk = detectRisk(netTxns, recurringKeys, paymentBehaviour.overdraftMonths, resolvedIds, integrity)
 
-  const transactionClarity = computeClarity(txns, resolvedIds, recurringKeys)
+  const transactionClarity = computeClarity(netTxns, resolvedIds, recurringKeys)
   const questions = generateQuestions({ income, expenses, unusual: risk.unusual, debitStreams, externalAccounts, resolvedIds })
   const stability = deriveStability(income, expenses, paymentBehaviour, commitments, months)
   const nameMatch = nameMatchScore(ctx.profileName, ctx.accountHolderName) > 0.7
@@ -90,7 +99,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     pendingQuestionCount: risk.unusual.filter((u) => u.status === 'pending_context').length,
   })
 
-  const monthly = computeMonthly(txns, incomeKeys, ownAccountKeys)
+  const monthly = computeMonthly(netTxns, incomeKeys, ownAccountKeys)
   const affordability = analyzeAffordability(income, expenses, commitments, paymentBehaviour)
   const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
 

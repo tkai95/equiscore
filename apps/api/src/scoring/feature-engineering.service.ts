@@ -98,6 +98,7 @@ export class FeatureEngineeringService {
         direction: t.direction as 'credit' | 'debit',
         description: t.description,
         merchantName: t.merchantName ?? null,
+        accountId: t.bankAccountId,
         balance: null,
       }))
       const answered = await db.insightQuestionAnswer.findMany({
