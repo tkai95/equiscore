@@ -11,7 +11,7 @@ import type {
   SubScore,
 } from './types'
 import { detectRecurringStreams } from './recurrence'
-import { analyzeIncome } from './income'
+import { analyzeIncome, incomeEligibleKeys } from './income'
 import { analyzeExpenses, resolveCategory } from './expenses'
 import { analyzeCommitments } from './commitments'
 import { analyzeAffordability } from './affordability'
@@ -40,7 +40,8 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   const debitStreams = detectRecurringStreams(txns, 'debit')
   const recurringKeys = new Set([...creditStreams, ...debitStreams].map((s) => s.key))
 
-  const income = analyzeIncome(txns, creditStreams, resolvedIds)
+  const incomeKeys = incomeEligibleKeys(txns, creditStreams)
+  const income = analyzeIncome(txns, creditStreams, resolvedIds, incomeKeys)
   const recurringDebitKeys = new Set(debitStreams.map((s) => s.key))
   const expenses = analyzeExpenses(txns, resolvedIds, months, ctx.answers, recurringDebitKeys)
   const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, txns, ctx.answers)
@@ -66,7 +67,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     pendingQuestionCount: risk.unusual.filter((u) => u.status === 'pending_context').length,
   })
 
-  const monthly = computeMonthly(txns)
+  const monthly = computeMonthly(txns, incomeKeys)
   const affordability = analyzeAffordability(income, expenses, commitments, paymentBehaviour)
   const summary = buildSummary({ income, expenses, subScores, source: ctx.source })
 
@@ -96,13 +97,15 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
  * transfers are not "spend"), and the essential portion of that spend so we can
  * show surplus-after-essentials, best/tightest month, and the latest month.
  */
-function computeMonthly(txns: NormalizedTxn[]): MonthlyPoint[] {
+function computeMonthly(txns: NormalizedTxn[], incomeKeys: Set<string>): MonthlyPoint[] {
   const map = new Map<string, { income: number; spend: number; essentialSpend: number }>()
   for (const t of txns) {
     const key = monthKey(toDate(t.date))
     const m = map.get(key) ?? { income: 0, spend: 0, essentialSpend: 0 }
     if (t.direction === 'credit') {
-      m.income += t.amount
+      // Only genuine income counts toward the month's "money in" — one-off
+      // personal transfers are money received, but not income.
+      if (incomeKeys.has(normalizeCounterparty(t))) m.income += t.amount
     } else {
       const base = classify(t)
       if (base !== 'savings_transfer' && base !== 'investment') {

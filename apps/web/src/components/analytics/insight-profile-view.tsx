@@ -27,6 +27,10 @@ interface InsightProfile {
   period: { from: string; to: string; months: number; transactionCount: number }
   income: {
     averageMonthlyIncome: number
+    netAnnualIncome: number
+    personalTransfersMonthly: number
+    salaryMonthlyNet: number | null
+    estimatedGrossAnnualSalary: number | null
     consistency: Consistency
     recurringSalaryDetected: boolean
     primaryCharacter: string
@@ -408,6 +412,32 @@ export function InsightProfileView() {
           Based on take-home income of {formatCurrency(aff.monthlyIncome)}/month
           {aff.incomeIsVariable && ' (income varies month to month)'}
         </p>
+
+        {(income.estimatedGrossAnnualSalary !== null || income.personalTransfersMonthly > 0) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            {income.estimatedGrossAnnualSalary !== null && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-brand/5 px-3 py-1.5 text-gray-700 ring-1 ring-brand/10">
+                Estimated gross salary ≈{' '}
+                <strong className="tabular-nums">
+                  £{income.estimatedGrossAnnualSalary.toLocaleString('en-GB')}
+                </strong>
+                /year
+                <InfoTooltip label="How the gross salary is estimated">
+                  Statements only show take-home pay, after income tax and National Insurance. We
+                  reverse those deductions on the detected salary to suggest the equivalent gross
+                  figure. It is an estimate and can&apos;t see pension contributions, salary
+                  sacrifice or student-loan deductions.
+                </InfoTooltip>
+              </span>
+            )}
+            {income.personalTransfersMonthly > 0 && (
+              <span className="rounded-lg bg-gray-50 px-3 py-1.5 text-gray-600 ring-1 ring-gray-200">
+                {formatCurrency(income.personalTransfersMonthly)}/mo received as personal transfers —
+                not counted as income
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-gray-50 px-4 py-3">

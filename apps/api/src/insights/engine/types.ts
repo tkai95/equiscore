@@ -75,6 +75,21 @@ export type IncomeCharacter =
 
 export interface IncomeProfile {
   averageMonthlyIncome: number
+  /** Genuine income annualised (averageMonthlyIncome × 12), net/take-home. */
+  netAnnualIncome: number
+  /**
+   * Average monthly value of inflows we did NOT count as income — one-off or
+   * sporadic credits from individuals (money from friends/family, repayments,
+   * refunds). Surfaced so the distinction is explicit rather than hidden.
+   */
+  personalTransfersMonthly: number
+  /** Net monthly take-home of the detected salary stream, if any. */
+  salaryMonthlyNet: number | null
+  /**
+   * Estimated gross annual salary implied by the net salary received, grossed
+   * up through PAYE + NI. Null unless a salary stream was detected. Estimate.
+   */
+  estimatedGrossAnnualSalary: number | null
   /** Coefficient of variation across months (0 = flat, higher = volatile). */
   volatility: number
   consistency: Consistency

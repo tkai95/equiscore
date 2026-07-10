@@ -2,7 +2,8 @@ import type { TransactionCategory } from '@prisma/client'
 import type { NormalizedTxn, IncomeProfile, IncomeSource, IncomeCharacter, Consistency } from './types'
 import type { RecurringStream } from './recurrence'
 import { classify } from './classify'
-import { normalizeCounterparty, displayName } from './normalize'
+import { normalizeCounterparty, displayName, looksLikePerson } from './normalize'
+import { grossUpFromNet } from './tax'
 import { toDate, monthKey, mean, coefficientOfVariation, round2 } from './util'
 
 const INTERNATIONAL = /\b(wise|transferwise|remitly|western union|moneygram|worldremit|xoom|revolut international)\b/i
@@ -10,6 +11,8 @@ const CASH_DEPOSIT = /\b(cash deposit|deposit at|paying in|counter credit|cash i
 /** A returned/reversed debit lands as a credit — it is not income. */
 const RETURN_PATTERN =
   /\b(returned|unpaid|bounced|recalled|reversal|reversed|refer to payer|represented|dd rejected)\b/i
+/** Student maintenance loans/grants land as credits and are genuine income. */
+const STUDENT_FINANCE = /\b(student loans? company|slc|student finance|maintenance loan|sfe england|saas)\b/i
 
 /** Categories that represent genuine money coming in (not internal shuffling). */
 const INCOME_CATEGORIES = new Set<TransactionCategory>([
@@ -18,19 +21,67 @@ const INCOME_CATEGORIES = new Set<TransactionCategory>([
   'government_benefit',
 ])
 
+/**
+ * Distinct months a source must appear in before an otherwise-unrecognised
+ * inflow is treated as regular income rather than a one-off personal transfer.
+ * Below this it's most likely money from a friend/family, a repayment, or a
+ * refund — real cash, but not income you could budget rent against.
+ */
+const REGULAR_INCOME_MONTHS = 3
+
+function isIncomeCredit(t: NormalizedTxn): boolean {
+  return t.direction === 'credit' && !RETURN_PATTERN.test(t.description ?? '')
+}
+
+/**
+ * Decide, per counterparty, whether their inflows count as income. The rule is
+ * deliberately conservative: only recognised income categories, student
+ * finance, a detected salary, or a source that recurs across several months
+ * count. A single large credit from "J Carter" is a transfer, not a salary.
+ *
+ * Returns the set of income-eligible counterparty keys, so the *same* decision
+ * drives both the income figures here and the monthly cashflow series in
+ * build-profile — they can never disagree.
+ */
+export function incomeEligibleKeys(txns: NormalizedTxn[], creditStreams: RecurringStream[]): Set<string> {
+  const salaryStream = detectSalaryStream(creditStreams)
+  const byParty = new Map<string, { cat: TransactionCategory; months: Set<string>; studentFinance: boolean }>()
+  for (const t of txns) {
+    if (!isIncomeCredit(t)) continue
+    const key = normalizeCounterparty(t)
+    const cat = salaryStream && key === salaryStream.key ? 'salary' : classify(t)
+    const e = byParty.get(key) ?? { cat, months: new Set<string>(), studentFinance: false }
+    e.months.add(monthKey(toDate(t.date)))
+    if (INCOME_CATEGORIES.has(cat)) e.cat = cat
+    if (STUDENT_FINANCE.test(t.description ?? '')) e.studentFinance = true
+    byParty.set(key, e)
+  }
+
+  const keys = new Set<string>()
+  for (const [key, e] of byParty) {
+    if (e.cat === 'savings_transfer' || e.cat === 'investment') continue
+    const isSalary = salaryStream?.key === key
+    const recognisedIncome = INCOME_CATEGORIES.has(e.cat)
+    const regular = e.months.size >= REGULAR_INCOME_MONTHS
+    if (isSalary || recognisedIncome || e.studentFinance || regular) keys.add(key)
+  }
+  return keys
+}
+
 export function analyzeIncome(
   txns: NormalizedTxn[],
   creditStreams: RecurringStream[],
-  resolvedIds: Set<string>
+  resolvedIds: Set<string>,
+  incomeKeys: Set<string>
 ): IncomeProfile {
-  // Reversals of failed debits arrive as credits — exclude them from income.
-  const credits = txns.filter(
-    (t) => t.direction === 'credit' && !RETURN_PATTERN.test(t.description ?? '')
-  )
+  // All non-reversal credits, split into genuine income vs personal transfers.
+  const credits = txns.filter(isIncomeCredit)
+  const incomeCredits = credits.filter((t) => incomeKeys.has(normalizeCounterparty(t)))
+  const transferCredits = credits.filter((t) => !incomeKeys.has(normalizeCounterparty(t)))
 
-  // Monthly income totals — exclude savings/own-transfers so we measure real income.
+  // Monthly income totals — genuine income only.
   const monthly = new Map<string, number>()
-  for (const t of credits) {
+  for (const t of incomeCredits) {
     const cat = classify(t)
     if (cat === 'savings_transfer' || cat === 'investment') continue
     const k = monthKey(toDate(t.date))
@@ -41,19 +92,41 @@ export function analyzeIncome(
   const volatility = round2(coefficientOfVariation(monthlyValues))
   const consistency = rateIncomeConsistency(volatility, monthlyValues.length)
 
+  // How much comes in as personal transfers (not counted as income), per month.
+  const periodMonths = new Set(credits.map((t) => monthKey(toDate(t.date)))).size || 1
+  const transfersTotal = transferCredits.reduce((s, t) => s + t.amount, 0)
+  const personalTransfersMonthly = round2(transfersTotal / periodMonths)
+
   // Salary detection is *behavioural*, not keyword-based: a monthly credit
   // stream with a stable amount from a single source is a salary even when the
   // description is just "BACS CREDIT BRIGHT CARE LTD". Keywords only break ties.
   const salaryStream = detectSalaryStream(creditStreams)
   const recurringSalaryDetected = Boolean(salaryStream)
 
+  // Estimate a gross annual salary by grossing up the net salary received. Only
+  // meaningful above the personal allowance (£12,570) — below it there is no tax
+  // or NI to reverse, so gross would equal net. That floor also guards against a
+  // behaviourally-detected "salary" that is really regular support or a pension:
+  // if grossing-up wouldn't change the figure, we don't present one.
+  const PERSONAL_ALLOWANCE = 12570
+  let salaryMonthlyNet: number | null = null
+  let estimatedGrossAnnualSalary: number | null = null
+  if (salaryStream) {
+    const paymentsPerYear = salaryStream.cadence === 'four_weekly' ? 13 : 12
+    const netAnnualSalary = salaryStream.amount * paymentsPerYear
+    if (netAnnualSalary > PERSONAL_ALLOWANCE) {
+      salaryMonthlyNet = round2((salaryStream.amount * paymentsPerYear) / 12)
+      estimatedGrossAnnualSalary = grossUpFromNet(netAnnualSalary)
+    }
+  }
+
   /** The stream we identified as salary wins over whatever the keyword rules said. */
   const effectiveCategory = (t: NormalizedTxn): TransactionCategory =>
     salaryStream && normalizeCounterparty(t) === salaryStream.key ? 'salary' : classify(t)
 
-  // Build the source list by counterparty.
+  // Build the source list from income-eligible counterparties only.
   const byParty = new Map<string, { name: string; cat: TransactionCategory; total: number; months: Set<string> }>()
-  for (const t of credits) {
+  for (const t of incomeCredits) {
     const cat = effectiveCategory(t)
     if (cat === 'savings_transfer' || cat === 'investment') continue
     const key = normalizeCounterparty(t)
@@ -80,10 +153,14 @@ export function analyzeIncome(
     .filter((s) => s.total > 0)
     .sort((a, b) => b.total - a.total)
 
-  const { primaryCharacter, characterTags } = deriveCharacter(sources, credits, recurringSalaryDetected)
+  const { primaryCharacter, characterTags } = deriveCharacter(sources, incomeCredits, recurringSalaryDetected)
 
   return {
     averageMonthlyIncome,
+    netAnnualIncome: round2(averageMonthlyIncome * 12),
+    personalTransfersMonthly,
+    salaryMonthlyNet,
+    estimatedGrossAnnualSalary,
     volatility,
     consistency,
     recurringSalaryDetected,
