@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const exposedEnv = {}
 
-if (process.env.NEXT_PUBLIC_API_URL || process.env.API_URL) {
-  exposedEnv.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL
+if (process.env.NEXT_PUBLIC_API_URL) {
+  exposedEnv.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL
 }
 
 if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.CLERK_PUBLISHABLE_KEY) {
