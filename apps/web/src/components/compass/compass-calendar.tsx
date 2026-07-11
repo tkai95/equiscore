@@ -41,7 +41,7 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ]
 
-  if (cal.events.length === 0) {
+  if (cal.events.length === 0 && cal.unscheduled.length === 0) {
     return (
       <EmptyState
         icon={<CalendarDays className="h-8 w-8" />}
@@ -72,9 +72,10 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
             hint="After fixed commitments"
           />
         </div>
-        {cal.unscheduledNote && <p className="mt-3 text-xs text-gray-400">Plus {cal.unscheduledNote}.</p>}
       </Card>
 
+      {cal.events.length > 0 && (
+        <>
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -191,6 +192,46 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
           ))}
         </div>
       </Card>
+        </>
+      )}
+
+      {cal.unscheduled.length > 0 && <UnscheduledCard cal={cal} />}
     </div>
+  )
+}
+
+function UnscheduledCard({ cal }: { cal: CompassPayload['calendar'] }) {
+  const parts: string[] = []
+  if (cal.unscheduledIn > 0) parts.push(`about ${money(cal.unscheduledIn)}/mo in`)
+  if (cal.unscheduledOut > 0) parts.push(`about ${money(cal.unscheduledOut)}/mo out`)
+  return (
+    <Card>
+      <CardTitle
+        title="Recurring, no fixed date"
+        subtitle="Predictable amounts that don't land on a set day each month, such as weekly or four-weekly payments."
+      />
+      <div className="divide-y divide-gray-50">
+        {cal.unscheduled.map((e) => (
+          <div key={e.id} className="flex items-center gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <span className="truncate text-sm font-medium text-gray-800">{e.label}</span>
+              <span className="block text-xs capitalize text-gray-400">{e.cadence.replace('_', ' ')}</span>
+            </div>
+            <span
+              className={cn(
+                'flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums',
+                e.direction === 'in' ? 'text-emerald-600' : 'text-rose-600',
+              )}
+            >
+              {e.direction === 'in' ? '+' : '−'}
+              {money(e.amount)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {parts.length > 0 && (
+        <p className="mt-3 text-xs text-gray-400">Roughly {parts.join(' and ')} from these.</p>
+      )}
+    </Card>
   )
 }

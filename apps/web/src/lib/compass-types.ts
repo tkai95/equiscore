@@ -106,7 +106,9 @@ export interface CompassCalendar {
   guaranteedIn: number
   guaranteedOut: number
   net: number
-  unscheduledNote: string | null
+  unscheduled: CompassCalendarEvent[]
+  unscheduledIn: number
+  unscheduledOut: number
 }
 
 export interface CompassMonthlyReview {

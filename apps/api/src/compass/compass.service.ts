@@ -180,56 +180,63 @@ export class CompassService {
   private buildCalendar(profile: InsightProfile): CompassPayload['calendar'] {
     const steady = (c: string) => c === 'very_consistent' || c === 'consistent'
     const confidence = (c: string): 'high' | 'medium' => (c === 'very_consistent' ? 'high' : 'medium')
+    // Payments-per-month by cadence, for the monthly-equivalent of undated items.
+    const monthlyFactor = (cadence: string): number =>
+      ({ weekly: 52 / 12, fortnightly: 26 / 12, four_weekly: 13 / 12, monthly: 1, quarterly: 1 / 3 })[cadence] ?? 1
+
     const events: CompassPayload['calendar']['events'] = []
+    const unscheduled: CompassPayload['calendar']['events'] = []
 
     for (const s of profile.income.sources) {
       const recurring = s.monthsPresent >= 3 || s.category === 'salary'
-      if (!recurring || s.typicalDayOfMonth == null || !steady(s.consistency)) continue
-      events.push({
+      if (!recurring || !steady(s.consistency)) continue
+      const ev = {
         id: `in:${s.key}`,
-        day: s.typicalDayOfMonth,
+        day: s.typicalDayOfMonth ?? 0,
         label: s.name,
         amount: r0(s.typicalAmount),
-        direction: 'in',
+        direction: 'in' as const,
         category: s.category,
         cadence: s.cadence,
         essential: true,
         confidence: confidence(s.consistency),
-      })
+      }
+      ;(s.typicalDayOfMonth != null ? events : unscheduled).push(ev)
     }
 
     for (const c of profile.commitments) {
-      if (c.typicalDayOfMonth == null || !steady(c.consistency)) continue
-      events.push({
+      if (!steady(c.consistency)) continue
+      const ev = {
         id: `out:${c.key}`,
-        day: c.typicalDayOfMonth,
+        day: c.typicalDayOfMonth ?? 0,
         label: c.name,
         amount: r0(c.amount),
-        direction: 'out',
+        direction: 'out' as const,
         category: c.category,
         cadence: c.cadence,
         essential: ESSENTIAL_COMMITMENT_CATEGORIES.has(c.category),
         confidence: confidence(c.consistency),
-      })
+      }
+      ;(c.typicalDayOfMonth != null ? events : unscheduled).push(ev)
     }
 
     events.sort((a, b) => a.day - b.day || (a.direction === b.direction ? 0 : a.direction === 'in' ? -1 : 1))
+    unscheduled.sort((a, b) => b.amount - a.amount)
 
-    const guaranteedIn = r0(events.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0))
-    const guaranteedOut = r0(events.filter((e) => e.direction === 'out').reduce((s, e) => s + e.amount, 0))
+    const sum = (list: typeof events, dir: 'in' | 'out', byFactor = false) =>
+      r0(list.filter((e) => e.direction === dir).reduce((s, e) => s + e.amount * (byFactor ? monthlyFactor(e.cadence) : 1), 0))
 
-    // Recurring commitments we're confident about but couldn't pin to a day.
-    const undated = profile.commitments.filter((c) => c.typicalDayOfMonth == null && steady(c.consistency)).length
+    const guaranteedIn = sum(events, 'in')
+    const guaranteedOut = sum(events, 'out')
 
     return {
       events,
       guaranteedIn,
       guaranteedOut,
       net: guaranteedIn - guaranteedOut,
-      unscheduledNote:
-        undated > 0
-          ? `${undated} more regular payment${undated === 1 ? '' : 's'} without a fixed monthly date`
-          : null,
+      unscheduled,
+      unscheduledIn: sum(unscheduled, 'in', true),
+      unscheduledOut: sum(unscheduled, 'out', true),
     }
   }
 

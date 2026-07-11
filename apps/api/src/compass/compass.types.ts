@@ -119,14 +119,17 @@ export interface CompassCalendarEvent {
 }
 
 export interface CompassCalendar {
-  /** Predictable, recurring events only — the "guaranteed" cashflow. */
+  /** Predictable, recurring events placed on a fixed day of the month. */
   events: CompassCalendarEvent[]
   guaranteedIn: number
   guaranteedOut: number
   /** guaranteedIn − guaranteedOut: the predictable monthly surplus. */
   net: number
-  /** Recurring items we couldn't pin to a fixed day, if any. */
-  unscheduledNote: string | null
+  /** Recurring, steady items we couldn't pin to a fixed day (e.g. weekly). */
+  unscheduled: CompassCalendarEvent[]
+  /** Monthly-equivalent totals for the unscheduled items. */
+  unscheduledIn: number
+  unscheduledOut: number
 }
 
 export interface CompassMonthlyReview {
