@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   ShoppingBag,
   CalendarClock,
+  CalendarDays,
   ShieldCheck,
   Sparkles,
   Gauge,
@@ -33,11 +34,22 @@ import {
   SavingsSection,
   SpendingSection,
 } from './compass-sections'
+import { CalendarSection } from './compass-calendar'
 
-type TabId = 'overview' | 'money-map' | 'income' | 'spending' | 'bills' | 'resilience' | 'savings' | 'impact'
+type TabId =
+  | 'overview'
+  | 'calendar'
+  | 'money-map'
+  | 'income'
+  | 'spending'
+  | 'bills'
+  | 'resilience'
+  | 'savings'
+  | 'impact'
 
 const TABS: { id: TabId; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid },
+  { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'money-map', label: 'Money Map', icon: Waypoints },
   { id: 'income', label: 'Income', icon: CircleDollarSign },
   { id: 'spending', label: 'Spending', icon: ShoppingBag },
@@ -114,6 +126,7 @@ export function CompassView() {
       ) : (
         <div>
           {tab === 'overview' && <OverviewSection data={data} onDrill={setDrawer} actions={actions} />}
+          {tab === 'calendar' && <CalendarSection data={data} />}
           {tab === 'money-map' && <MoneyMapSection data={data} />}
           {tab === 'income' && <IncomeSection data={data} onDrill={setDrawer} />}
           {tab === 'spending' && <SpendingSection data={data} onDrill={setDrawer} />}

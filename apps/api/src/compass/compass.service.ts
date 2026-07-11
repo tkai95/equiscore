@@ -165,6 +165,71 @@ export class CompassService {
       opportunities,
       reminders: activeReminders.map((r) => this.toReminder(r, now)),
       goal: this.buildGoal(goalRow, profile, liquid, monthlySavings),
+      calendar: this.buildCalendar(profile),
+    }
+  }
+
+  // ─── Guaranteed cashflow calendar ───────────────────────────────────────────
+
+  /**
+   * The predictable, recurring money in and out — the "guaranteed" cashflow —
+   * placed on the day of the month it lands. Only steady recurring income
+   * streams and consistent commitments with a known payment day are included;
+   * variable spend and one-off credits are deliberately excluded.
+   */
+  private buildCalendar(profile: InsightProfile): CompassPayload['calendar'] {
+    const steady = (c: string) => c === 'very_consistent' || c === 'consistent'
+    const confidence = (c: string): 'high' | 'medium' => (c === 'very_consistent' ? 'high' : 'medium')
+    const events: CompassPayload['calendar']['events'] = []
+
+    for (const s of profile.income.sources) {
+      const recurring = s.monthsPresent >= 3 || s.category === 'salary'
+      if (!recurring || s.typicalDayOfMonth == null || !steady(s.consistency)) continue
+      events.push({
+        id: `in:${s.key}`,
+        day: s.typicalDayOfMonth,
+        label: s.name,
+        amount: r0(s.typicalAmount),
+        direction: 'in',
+        category: s.category,
+        cadence: s.cadence,
+        essential: true,
+        confidence: confidence(s.consistency),
+      })
+    }
+
+    for (const c of profile.commitments) {
+      if (c.typicalDayOfMonth == null || !steady(c.consistency)) continue
+      events.push({
+        id: `out:${c.key}`,
+        day: c.typicalDayOfMonth,
+        label: c.name,
+        amount: r0(c.amount),
+        direction: 'out',
+        category: c.category,
+        cadence: c.cadence,
+        essential: ESSENTIAL_COMMITMENT_CATEGORIES.has(c.category),
+        confidence: confidence(c.consistency),
+      })
+    }
+
+    events.sort((a, b) => a.day - b.day || (a.direction === b.direction ? 0 : a.direction === 'in' ? -1 : 1))
+
+    const guaranteedIn = r0(events.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0))
+    const guaranteedOut = r0(events.filter((e) => e.direction === 'out').reduce((s, e) => s + e.amount, 0))
+
+    // Recurring commitments we're confident about but couldn't pin to a day.
+    const undated = profile.commitments.filter((c) => c.typicalDayOfMonth == null && steady(c.consistency)).length
+
+    return {
+      events,
+      guaranteedIn,
+      guaranteedOut,
+      net: guaranteedIn - guaranteedOut,
+      unscheduledNote:
+        undated > 0
+          ? `${undated} more regular payment${undated === 1 ? '' : 's'} without a fixed monthly date`
+          : null,
     }
   }
 

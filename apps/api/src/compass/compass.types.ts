@@ -105,6 +105,30 @@ export interface CompassOpportunity {
   linkedKey: string | null
 }
 
+export interface CompassCalendarEvent {
+  id: string
+  /** Day of the month the amount typically lands (1–31). */
+  day: number
+  label: string
+  amount: number
+  direction: 'in' | 'out'
+  category: string
+  cadence: string
+  essential: boolean
+  confidence: 'high' | 'medium'
+}
+
+export interface CompassCalendar {
+  /** Predictable, recurring events only — the "guaranteed" cashflow. */
+  events: CompassCalendarEvent[]
+  guaranteedIn: number
+  guaranteedOut: number
+  /** guaranteedIn − guaranteedOut: the predictable monthly surplus. */
+  net: number
+  /** Recurring items we couldn't pin to a fixed day, if any. */
+  unscheduledNote: string | null
+}
+
 export interface CompassMonthlyReview {
   month: string
   label: string
@@ -274,4 +298,5 @@ export interface CompassPayload {
   opportunities: CompassOpportunity[]
   reminders: CompassReminder[]
   goal: CompassGoal | null
+  calendar: CompassCalendar
 }

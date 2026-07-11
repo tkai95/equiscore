@@ -89,6 +89,26 @@ export interface CompassOpportunity {
   linkedKey: string | null
 }
 
+export interface CompassCalendarEvent {
+  id: string
+  day: number
+  label: string
+  amount: number
+  direction: 'in' | 'out'
+  category: string
+  cadence: string
+  essential: boolean
+  confidence: 'high' | 'medium'
+}
+
+export interface CompassCalendar {
+  events: CompassCalendarEvent[]
+  guaranteedIn: number
+  guaranteedOut: number
+  net: number
+  unscheduledNote: string | null
+}
+
 export interface CompassMonthlyReview {
   month: string
   label: string
@@ -256,4 +276,5 @@ export interface CompassPayload {
   opportunities: CompassOpportunity[]
   reminders: CompassReminder[]
   goal: CompassGoal | null
+  calendar: CompassCalendar
 }

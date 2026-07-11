@@ -67,6 +67,14 @@ export interface IncomeSource {
   monthsPresent: number
   /** Awaiting user confirmation before it counts as regular income. */
   pendingConfirmation: boolean
+  /** Median day-of-month this income lands (1–31); null unless monthly & steady. */
+  typicalDayOfMonth: number | null
+  /** Typical amount per payment (median) — for the cashflow calendar. */
+  typicalAmount: number
+  /** Cadence of the underlying recurring stream, if any. */
+  cadence: Cadence
+  /** How predictable this income stream is. */
+  consistency: Consistency
 }
 
 export type IncomeCharacter =

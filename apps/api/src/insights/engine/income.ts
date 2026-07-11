@@ -138,18 +138,28 @@ export function analyzeIncome(
     byParty.set(key, e)
   }
 
+  // Reuse the recurring-stream detection for per-source timing (day + cadence).
+  const streamByKey = new Map(creditStreams.map((s) => [s.key, s]))
+
   const monthsSpan = Math.max(1, monthlyValues.length)
   const sources: IncomeSource[] = [...byParty.entries()]
-    .map(([key, e]) => ({
-      name: e.name,
-      key,
-      category: e.cat,
-      total: round2(e.total),
-      monthlyAverage: round2(e.total / monthsSpan),
-      monthsPresent: e.months.size,
-      // Gig income only counts as regular once the user confirms it.
-      pendingConfirmation: e.cat === 'gig_income' && !resolvedIds.has(`income:${e.name}`),
-    }))
+    .map(([key, e]) => {
+      const stream = streamByKey.get(key)
+      return {
+        name: e.name,
+        key,
+        category: e.cat,
+        total: round2(e.total),
+        monthlyAverage: round2(e.total / monthsSpan),
+        monthsPresent: e.months.size,
+        // Gig income only counts as regular once the user confirms it.
+        pendingConfirmation: e.cat === 'gig_income' && !resolvedIds.has(`income:${e.name}`),
+        typicalDayOfMonth: stream?.typicalDayOfMonth ?? null,
+        typicalAmount: round2(stream?.amount ?? e.total / Math.max(1, e.months.size)),
+        cadence: stream?.cadence ?? 'irregular',
+        consistency: stream?.consistency ?? 'variable',
+      }
+    })
     .filter((s) => s.total > 0)
     .sort((a, b) => b.total - a.total)
 
