@@ -8,7 +8,7 @@ const IS_PUBLIC_MARKETING = process.env.NEXT_PUBLIC_SITE_MODE === 'public'
 // is deliberately absent here. The owner's share-management UI lives under
 // `/dashboard/share`, which stays protected via the `/dashboard` prefix.
 const AUTH_ROUTES = ['/dashboard', '/workspace', '/onboarding', '/trust-score', '/sign-in', '/sign-up']
-const PUBLIC_MARKETING_BLOCKED = ['/dashboard', '/onboarding', '/trust-score']
+const PUBLIC_MARKETING_BLOCKED = ['/dashboard', '/workspace', '/onboarding', '/trust-score']
 
 function matchesPrefix(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'))
