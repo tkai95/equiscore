@@ -35,9 +35,51 @@ export default {
           DEFAULT: '#123C35',
           dark: '#0B2F29',
           mid: '#3D6658',
-          // Tints for subtle backgrounds / active nav states (canonical brand green)
-          100: '#E4EFEB',
-          50: '#F1F7F4',
+          // Consolidated ramp (Phase 1). 100/50 remapped to the new tints.
+          900: 'var(--brand-900)',
+          800: 'var(--brand-800)',
+          600: 'var(--brand-600)',
+          100: 'var(--brand-100)',
+          50: 'var(--brand-50)',
+        },
+        // ─── Consolidated system (Phase 1) — surfaces, borders, text, states ──
+        surface: {
+          page: 'var(--surface-page)',
+          card: 'var(--surface-card)',
+          raised: 'var(--surface-raised)',
+          inset: 'var(--surface-inset)',
+          hover: 'var(--surface-hover)',
+          sidebar: '#FBFAF6',
+          subtle: '#F4F5F2',
+        },
+        // Low-contrast borders (class: border-line / border-line-subtle / border-line-strong)
+        line: {
+          DEFAULT: 'var(--border-default)',
+          subtle: 'var(--border-subtle)',
+          strong: 'var(--border-strong)',
+        },
+        // Three-level neutral text (class: text-content / text-content-secondary / text-content-muted)
+        content: {
+          DEFAULT: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+        },
+        warning: {
+          soft: 'var(--warning-bg)',
+          strong: 'var(--warning-text)',
+        },
+        info: {
+          soft: 'var(--info-bg)',
+          strong: 'var(--info-text)',
+        },
+        chart: {
+          1: 'var(--chart-1)',
+          2: 'var(--chart-2)',
+          3: 'var(--chart-3)',
+          4: 'var(--chart-4)',
+          5: 'var(--chart-5)',
+          6: 'var(--chart-6)',
+          7: 'var(--chart-7)',
         },
         // Semantic status tokens — one source of truth for meaning → colour.
         // success = verified/complete, warn = needs attention/incomplete,
@@ -47,6 +89,8 @@ export default {
           fg: '#0C4A37',
           bg: '#E8F6F0',
           border: '#BFE6D6',
+          soft: 'var(--success-bg)',
+          strong: 'var(--success-text)',
         },
         warn: {
           DEFAULT: '#A86812',
@@ -59,6 +103,8 @@ export default {
           fg: '#822E39',
           bg: '#FBEBED',
           border: '#EFC9CE',
+          soft: 'var(--danger-bg)',
+          strong: 'var(--danger-text)',
         },
         sage: {
           DEFAULT: '#8FA491',
@@ -67,13 +113,6 @@ export default {
         cream: {
           DEFAULT: '#F7F3EA',
           surface: '#FFFDF7',
-        },
-        // Surface levels for card hierarchy (page → card → inset).
-        surface: {
-          page: '#F7F6F2',
-          card: '#FFFDF7',
-          sidebar: '#FBFAF6',
-          subtle: '#F4F5F2',
         },
         sand: {
           DEFAULT: '#C7A66A',
@@ -107,8 +146,14 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      boxShadow: {
+        // The single sanctioned card elevation. Tables/insets stay flat.
+        card: 'var(--shadow-card)',
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Display face — reserved for the score, tier and major conclusions only.
+        display: ['var(--font-display)', 'ui-serif', 'Georgia', 'serif'],
       },
     },
   },

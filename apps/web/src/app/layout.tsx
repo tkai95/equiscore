@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Fraunces } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Providers } from '@/providers'
 import { CookieBanner } from '@/components/landing/cookie-banner'
@@ -8,6 +8,15 @@ import { isPublicSite } from '@/lib/site'
 import '@/styles/globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+// Display face — reserved for the Trust Score number, tier and major
+// assessment conclusions. Refined high-contrast serif that relates to the
+// wordmark; swap by changing this one import + --font-display.
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
+  weight: ['400', '500', '600'],
+})
 
 export const metadata: Metadata = {
   title: { default: 'Equiscore', template: '%s | Equiscore' },
@@ -37,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const inner = (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.variable}>
+      <body className={`${inter.variable} ${fraunces.variable}`}>
         <Providers>{children}</Providers>
         <CookieBanner />
         {gaId && <Analytics gaId={gaId} />}
