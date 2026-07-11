@@ -6,7 +6,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Building2, Plus } from 'lucide-react'
 import { workspaceApi, type WorkspaceOrganisation } from '@/lib/workspace-api'
-import { Button, Card, PageHeader, PageLayout, StatusPill } from '@/components/ui'
+import { Button, Card, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
 
 export function WorkspaceHome() {
   const { getToken } = useAuth()
@@ -41,46 +41,53 @@ export function WorkspaceHome() {
         description="Use partners.equiscore.app for company assessment workflows. Organisations are isolated workspaces with their own cases, policies, usage and audit trail."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card>
-          <div className="mb-4 flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-brand" />
-            <h2 className="text-lg font-semibold text-content">Your organisations</h2>
-          </div>
-
-          {isLoading ? (
-            <div className="h-28 animate-pulse rounded-xl bg-surface-hover" />
-          ) : organisations.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line p-8 text-center">
-              <p className="font-medium text-content">No company organisation yet</p>
-              <p className="mt-1 text-sm text-content-secondary">
-                Create one to start building the Company Assessment Workspace foundation.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-line-subtle">
-              {organisations.map((organisation: WorkspaceOrganisation) => (
-                <Link
-                  key={organisation.id}
-                  href={`/workspace/o/${organisation.slug}`}
-                  className="flex items-center justify-between gap-4 py-4 hover:bg-surface-hover sm:px-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-content">{organisation.name}</p>
-                      <StatusPill status="success" label={organisation.member.role.replace('_', ' ')} />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <Card padding="lg">
+          <Section
+            title={
+              <span className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-brand" />
+                Your organisations
+              </span>
+            }
+          >
+            {isLoading ? (
+              <div className="h-28 animate-pulse rounded-xl bg-surface-hover" />
+            ) : organisations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line bg-surface-card p-8 text-center">
+                <p className="font-medium text-content">No company organisation yet</p>
+                <p className="mx-auto mt-1 max-w-xl text-sm text-content-secondary">
+                  Create one to start building the Company Assessment Workspace foundation.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-line-subtle">
+                {organisations.map((organisation: WorkspaceOrganisation) => (
+                  <Link
+                    key={organisation.id}
+                    href={`/workspace/o/${organisation.slug}`}
+                    className="flex items-center justify-between gap-4 rounded-lg py-4 transition-colors hover:bg-surface-hover sm:px-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-content">{organisation.name}</p>
+                        <StatusPill status="success" label={organisation.member.role.replace('_', ' ')} />
+                      </div>
+                      <p className="mt-1 text-sm text-content-muted">/{organisation.slug}</p>
                     </div>
-                    <p className="mt-1 text-sm text-content-muted">/{organisation.slug}</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-content-muted" />
-                </Link>
-              ))}
-            </div>
-          )}
+                    <ArrowRight className="h-4 w-4 shrink-0 text-content-muted" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Section>
         </Card>
 
-        <Card>
-          <h2 className="text-lg font-semibold text-content">Create organisation</h2>
+        <Card padding="lg" className="self-start">
+          <div className="mb-4 flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-brand" />
+            <h2 className="text-lg font-semibold text-content">Create organisation</h2>
+          </div>
           <p className="mt-1 text-sm text-content-secondary">
             This creates the tenant boundary for assessment cases, policies and usage events.
           </p>
