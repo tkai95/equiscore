@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Logger, Param, Post, Query, Redirect, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Logger, Param, Post, Query, Redirect, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -17,6 +17,11 @@ export class BankingController {
     private readonly config: ConfigService
   ) {}
 
+  /** WEB_URL may be a comma-separated CORS list; the redirect uses the first. */
+  private webBase(): string {
+    return (this.config.get<string>('WEB_URL') ?? 'http://localhost:3000').split(',')[0]!.trim()
+  }
+
   @Post('link-token')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
@@ -31,12 +36,49 @@ export class BankingController {
   @Redirect()
   @ApiOperation({ summary: 'TrueLayer OAuth callback — handles code exchange and data sync' })
   async callback(@Query('code') code: string, @Query('state') state: string) {
-    const webUrl = this.config.get<string>('WEB_URL') ?? 'http://localhost:3000'
+    const webUrl = this.webBase()
     try {
       await this.bankingService.handleCallback(code, state)
       return { url: `${webUrl}/dashboard/connections?bank_connected=true` }
     } catch (error) {
       this.logger.error('Banking callback failed', error)
+      return { url: `${webUrl}/dashboard/connections?bank_error=true` }
+    }
+  }
+
+  // ─── Enable Banking (parallel provider) ─────────────────────────────────────
+
+  @Get('enable-banking/aspsps')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List banks available via Enable Banking' })
+  async ebAspsps(@Query('country') country?: string) {
+    return this.bankingService.listAspsps(country || 'GB')
+  }
+
+  @Post('enable-banking/link-token')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generate an Enable Banking auth URL for a chosen bank' })
+  async ebLinkUrl(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { aspsp: string; country?: string },
+  ) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    const url = await this.bankingService.buildEnableBankingLinkUrl(dbUser.id, body.aspsp, body.country || 'GB')
+    return { url }
+  }
+
+  @Get('enable-banking/callback')
+  @Redirect()
+  @ApiOperation({ summary: 'Enable Banking callback — creates the session and syncs data' })
+  async ebCallback(@Query('code') code: string, @Query('state') state: string) {
+    const webUrl = this.webBase()
+    try {
+      await this.bankingService.handleEnableBankingCallback(code, state)
+      return { url: `${webUrl}/dashboard/connections?bank_connected=true` }
+    } catch (error) {
+      this.logger.error('Enable Banking callback failed', error)
       return { url: `${webUrl}/dashboard/connections?bank_error=true` }
     }
   }

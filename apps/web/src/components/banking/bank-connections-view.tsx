@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { EnableBankingConnect } from './enable-banking-connect'
 
 interface BankAccount {
   id: string
@@ -528,6 +529,9 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
         <p className="mt-2 text-xs text-gray-400">
           Powered by TrueLayer · Secure Open Banking · Read-only access
         </p>
+        <div className="mt-3">
+          <EnableBankingConnect />
+        </div>
       </div>
 
       {/* Upload a statement — the no-open-banking path */}

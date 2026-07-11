@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import { TrueLayerService } from './truelayer.service'
+import { EnableBankingService, type EbAccount } from './enable-banking.service'
 import { ConfigService } from '@nestjs/config'
 import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
@@ -13,6 +14,7 @@ export class BankingService {
 
   constructor(
     private readonly trueLayer: TrueLayerService,
+    private readonly enableBanking: EnableBankingService,
     private readonly config: ConfigService,
     private readonly scoringService: ScoringService,
     private readonly audit: AuditService
@@ -103,6 +105,11 @@ export class BankingService {
       where: { id: connectionId },
     })
     if (!connection) return
+
+    if (connection.providerName === 'enablebanking') {
+      await this.syncEbConnection(connectionId)
+      return
+    }
 
     const token = accessToken ?? await this.getFreshToken(connection)
     const tlAccounts = await this.trueLayer.getAccounts(token)
@@ -299,8 +306,12 @@ export class BankingService {
 
     let consentRevoked = false
     try {
-      const token = await this.getFreshToken(connection)
-      consentRevoked = await this.trueLayer.revokeConnection(token)
+      if (connection.providerName === 'enablebanking') {
+        consentRevoked = connection.consentId ? await this.enableBanking.deleteSession(connection.consentId) : false
+      } else {
+        const token = await this.getFreshToken(connection)
+        consentRevoked = await this.trueLayer.revokeConnection(token)
+      }
     } catch (err) {
       this.logger.warn(`Could not revoke consent for connection ${connectionId}: ${String(err)}`)
     }
@@ -348,6 +359,161 @@ export class BankingService {
     if (t.includes('credit')) return 'credit_card'
     if (t.includes('business')) return 'business'
     return 'current'
+  }
+
+  // ─── Enable Banking ─────────────────────────────────────────────────────────
+
+  private ebRedirectUri(): string {
+    return `${this.config.get('API_URL')}/api/v1/open-banking/enable-banking/callback`
+  }
+
+  /** List banks the user can connect (GB by default). */
+  async listAspsps(country = 'GB') {
+    const aspsps = await this.enableBanking.getAspsps(country)
+    return aspsps.map((a) => ({ name: a.name, country: a.country, logo: a.logo ?? null }))
+  }
+
+  /** Build the bank-authorization URL for an Enable Banking connection. */
+  async buildEnableBankingLinkUrl(userId: string, aspsp: string, country = 'GB'): Promise<string> {
+    const { url } = await this.enableBanking.startAuth(aspsp, country, userId, this.ebRedirectUri())
+    return url
+  }
+
+  async handleEnableBankingCallback(code: string, state: string) {
+    const userId = state
+    const session = await this.enableBanking.createSession(code)
+    const validUntil = session.access?.valid_until ? new Date(session.access.valid_until) : null
+
+    const connection = await db.bankConnection.create({
+      data: {
+        userId,
+        providerName: 'enablebanking',
+        connectionStatus: 'active',
+        institutionName: session.aspsp?.name ?? null,
+        consentId: session.session_id,
+        tokenExpiresAt: validUntil,
+      },
+    })
+
+    await this.syncEbAccounts(connection.id, session.accounts ?? [])
+
+    try {
+      await db.userProfile.updateMany({
+        where: { userId, profileStage: { notIn: ['scored', 'complete'] } },
+        data: { profileStage: 'banking_connected' },
+      })
+    } catch (err) {
+      this.logger.warn(`Profile stage update failed: ${String(err)}`)
+    }
+
+    this.audit.log(userId, 'bank.connected', { connectionId: connection.id, provider: 'enablebanking' })
+
+    try {
+      await this.scoringService.recompute(userId)
+    } catch (err) {
+      this.logger.warn(`Score auto-recompute failed after bank connect: ${String(err)}`)
+    }
+
+    return connection
+  }
+
+  /** Re-sync an existing Enable Banking connection from its stored account uids. */
+  private async syncEbConnection(connectionId: string) {
+    const accounts = await db.bankAccount.findMany({ where: { bankConnectionId: connectionId } })
+    // The account uid is our externalAccountId; the app-level JWT + valid consent
+    // is all that is needed to read them again.
+    const ebAccounts: EbAccount[] = accounts.map((a) => ({
+      uid: a.externalAccountId,
+      name: a.accountName ?? undefined,
+      currency: a.currency,
+    }))
+    await this.syncEbAccounts(connectionId, ebAccounts)
+  }
+
+  private async syncEbAccounts(connectionId: string, ebAccounts: EbAccount[]) {
+    const oneYearAgo = new Date()
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+    const dateFrom = oneYearAgo.toISOString().slice(0, 10)
+
+    for (const ebAccount of ebAccounts) {
+      const uid = ebAccount.uid
+      try {
+        const balance = EnableBankingService.balanceAmount(await this.enableBanking.getBalances(uid))
+
+        const account = await db.bankAccount.upsert({
+          where: {
+            bankConnectionId_externalAccountId: { bankConnectionId: connectionId, externalAccountId: uid },
+          },
+          update: {
+            accountName: EnableBankingService.accountName(ebAccount),
+            accountType: EnableBankingService.accountType(ebAccount),
+            currentBalance: balance ?? undefined,
+            syncedAt: new Date(),
+          },
+          create: {
+            bankConnectionId: connectionId,
+            externalAccountId: uid,
+            accountName: EnableBankingService.accountName(ebAccount),
+            accountType: EnableBankingService.accountType(ebAccount),
+            currency: ebAccount.currency ?? 'GBP',
+            currentBalance: balance ?? undefined,
+            syncedAt: new Date(),
+          },
+        })
+
+        const holderName = await this.enableBanking.getAccountHolderName(uid)
+        if (holderName) {
+          await db.bankAccount.update({ where: { id: account.id }, data: { accountHolderName: holderName } })
+        }
+
+        const txns = await this.enableBanking.getTransactions(uid, dateFrom)
+        for (const t of txns) {
+          const direction = EnableBankingService.txnDirection(t)
+          const amount = EnableBankingService.txnAmount(t)
+          const description = EnableBankingService.txnDescription(t)
+          const merchantName = EnableBankingService.txnCounterparty(t)
+          const category = classifyTransaction({ description, merchantName, amount, direction, tlCategory: '' })
+          try {
+            await db.bankTransaction.upsert({
+              where: {
+                bankAccountId_externalTxnId: {
+                  bankAccountId: account.id,
+                  externalTxnId: EnableBankingService.txnExternalId(t),
+                },
+              },
+              update: { category },
+              create: {
+                bankAccountId: account.id,
+                externalTxnId: EnableBankingService.txnExternalId(t),
+                bookedAt: EnableBankingService.txnBookedAt(t),
+                amount,
+                currency: t.transaction_amount?.currency ?? ebAccount.currency ?? 'GBP',
+                description,
+                merchantName,
+                category,
+                direction,
+                rawPayload: t as never,
+              },
+            })
+          } catch (err) {
+            this.logger.warn(`Skipping Enable Banking txn: ${String(err)}`)
+          }
+        }
+      } catch (err) {
+        // A 401/403 here means the consent has lapsed — mark it so the user re-links.
+        this.logger.warn(`Enable Banking account sync failed for ${uid}: ${String(err)}`)
+        await db.bankConnection.update({
+          where: { id: connectionId },
+          data: { connectionStatus: 'expired' },
+        }).catch(() => undefined)
+      }
+    }
+
+    await db.bankConnection.update({ where: { id: connectionId }, data: { lastSyncedAt: new Date() } })
+    const conn = await db.bankConnection.findUnique({ where: { id: connectionId } })
+    if (conn) {
+      this.audit.log(conn.userId, 'bank.synced', { connectionId, accountsSynced: ebAccounts.length, provider: 'enablebanking' })
+    }
   }
 
 }

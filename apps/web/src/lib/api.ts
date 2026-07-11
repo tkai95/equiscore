@@ -187,6 +187,21 @@ export const api = {
         { method: 'DELETE' },
         token
       ),
+    // Enable Banking — alternative provider (free own-account testing).
+    enableBanking: {
+      aspsps: (token: string, country = 'GB') =>
+        apiFetch<Array<{ name: string; country: string; logo: string | null }>>(
+          `/open-banking/enable-banking/aspsps?country=${country}`,
+          {},
+          token
+        ),
+      linkUrl: (token: string, aspsp: string, country = 'GB') =>
+        apiFetch<{ url: string }>(
+          '/open-banking/enable-banking/link-token',
+          { method: 'POST', body: JSON.stringify({ aspsp, country }) },
+          token
+        ),
+    },
   },
   documents: {
     list: (token: string) => apiFetch('/documents', {}, token),
