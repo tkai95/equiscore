@@ -145,6 +145,9 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        // Consolidated corners — sharper than before. Cards 14px, panels 12px.
+        card: '14px',
+        panel: '12px',
       },
       boxShadow: {
         // The single sanctioned card elevation. Tables/insets stay flat.

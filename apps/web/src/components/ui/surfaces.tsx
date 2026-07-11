@@ -17,17 +17,14 @@ type Div = React.HTMLAttributes<HTMLDivElement>
 
 const PAD = { none: '', sm: 'p-4', md: 'p-6', lg: 'p-6 sm:p-8' } as const
 
-/** Primary content block: crisp near-white, low-contrast border, subtle shadow. */
+/** Primary content block: crisp white, subtle grey-green border, near-flat. */
 export function Card({
   className,
   padding = 'md',
   ...props
 }: Div & { padding?: keyof typeof PAD }) {
   return (
-    <div
-      className={cn('rounded-2xl border border-line bg-surface-card shadow-card', PAD[padding], className)}
-      {...props}
-    />
+    <div className={cn('rounded-card border border-line bg-surface-card', PAD[padding], className)} {...props} />
   )
 }
 

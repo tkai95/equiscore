@@ -39,22 +39,22 @@
     --brand-100: #dfeae5;
     --brand-50: #f0f5f2;
 
-    /* Surfaces — warm-stone page, crisp near-white cards, selective cream inset */
-    --surface-page: #f5f5f1;
-    --surface-card: #fefefc;
+    /* Surfaces — near-white page, crisp white cards, cream ONLY for guidance */
+    --surface-page: #f6f7f5;
+    --surface-card: #ffffff;
     --surface-raised: #ffffff;
     --surface-inset: #f7f2e7;
-    --surface-hover: #f2f4f1;
+    --surface-hover: #f1f4f1;
 
-    /* Borders — low contrast; a card reads via the page↔card surface step, not an outline */
-    --border-default: #dfe3de;
-    --border-subtle: #e9eae6;
-    --border-strong: #c9d0cb;
+    /* Borders — subtle grey-green; cards read via border + surface contrast (no shadow) */
+    --border-default: #dde2dd;
+    --border-subtle: #e7eae6;
+    --border-strong: #c7cec8;
 
-    /* Text — three-level neutral scale */
-    --text-primary: #18231f;
-    --text-secondary: #626b66;
-    --text-muted: #858b87;
+    /* Text — three-level scale; dark green-black, with muted lifted for contrast */
+    --text-primary: #16201c;
+    --text-secondary: #4f5751;
+    --text-muted: #6c726d;
 
     /* Semantic states (bg + text pairs) — distinct from brand green */
     --success-bg: #e5f1e9;
@@ -75,8 +75,8 @@
     --chart-6: #b78065;
     --chart-7: #d8ccb0;
 
-    /* Elevation — one understated, brand-tinted shadow. Tables/insets stay flat. */
-    --shadow-card: 0 1px 2px rgba(18, 60, 53, 0.03), 0 8px 24px rgba(18, 60, 53, 0.035);
+    /* Elevation — near-flat. Cards rely on border + surface contrast, not shadow. */
+    --shadow-card: 0 1px 1px rgba(18, 60, 53, 0.03);
   }
 
   .dark {

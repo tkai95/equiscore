@@ -4,7 +4,16 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { RefreshCw, AlertTriangle, Clock, ArrowRight, ChevronRight, CheckCircle2, ShieldCheck } from 'lucide-react'
+import {
+  RefreshCw,
+  AlertTriangle,
+  Clock,
+  ArrowRight,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle2,
+  ShieldCheck,
+} from 'lucide-react'
 import { api, type ScoreImprovements } from '@/lib/api'
 import { formatDate, cn } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
@@ -16,7 +25,6 @@ import {
   Drawer,
   InsetPanel,
   Metric,
-  MetricGroup,
   PageHeader,
   PageLayout,
   Section,
@@ -123,21 +131,25 @@ const SOURCE_LABEL: Record<string, string> = {
   test: 'Sample data',
 }
 
-function assessment(score: number): string {
+/** One rating scale, used everywhere: Excellent · Strong · Moderate · Review · Weak. */
+function rating(score: number): string {
   if (score >= 90) return 'Excellent'
-  if (score >= 75) return 'Strong'
-  if (score >= 55) return 'Moderate'
-  if (score >= 40) return 'Limited'
-  if (score >= 1) return 'Weak'
-  return 'Not verified'
+  if (score >= 70) return 'Strong'
+  if (score >= 50) return 'Moderate'
+  if (score >= 30) return 'Review'
+  return 'Weak'
 }
-
-/** Score → status label, semantic pill tone, and a brand-derived bar colour. */
-function band(score: number): { label: string; tone: StatusTone; bar: string } {
-  if (score >= 70) return { label: 'Strong', tone: 'success', bar: 'bg-chart-2' }
-  if (score >= 50) return { label: 'Review', tone: 'neutral', bar: 'bg-chart-3' }
-  if (score >= 30) return { label: 'Improve', tone: 'warning', bar: 'bg-chart-5' }
-  return { label: 'Action', tone: 'warning', bar: 'bg-chart-6' }
+function toneFor(score: number): StatusTone {
+  if (score >= 70) return 'success'
+  if (score >= 50) return 'neutral'
+  return 'warning'
+}
+/** Brand-derived bar colour: green → sage → ochre → terracotta. */
+function barColor(score: number): string {
+  if (score >= 70) return 'bg-chart-2'
+  if (score >= 50) return 'bg-chart-3'
+  if (score >= 30) return 'bg-chart-5'
+  return 'bg-chart-6'
 }
 
 const DIM_CAMEL: Record<string, string> = {
@@ -196,9 +208,9 @@ export function TrustScoreView() {
   if (isLoading) {
     return (
       <PageLayout>
-        <div className="h-8 w-56 animate-pulse rounded bg-surface-inset" />
-        <div className="h-56 animate-pulse rounded-2xl bg-surface-inset" />
-        <div className="h-64 animate-pulse rounded-2xl bg-surface-inset" />
+        <div className="h-8 w-56 animate-pulse rounded bg-surface-hover" />
+        <div className="h-52 animate-pulse rounded-card bg-surface-hover" />
+        <div className="h-64 animate-pulse rounded-card bg-surface-hover" />
       </PageLayout>
     )
   }
@@ -238,7 +250,6 @@ export function TrustScoreView() {
     : financiallyStrong
       ? 'Financially strong and verified.'
       : 'Assessment complete.'
-  const financialRating = assessment(financialAvg)
 
   const primary =
     improvements?.improvements.find((i) => i.dimension === 'Identity Confidence') ??
@@ -273,20 +284,20 @@ export function TrustScoreView() {
         }
         actions={
           <>
-            <Link href="/dashboard/share" className={buttonClasses('secondary')}>
-              Share portfolio
-            </Link>
             <Button variant="secondary" loading={recompute.isPending} onClick={() => recompute.mutate()}>
               {!recompute.isPending && <RefreshCw className="h-4 w-4" />}
               {recompute.isPending ? 'Recalculating…' : 'Recalculate'}
             </Button>
+            <Link href="/dashboard/share" className={buttonClasses('primary')}>
+              Share portfolio
+            </Link>
           </>
         }
       />
 
       {/* Freshness notice */}
       {score.status && score.status !== 'current' && (
-        <div className="flex items-start gap-3 rounded-xl bg-warning-soft px-5 py-3.5">
+        <div className="flex items-start gap-3 rounded-panel bg-warning-soft px-5 py-3">
           <Clock className="mt-0.5 h-5 w-5 shrink-0 text-warning-strong" />
           <p className="text-sm text-warning-strong">
             This assessment is based on financial evidence that is no longer current. Refresh your bank data or upload a
@@ -295,26 +306,24 @@ export function TrustScoreView() {
         </div>
       )}
 
-      {/* ── Assessment summary (the one true hero card) ─────────────────────── */}
-      <Card padding="lg">
-        <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
-          <div className="flex flex-col items-center justify-center border-b border-line-subtle pb-8 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
+      {/* ── Assessment summary (the one hero card) ─────────────────────────── */}
+      <Card padding="md">
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <div className="flex flex-col items-center justify-center border-b border-line-subtle pb-6 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
             <AnimatedGauge score={score.overallScore} tier={score.overallTier} />
-            <Display size="md" className="mt-2">
-              Trust Tier {score.overallTier}
-            </Display>
+            <p className="mt-1 text-lg font-semibold text-content">Trust Tier {score.overallTier}</p>
           </div>
 
           <div className="flex flex-col justify-center">
-            <Display size="md">{decision}</Display>
+            <h2 className="text-2xl font-semibold tracking-tight text-content">{decision}</h2>
             <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-content-secondary">
               {verificationWeak
                 ? `Your profile is currently limited to Tier ${score.overallTier} because your identity and evidence could not be fully verified${financiallyStrong ? ', even though your financial behaviour is strong' : ''}. Verifying unlocks a higher tier.`
                 : 'Your financial behaviour and verified evidence support this assessment.'}
             </p>
 
-            <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
-              <SummaryRow label="Financial assessment" value={financialRating} tone={financialAvg >= 55 ? 'success' : 'warning'} />
+            <div className="mt-4 divide-y divide-line-subtle border-y border-line-subtle">
+              <SummaryRow label="Financial assessment" value={rating(financialAvg)} tone={toneFor(financialAvg)} />
               <SummaryRow
                 label="Identity verification"
                 value={verificationWeak ? 'Action required' : 'Verified'}
@@ -323,7 +332,7 @@ export function TrustScoreView() {
             </div>
 
             {primary && (
-              <div className="mt-6 flex flex-wrap items-center gap-4">
+              <div className="mt-5 flex flex-wrap items-center gap-4">
                 <Link href={primary.href} className={buttonClasses('primary', 'lg')}>
                   {verificationWeak ? 'Resolve verification' : primary.title}
                   <ArrowRight className="ml-1 h-4 w-4" />
@@ -339,12 +348,12 @@ export function TrustScoreView() {
 
       {/* Action banner */}
       {verificationWeak && (
-        <div className="flex flex-col gap-3 rounded-2xl bg-warning-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-panel bg-warning-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-strong" />
             <div>
               <p className="font-semibold text-warning-strong">Complete verification to unlock a higher tier</p>
-              <p className="mt-0.5 text-sm text-warning-strong/90">
+              <p className="mt-0.5 text-sm text-warning-strong">
                 {nameMismatch
                   ? 'The name connected to your bank account does not fully match your EquiScore profile. Resolving this raises your verification confidence.'
                   : score.identityConfidenceScore < 50
@@ -371,15 +380,11 @@ export function TrustScoreView() {
         {capped && (
           <InsetPanel className="flex items-start gap-2 text-sm text-content-secondary">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
-            Your financial assessment ({financialRating.toLowerCase()}) supports a stronger profile. Your trust tier is
-            capped at C until verification is completed.
+            Your financial assessment ({rating(financialAvg).toLowerCase()}) supports a stronger profile. Your trust tier
+            is capped at C until verification is completed.
           </InsetPanel>
         )}
         <DimensionList dims={VERIFICATION_DIMS} score={score} onOpen={setDrawerDim} />
-        <div className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-sm">
-          <span className="text-content-secondary">Profile completeness</span>
-          <span className="font-semibold tabular-nums text-content">{score.profileCompletenessScore}%</span>
-        </div>
       </Section>
 
       {/* ── Key assessment findings (report columns, no boxes) ─────────────── */}
@@ -390,20 +395,27 @@ export function TrustScoreView() {
         </div>
       </Section>
 
-      {/* ── Evidence & methodology ─────────────────────────────────────────── */}
-      <Section title="Evidence & methodology">
-        <MetricGroup>
-          <Metric label="Data coverage" value={profileMeta ? `${profileMeta.period.months} months` : '—'} />
-          <Metric label="Primary source" value={profileMeta ? SOURCE_LABEL[profileMeta.source] ?? profileMeta.source : '—'} />
-          <Metric label="Financial evidence up to" value={score.financialDataAsOf ? formatDate(score.financialDataAsOf) : '—'} />
-          <Metric label="Assessment valid until" value={score.validUntil ? formatDate(score.validUntil) : '—'} />
-        </MetricGroup>
-        <p className="border-t border-line-subtle pt-4 text-sm text-content-muted">
-          Financial dimensions measure the quality of your financial behaviour; verification dimensions measure
-          confidence in the evidence. A trust tier can be capped by weak verification even when financial behaviour is
-          strong. An assessment is valid for up to three months from the latest date its evidence covers.
-        </p>
-      </Section>
+      {/* ── Evidence & methodology (collapsed by default) ──────────────────── */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between border-b border-line-subtle pb-3 [&::-webkit-details-marker]:hidden">
+          <h2 className="text-lg font-semibold text-content">Evidence &amp; methodology</h2>
+          <ChevronDown className="h-4 w-4 text-content-muted transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+            <Metric label="Data coverage" value={profileMeta ? `${profileMeta.period.months} months` : '—'} />
+            <Metric label="Primary source" value={profileMeta ? SOURCE_LABEL[profileMeta.source] ?? profileMeta.source : '—'} />
+            <Metric label="Profile completeness" value={`${score.profileCompletenessScore}%`} />
+            <Metric label="Evidence up to" value={score.financialDataAsOf ? formatDate(score.financialDataAsOf) : '—'} />
+            <Metric label="Valid until" value={score.validUntil ? formatDate(score.validUntil) : '—'} />
+          </div>
+          <p className="border-t border-line-subtle pt-4 text-sm text-content-muted">
+            Financial dimensions measure the quality of your financial behaviour; verification dimensions measure
+            confidence in the evidence. A trust tier can be capped by weak verification even when financial behaviour is
+            strong. An assessment is valid for up to three months from the latest date its evidence covers.
+          </p>
+        </div>
+      </details>
 
       <DimensionDrawer
         dimKey={drawerDim}
@@ -421,8 +433,7 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
   const [shown, setShown] = useState(0)
 
   useEffect(() => {
-    const reduce =
-      typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     if (reduce) {
       setShown(score)
       return
@@ -432,7 +443,7 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
     const start = performance.now()
     const tick = (t: number) => {
       const p = Math.min(1, (t - start) / duration)
-      const eased = 1 - Math.pow(1 - p, 3) // ease-out cubic, no overshoot
+      const eased = 1 - Math.pow(1 - p, 3)
       setShown(Math.round(score * eased))
       if (p < 1) raf = requestAnimationFrame(tick)
     }
@@ -440,8 +451,8 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
     return () => cancelAnimationFrame(raf)
   }, [score])
 
-  const r = 92
-  const stroke = 12
+  const r = 80
+  const stroke = 11
   const w = r * 2 + stroke
   const h = r + stroke
   const cy = r + stroke / 2
@@ -451,8 +462,8 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
 
   return (
     <div className="relative" style={{ width: w, maxWidth: '100%' }}>
-      <svg width="100%" viewBox={`0 0 ${w} ${h + 8}`} aria-hidden>
-        <path d={path} fill="none" stroke="#E7E0D2" strokeWidth={stroke} strokeLinecap="round" />
+      <svg width="100%" viewBox={`0 0 ${w} ${h + 6}`} aria-hidden>
+        <path d={path} fill="none" stroke="#DDE2DD" strokeWidth={stroke} strokeLinecap="round" />
         <path
           d={path}
           fill="none"
@@ -463,9 +474,9 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
           strokeDashoffset={offset}
         />
       </svg>
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: r * 0.34 }}>
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: r * 0.36 }}>
         <Display size="score">{shown}</Display>
-        <span className="mt-1 text-xs text-content-muted">out of 100</span>
+        <span className="mt-0.5 text-xs text-content-muted">out of 100</span>
       </div>
     </div>
   )
@@ -483,7 +494,7 @@ function DimensionList({
   onOpen: (k: DimKey) => void
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface-card">
+    <div className="overflow-hidden rounded-panel border border-line bg-surface-card">
       {dims.map((k, i) => (
         <DimensionRow key={k} dimKey={k} score={score[k] as number} first={i === 0} onOpen={() => onOpen(k)} />
       ))}
@@ -502,39 +513,35 @@ function DimensionRow({
   first: boolean
   onOpen: () => void
 }) {
-  const b = band(score)
   return (
     <button
       onClick={onOpen}
       className={cn(
-        'flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-surface-hover',
+        'flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-surface-hover',
         !first && 'border-t border-line-subtle',
       )}
     >
       <span className="w-40 shrink-0 text-sm font-medium text-content">{DIM_LABELS[dimKey]}</span>
-      <span className="hidden w-24 shrink-0 text-sm text-content-muted sm:block">{assessment(score)}</span>
-      <div className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-surface-inset sm:block">
-        <div className={cn('h-full rounded-full', b.bar)} style={{ width: `${Math.max(2, score)}%` }} />
+      <span className="hidden w-24 shrink-0 text-sm text-content-secondary sm:block">{rating(score)}</span>
+      <div className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-surface-hover sm:block">
+        <div className={cn('h-full rounded-full', barColor(score))} style={{ width: `${Math.max(2, score)}%` }} />
       </div>
       <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums text-content">{score}</span>
-      <span className="hidden md:inline-block">
-        <StatusPill status={b.tone} label={b.label} />
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-content-muted/50" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-content-muted/60" />
     </button>
   )
 }
 
 function SummaryRow({ label, value, tone }: { label: string; value: string; tone: StatusTone }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-surface-inset px-4 py-2.5">
+    <div className="flex items-center justify-between py-2.5">
       <span className="text-sm text-content-secondary">{label}</span>
       <StatusPill status={tone} label={value} />
     </div>
   )
 }
 
-// ── Findings ────────────────────────────────────────────────────────────────────
+// ── Findings (top 4 + view all; compact empty state) ────────────────────────────
 
 function FindingsColumn({
   title,
@@ -545,29 +552,42 @@ function FindingsColumn({
   tone: 'good' | 'warn'
   items: Array<{ code: string; dimension: string; sentiment: string; message: string }>
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? items : items.slice(0, 4)
   return (
     <div>
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-content-muted">{title}</h3>
       {items.length === 0 ? (
-        <p className="text-sm text-content-muted">
-          {tone === 'good' ? 'Add financial evidence to build positive signals.' : 'Nothing is materially limiting your profile.'}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((r) => (
-            <div key={r.code} className="flex items-start gap-3">
-              {tone === 'good' ? (
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success-strong" />
-              ) : (
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" />
-              )}
-              <div>
-                <p className="text-sm text-content">{r.message}</p>
-                <p className="mt-0.5 text-xs text-content-muted">{DIM_CAMEL[r.dimension] ?? r.dimension}</p>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-2 text-sm text-content-secondary">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-success-strong" />
+          {tone === 'good' ? 'Add financial evidence to build positive signals.' : 'No factors are currently limiting your profile.'}
         </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {shown.map((r) => (
+              <div key={r.code} className="flex items-start gap-3">
+                {tone === 'good' ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success-strong" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" />
+                )}
+                <div>
+                  <p className="text-sm text-content">{r.message}</p>
+                  <p className="mt-0.5 text-xs text-content-muted">{DIM_CAMEL[r.dimension] ?? r.dimension}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {items.length > 4 && (
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="mt-3 text-sm font-medium text-brand-900 hover:underline"
+            >
+              {expanded ? 'Show fewer' : `View all ${items.length}`}
+            </button>
+          )}
+        </>
       )}
     </div>
   )
@@ -589,25 +609,24 @@ function DimensionDrawer({
   const meta = dimKey ? DIM_META[dimKey] : null
   const camel = dimKey?.replace('Score', '')
   const affecting = dimKey ? reasonCodes.filter((r) => r.dimension === camel) : []
-  const b = band(score)
   return (
     <Drawer
       open={!!dimKey}
       onOpenChange={(o) => !o && onClose()}
       title={dimKey ? DIM_LABELS[dimKey] : ''}
-      subtitle={dimKey ? `${assessment(score)} · ${score}/100` : undefined}
+      subtitle={dimKey ? `${rating(score)} · ${score}/100` : undefined}
     >
       {meta && (
         <div className="space-y-5">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-inset">
-            <div className={cn('h-full rounded-full', b.bar)} style={{ width: `${Math.max(2, score)}%` }} />
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+            <div className={cn('h-full rounded-full', barColor(score))} style={{ width: `${Math.max(2, score)}%` }} />
           </div>
 
           <DrawerBlock title="What we assessed">
             <ul className="space-y-1.5">
               {meta.assessed.map((a) => (
                 <li key={a} className="flex items-start gap-2 text-sm text-content-secondary">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-content-muted/50" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-content-muted/60" />
                   {a}
                 </li>
               ))}
