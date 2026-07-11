@@ -228,6 +228,8 @@ function Markdown({ text, onNavigate }: { text: string; onNavigate: (href: strin
 
 function Block({ block, onNavigate }: { block: string; onNavigate: (href: string) => void }) {
   const lines = block.split('\n').filter((l) => l.trim() !== '')
+  const table = parseTable(lines)
+  if (table) return <Table {...table} onNavigate={onNavigate} />
   if (lines.length > 0 && lines.every((l) => /^\s*[-*]\s+/.test(l))) {
     return (
       <ul className="list-disc space-y-1 pl-5">
@@ -254,6 +256,74 @@ function Block({ block, onNavigate }: { block: string; onNavigate: (href: string
     <p>
       <Inline text={block} onNavigate={onNavigate} />
     </p>
+  )
+}
+
+// ── GitHub-flavoured table support ──
+
+type Align = 'left' | 'center' | 'right'
+type ParsedTable = { header: string[]; rows: string[][]; align: Align[] }
+
+/** Split a `| a | b |` row into trimmed cells, tolerating missing edge pipes. */
+function splitRow(line: string): string[] {
+  let s = line.trim()
+  if (s.startsWith('|')) s = s.slice(1)
+  if (s.endsWith('|')) s = s.slice(0, -1)
+  return s.split('|').map((c) => c.trim())
+}
+
+/** Detect a GFM table (header row + `---|---` separator) and parse it, else null. */
+function parseTable(lines: string[]): ParsedTable | null {
+  const [headerLine, sepLine] = lines
+  if (!headerLine || !sepLine || !headerLine.includes('|')) return null
+  const sep = splitRow(sepLine)
+  if (sep.length === 0 || !sep.every((c) => /^:?-+:?$/.test(c))) return null
+
+  const align: Align[] = sep.map((c) => {
+    const left = c.startsWith(':')
+    const right = c.endsWith(':')
+    if (left && right) return 'center'
+    if (right) return 'right'
+    return 'left'
+  })
+  const header = splitRow(headerLine)
+  const rows = lines.slice(2).map(splitRow)
+  return { header, rows, align }
+}
+
+function Table({
+  header,
+  rows,
+  align,
+  onNavigate,
+}: ParsedTable & { onNavigate: (href: string) => void }) {
+  const alignClass = (i: number) =>
+    align[i] === 'right' ? 'text-right' : align[i] === 'center' ? 'text-center' : 'text-left'
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[0.9em]">
+        <thead>
+          <tr className="border-b border-gray-300">
+            {header.map((cell, i) => (
+              <th key={i} className={`px-2 py-1 font-semibold ${alignClass(i)}`}>
+                <Inline text={cell} onNavigate={onNavigate} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r} className="border-b border-gray-200 last:border-0">
+              {header.map((_, i) => (
+                <td key={i} className={`px-2 py-1 align-top ${alignClass(i)}`}>
+                  <Inline text={row[i] ?? ''} onNavigate={onNavigate} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
