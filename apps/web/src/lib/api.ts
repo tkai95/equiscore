@@ -1,8 +1,7 @@
 import type { CompassPayload } from './compass-types'
+import { API_URL } from './api-base'
 
 export type { CompassPayload }
-
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000/api/v1'
 
 /** Shape of GET /auth/me — the current user row (plus profile + counts). */
 export interface Me {
