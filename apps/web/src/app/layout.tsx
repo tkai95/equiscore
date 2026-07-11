@@ -4,7 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { Providers } from '@/providers'
 import { CookieBanner } from '@/components/landing/cookie-banner'
 import { Analytics } from '@/components/landing/analytics'
-import { isPublicSite } from '@/lib/site'
+import { hasClerkPublishableKey } from '@/lib/site'
 import '@/styles/globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 
-  if (isPublicSite) return inner
+  if (!hasClerkPublishableKey) return inner
 
   return (
     <ClerkProvider

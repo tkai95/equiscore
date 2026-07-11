@@ -11,33 +11,47 @@ datasource db {
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  authProviderId String   @unique @map("auth_provider_id")
+  id             String     @id @default(cuid())
+  email          String     @unique
+  authProviderId String     @unique @map("auth_provider_id")
   status         UserStatus @default(active)
   // Gates the Compass module (financial-coaching layer). Flipped on for
   // subscribers; default off. Read via /auth/me and enforced by the API guard.
   // Migration target once real billing exists: Clerk Billing has({plan}).
-  compassEnabled Boolean  @default(false) @map("compass_enabled")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  compassEnabled Boolean    @default(false) @map("compass_enabled")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  profile        UserProfile?
-  addresses      UserAddress[]
-  employment     EmploymentProfile[]
-  bankConnections BankConnection[]
-  documents      UploadedDocument[]
-  rentalProfiles  RentalProfile[]
-  trustFeatures  TrustFeature[]
-  trustScores    TrustScore[]
-  sharedProfiles SharedProfile[]
-  statementImportJobs StatementImportJob[]
-  insightQuestionAnswers InsightQuestionAnswer[]
-  auditEvents    AuditEvent[]
-  commitmentSettings CommitmentSetting[]
-  reminders      Reminder[]
-  savingsGoals   SavingsGoal[]
-  compassDismissals CompassDismissal[]
+  profile                     UserProfile?
+  addresses                   UserAddress[]
+  employment                  EmploymentProfile[]
+  bankConnections             BankConnection[]
+  documents                   UploadedDocument[]
+  rentalProfiles              RentalProfile[]
+  trustFeatures               TrustFeature[]
+  trustScores                 TrustScore[]
+  sharedProfiles              SharedProfile[]
+  statementImportJobs         StatementImportJob[]
+  insightQuestionAnswers      InsightQuestionAnswer[]
+  auditEvents                 AuditEvent[]
+  organisationMemberships     OrganisationMember[]
+  createdAssessmentRequests   AssessmentRequest[]     @relation("AssessmentRequestCreator")
+  applicantAssessmentRequests AssessmentRequest[]     @relation("AssessmentRequestApplicant")
+  companyConsents             CompanyConsent[]
+  assessmentSnapshots         AssessmentSnapshot[]
+  applicantAssessmentCases    AssessmentCase[]        @relation("AssessmentApplicant")
+  assignedAssessmentCases     AssessmentCase[]        @relation("AssessmentReviewer")
+  createdPolicies             Policy[]                @relation("PolicyCreator")
+  createdPolicyVersions       PolicyVersion[]         @relation("PolicyVersionCreator")
+  approvedPolicyVersions      PolicyVersion[]         @relation("PolicyVersionApprover")
+  caseNotes                   CaseNote[]
+  caseDecisions               CaseDecision[]
+  applicantUsageEvents        UsageEvent[]            @relation("UsageApplicant")
+  initiatedUsageEvents        UsageEvent[]            @relation("UsageInitiator")
+  commitmentSettings          CommitmentSetting[]
+  reminders                   Reminder[]
+  savingsGoals                SavingsGoal[]
+  compassDismissals           CompassDismissal[]
 
   @@map("users")
 }
@@ -53,19 +67,19 @@ enum UserStatus {
 // ─── User Profile ──────────────────────────────────────────────────────────────
 
 model UserProfile {
-  id                  String           @id @default(cuid())
-  userId              String           @unique @map("user_id")
-  fullName            String?          @map("full_name")
-  dob                 DateTime?
-  nationality         String?
-  residencyStatus     ResidencyStatus? @map("residency_status")
-  ukMoveDate          DateTime?        @map("uk_move_date")
-  employmentType      EmploymentType?  @map("employment_type")
-  monthlyIncomeDeclared Float?         @map("monthly_income_declared")
-  monthlyRentDeclared Float?           @map("monthly_rent_declared")
-  profileStage        ProfileStage     @default(created) @map("profile_stage")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
+  id                    String           @id @default(cuid())
+  userId                String           @unique @map("user_id")
+  fullName              String?          @map("full_name")
+  dob                   DateTime?
+  nationality           String?
+  residencyStatus       ResidencyStatus? @map("residency_status")
+  ukMoveDate            DateTime?        @map("uk_move_date")
+  employmentType        EmploymentType?  @map("employment_type")
+  monthlyIncomeDeclared Float?           @map("monthly_income_declared")
+  monthlyRentDeclared   Float?           @map("monthly_rent_declared")
+  profileStage          ProfileStage     @default(created) @map("profile_stage")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -113,17 +127,17 @@ enum ProfileStage {
 // ─── Addresses ────────────────────────────────────────────────────────────────
 
 model UserAddress {
-  id           String   @id @default(cuid())
-  userId       String   @map("user_id")
-  addressLine1 String   @map("address_line_1")
-  addressLine2 String?  @map("address_line_2")
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  addressLine1 String    @map("address_line_1")
+  addressLine2 String?   @map("address_line_2")
   city         String
   postcode     String
-  country      String   @default("GB")
-  fromDate     DateTime @map("from_date")
+  country      String    @default("GB")
+  fromDate     DateTime  @map("from_date")
   toDate       DateTime? @map("to_date")
-  isCurrent    Boolean  @default(false) @map("is_current")
-  createdAt    DateTime @default(now()) @map("created_at")
+  isCurrent    Boolean   @default(false) @map("is_current")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -215,7 +229,7 @@ model BankAccount {
   syncedAt            DateTime?   @map("synced_at")
   createdAt           DateTime    @default(now()) @map("created_at")
 
-  bankConnection BankConnection   @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
+  bankConnection BankConnection    @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
   transactions   BankTransaction[]
   directDebits   DirectDebit[]
   standingOrders StandingOrder[]
@@ -273,18 +287,18 @@ enum AccountType {
 }
 
 model BankTransaction {
-  id             String                @id @default(cuid())
-  bankAccountId  String                @map("bank_account_id")
-  externalTxnId  String                @map("external_txn_id")
-  bookedAt       DateTime              @map("booked_at")
-  amount         Float
-  currency       String                @default("GBP")
-  description    String?
-  merchantName   String?               @map("merchant_name")
-  category       TransactionCategory?
-  direction      TransactionDirection
-  rawPayload     Json?                 @map("raw_payload")
-  createdAt      DateTime              @default(now()) @map("created_at")
+  id            String               @id @default(cuid())
+  bankAccountId String               @map("bank_account_id")
+  externalTxnId String               @map("external_txn_id")
+  bookedAt      DateTime             @map("booked_at")
+  amount        Float
+  currency      String               @default("GBP")
+  description   String?
+  merchantName  String?              @map("merchant_name")
+  category      TransactionCategory?
+  direction     TransactionDirection
+  rawPayload    Json?                @map("raw_payload")
+  createdAt     DateTime             @default(now()) @map("created_at")
 
   bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
 
@@ -371,15 +385,15 @@ enum VerificationStatus {
 // ─── Rental Profiles ──────────────────────────────────────────────────────────
 
 model RentalProfile {
-  id                 String    @id @default(cuid())
-  userId             String    @map("user_id")
-  monthlyRentDeclared Float?   @map("monthly_rent_declared")
-  landlordName       String?   @map("landlord_name")
-  tenancyStartDate   DateTime? @map("tenancy_start_date")
-  tenancyEndDate     DateTime? @map("tenancy_end_date")
-  propertyAddress    String?   @map("property_address")
-  isCurrent          Boolean   @default(true) @map("is_current")
-  createdAt          DateTime  @default(now()) @map("created_at")
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  monthlyRentDeclared Float?    @map("monthly_rent_declared")
+  landlordName        String?   @map("landlord_name")
+  tenancyStartDate    DateTime? @map("tenancy_start_date")
+  tenancyEndDate      DateTime? @map("tenancy_end_date")
+  propertyAddress     String?   @map("property_address")
+  isCurrent           Boolean   @default(true) @map("is_current")
+  createdAt           DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -407,21 +421,21 @@ model TrustFeature {
 // ─── Trust Scores ─────────────────────────────────────────────────────────────
 
 model TrustScore {
-  id                      String        @id @default(cuid())
-  userId                  String        @map("user_id")
-  scorecardType           ScorecardType @map("scorecard_type")
-  scoreVersion            String        @map("score_version")
-  profileCompletenessScore Float        @map("profile_completeness_score")
-  verificationStrengthScore Float       @map("verification_strength_score")
-  identityConfidenceScore Float         @map("identity_confidence_score")
-  incomeStabilityScore    Float         @map("income_stability_score")
-  affordabilityScore      Float         @map("affordability_score")
-  rentalReliabilityScore  Float         @map("rental_reliability_score")
-  financialStabilityScore Float         @map("financial_stability_score")
-  overallScore            Float         @map("overall_score")
-  overallTier             TrustTier     @map("overall_tier")
-  fraudRisk               FraudRisk     @map("fraud_risk")
-  reasonCodes             Json          @map("reason_codes")
+  id                        String        @id @default(cuid())
+  userId                    String        @map("user_id")
+  scorecardType             ScorecardType @map("scorecard_type")
+  scoreVersion              String        @map("score_version")
+  profileCompletenessScore  Float         @map("profile_completeness_score")
+  verificationStrengthScore Float         @map("verification_strength_score")
+  identityConfidenceScore   Float         @map("identity_confidence_score")
+  incomeStabilityScore      Float         @map("income_stability_score")
+  affordabilityScore        Float         @map("affordability_score")
+  rentalReliabilityScore    Float         @map("rental_reliability_score")
+  financialStabilityScore   Float         @map("financial_stability_score")
+  overallScore              Float         @map("overall_score")
+  overallTier               TrustTier     @map("overall_tier")
+  fraudRisk                 FraudRisk     @map("fraud_risk")
+  reasonCodes               Json          @map("reason_codes")
 
   // ── Freshness ───────────────────────────────────────────────────────────────
   // A score is an attestation about evidence up to a point in time. Validity is
@@ -441,7 +455,7 @@ model TrustScore {
 
   computedAt DateTime @default(now()) @map("computed_at")
 
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Retained as the snapshot that was current when the link was created (audit).
   // Recipient views resolve the applicant's *latest* score, never this one.
   sharedProfiles SharedProfile[]
@@ -480,25 +494,626 @@ enum FraudRisk {
 // ─── Shared Profiles ──────────────────────────────────────────────────────────
 
 model SharedProfile {
-  id            String    @id @default(cuid())
-  userId        String    @map("user_id")
-  trustScoreId  String    @map("trust_score_id")
-  shareToken    String    @unique @map("share_token")
-  expiresAt     DateTime  @map("expires_at")
-  targetType    String?   @map("target_type") // "landlord", "employer", "lender"
-  targetName    String?   @map("target_name")
-  viewCount     Int       @default(0) @map("view_count")
-  lastViewedAt  DateTime? @map("last_viewed_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  revokedAt     DateTime? @map("revoked_at")
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  trustScoreId    String    @map("trust_score_id")
+  shareToken      String    @unique @map("share_token")
+  expiresAt       DateTime  @map("expires_at")
+  targetType      String?   @map("target_type") // "landlord", "employer", "lender"
+  targetName      String?   @map("target_name")
+  viewCount       Int       @default(0) @map("view_count")
+  lastViewedAt    DateTime? @map("last_viewed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  revokedAt       DateTime? @map("revoked_at")
   // Recipient insight frozen at share time — a share link is a point-in-time
   // snapshot and must never change as the applicant's later evidence changes.
-  insightSnapshot Json?   @map("insight_snapshot")
+  insightSnapshot Json?     @map("insight_snapshot")
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trustScore TrustScore @relation(fields: [trustScoreId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustScore      TrustScore       @relation(fields: [trustScoreId], references: [id])
+  companyConsents CompanyConsent[]
 
   @@map("shared_profiles")
+}
+
+// ─── Company Assessment Workspace ────────────────────────────────────────────
+// B2B layer over the existing consumer profile, evidence, insight, scoring and
+// sharing capabilities. These records orchestrate, freeze and evaluate existing
+// EquiScore outputs; they are not a second financial-analysis system.
+
+model Organisation {
+  id                         String             @id @default(cuid())
+  name                       String
+  slug                       String             @unique
+  status                     OrganisationStatus @default(active)
+  planName                   String?            @map("plan_name")
+  monthlyAssessmentAllowance Int                @default(0) @map("monthly_assessment_allowance")
+  overageUnitPrice           Float?             @map("overage_unit_price")
+  currency                   String             @default("GBP")
+  createdAt                  DateTime           @default(now()) @map("created_at")
+  updatedAt                  DateTime           @updatedAt @map("updated_at")
+
+  members             OrganisationMember[]
+  assessmentRequests  AssessmentRequest[]
+  companyConsents     CompanyConsent[]
+  assessmentSnapshots AssessmentSnapshot[]
+  assessmentCases     AssessmentCase[]
+  policies            Policy[]
+  policyVersions      PolicyVersion[]
+  caseNotes           CaseNote[]
+  caseDecisions       CaseDecision[]
+  usageEvents         UsageEvent[]
+  auditEvents         OrganisationAuditEvent[]
+
+  @@map("organisations")
+}
+
+enum OrganisationStatus {
+  active
+  suspended
+  archived
+
+  @@map("organisation_status")
+}
+
+model OrganisationMember {
+  id             String                   @id @default(cuid())
+  organisationId String                   @map("organisation_id")
+  userId         String                   @map("user_id")
+  role           OrganisationMemberRole   @default(reviewer)
+  status         OrganisationMemberStatus @default(active)
+  invitedAt      DateTime?                @map("invited_at")
+  joinedAt       DateTime?                @map("joined_at")
+  lastActiveAt   DateTime?                @map("last_active_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, userId])
+  @@index([userId, status])
+  @@index([organisationId, role])
+  @@map("organisation_members")
+}
+
+enum OrganisationMemberRole {
+  owner
+  admin
+  policy_admin
+  reviewer
+  manager
+  billing_admin
+  auditor
+
+  @@map("organisation_member_role")
+}
+
+enum OrganisationMemberStatus {
+  invited
+  active
+  suspended
+  removed
+
+  @@map("organisation_member_status")
+}
+
+model AssessmentRequest {
+  id                 String                  @id @default(cuid())
+  organisationId     String                  @map("organisation_id")
+  applicantId        String?                 @map("applicant_id")
+  applicantEmail     String                  @map("applicant_email")
+  applicantName      String?                 @map("applicant_name")
+  assessmentType     CompanyAssessmentType   @map("assessment_type")
+  policyVersionId    String?                 @map("policy_version_id")
+  proposedCommitment Float?                  @map("proposed_commitment")
+  reference          String?
+  status             AssessmentRequestStatus @default(draft)
+  requestToken       String?                 @unique @map("request_token")
+  deadline           DateTime?
+  createdById        String                  @map("created_by_id")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  sentAt             DateTime?               @map("sent_at")
+  completedAt        DateTime?               @map("completed_at")
+  cancelledAt        DateTime?               @map("cancelled_at")
+
+  organisation  Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  applicant     User?            @relation("AssessmentRequestApplicant", fields: [applicantId], references: [id])
+  createdBy     User             @relation("AssessmentRequestCreator", fields: [createdById], references: [id])
+  policyVersion PolicyVersion?   @relation(fields: [policyVersionId], references: [id])
+  consents      CompanyConsent[]
+  cases         AssessmentCase[]
+
+  @@index([organisationId, status])
+  @@index([applicantEmail])
+  @@map("assessment_requests")
+}
+
+enum CompanyAssessmentType {
+  rental
+  telecom
+  utilities
+  lending
+  other
+
+  @@map("company_assessment_type")
+}
+
+enum AssessmentRequestStatus {
+  draft
+  invitation_scheduled
+  invitation_sent
+  applicant_opened
+  applicant_started
+  information_incomplete
+  awaiting_consent
+  ready_for_assessment
+  assessment_delivered
+  expired
+  cancelled
+
+  @@map("assessment_request_status")
+}
+
+model CompanyConsent {
+  id                  String                @id @default(cuid())
+  organisationId      String                @map("organisation_id")
+  applicantId         String                @map("applicant_id")
+  assessmentRequestId String?               @map("assessment_request_id")
+  sharedProfileId     String?               @map("shared_profile_id")
+  assessmentType      CompanyAssessmentType @map("assessment_type")
+  purpose             String?
+  permittedDataScope  Json                  @map("permitted_data_scope")
+  consentTextVersion  String                @map("consent_text_version")
+  status              CompanyConsentStatus  @default(granted)
+  grantedAt           DateTime?             @map("granted_at")
+  expiresAt           DateTime?             @map("expires_at")
+  revokedAt           DateTime?             @map("revoked_at")
+  companyReference    String?               @map("company_reference")
+  createdAt           DateTime              @default(now()) @map("created_at")
+
+  organisation      Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  applicant         User                 @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  assessmentRequest AssessmentRequest?   @relation(fields: [assessmentRequestId], references: [id])
+  sharedProfile     SharedProfile?       @relation(fields: [sharedProfileId], references: [id])
+  snapshots         AssessmentSnapshot[]
+  cases             AssessmentCase[]
+
+  @@index([organisationId, status])
+  @@index([applicantId, status])
+  @@map("company_consents")
+}
+
+enum CompanyConsentStatus {
+  pending
+  granted
+  expired
+  revoked
+
+  @@map("company_consent_status")
+}
+
+model AssessmentSnapshot {
+  id                   String    @id @default(cuid())
+  organisationId       String    @map("organisation_id")
+  applicantId          String    @map("applicant_id")
+  consentId            String    @map("consent_id")
+  snapshotVersion      Int       @map("snapshot_version")
+  dataPeriodStart      DateTime? @map("data_period_start")
+  dataPeriodEnd        DateTime? @map("data_period_end")
+  sourceFreshness      String?   @map("source_freshness")
+  permittedDataScope   Json      @map("permitted_data_scope")
+  trustScoreSummary    Json      @map("trust_score_summary")
+  insightSummary       Json      @map("insight_summary")
+  incomeSummary        Json      @map("income_summary")
+  affordabilitySummary Json      @map("affordability_summary")
+  commitmentsSummary   Json      @map("commitments_summary")
+  verificationSummary  Json      @map("verification_summary")
+  evidenceManifest     Json?     @map("evidence_manifest")
+  evidenceReferences   Json?     @map("evidence_references")
+  integrityHash        String    @map("integrity_hash")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  organisation Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  applicant    User             @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  consent      CompanyConsent   @relation(fields: [consentId], references: [id])
+  cases        AssessmentCase[]
+  usageEvents  UsageEvent[]
+
+  @@unique([organisationId, applicantId, snapshotVersion])
+  @@index([organisationId, createdAt])
+  @@map("assessment_snapshots")
+}
+
+model Policy {
+  id             String                @id @default(cuid())
+  organisationId String                @map("organisation_id")
+  name           String
+  assessmentType CompanyAssessmentType @map("assessment_type")
+  status         PolicyStatus          @default(draft)
+  createdById    String?               @map("created_by_id")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  organisation Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdBy    User?           @relation("PolicyCreator", fields: [createdById], references: [id])
+  versions     PolicyVersion[]
+
+  @@index([organisationId, assessmentType, status])
+  @@map("policies")
+}
+
+enum PolicyStatus {
+  draft
+  active
+  retired
+
+  @@map("policy_status")
+}
+
+model PolicyVersion {
+  id                      String              @id @default(cuid())
+  organisationId          String              @map("organisation_id")
+  policyId                String              @map("policy_id")
+  versionNumber           Int                 @map("version_number")
+  status                  PolicyVersionStatus @default(draft)
+  effectiveFrom           DateTime?           @map("effective_from")
+  effectiveTo             DateTime?           @map("effective_to")
+  createdById             String?             @map("created_by_id")
+  approvedById            String?             @map("approved_by_id")
+  sourceDocumentReference String?             @map("source_document_reference")
+  changeSummary           String?             @map("change_summary")
+  testResults             Json?               @map("test_results")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  approvedAt              DateTime?           @map("approved_at")
+
+  organisation Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  policy       Policy              @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  createdBy    User?               @relation("PolicyVersionCreator", fields: [createdById], references: [id])
+  approvedBy   User?               @relation("PolicyVersionApprover", fields: [approvedById], references: [id])
+  rules        PolicyRule[]
+  requests     AssessmentRequest[]
+  cases        AssessmentCase[]
+
+  @@unique([policyId, versionNumber])
+  @@index([organisationId, status])
+  @@map("policy_versions")
+}
+
+enum PolicyVersionStatus {
+  draft
+  awaiting_approval
+  approved
+  active
+  retired
+
+  @@map("policy_version_status")
+}
+
+model PolicyRule {
+  id                    String    @id @default(cuid())
+  policyVersionId       String    @map("policy_version_id")
+  name                  String
+  description           String?
+  inputField            String    @map("input_field")
+  operator              String
+  threshold             Json?
+  thresholdType         String?   @map("threshold_type")
+  evidencePeriodMonths  Int?      @map("evidence_period_months")
+  missingDataBehaviour  String    @default("review") @map("missing_data_behaviour")
+  confidenceRequirement String?   @map("confidence_requirement")
+  passOutcome           String    @map("pass_outcome")
+  failOutcome           String    @map("fail_outcome")
+  alternativePathway    String?   @map("alternative_pathway")
+  humanReviewRequired   Boolean   @default(false) @map("human_review_required")
+  priority              Int       @default(0)
+  effectiveFrom         DateTime? @map("effective_from")
+  effectiveTo           DateTime? @map("effective_to")
+
+  policyVersion    PolicyVersion     @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  criterionResults CriterionResult[]
+
+  @@index([policyVersionId, priority])
+  @@map("policy_rules")
+}
+
+model AssessmentCase {
+  id                   String                @id @default(cuid())
+  organisationId       String                @map("organisation_id")
+  applicantId          String                @map("applicant_id")
+  assessmentRequestId  String?               @map("assessment_request_id")
+  source               AssessmentSource
+  assessmentType       CompanyAssessmentType @map("assessment_type")
+  policyVersionId      String?               @map("policy_version_id")
+  assessmentSnapshotId String                @map("assessment_snapshot_id")
+  consentId            String                @map("consent_id")
+  status               AssessmentCaseStatus  @default(assessment_ready)
+  assessmentOutcome    AssessmentOutcome?    @map("assessment_outcome")
+  assessmentConfidence AssessmentConfidence? @map("assessment_confidence")
+  reviewerId           String?               @map("reviewer_id")
+  companyDecision      CompanyDecision?      @map("company_decision")
+  decisionRationale    String?               @map("decision_rationale")
+  reference            String?
+  proposedCommitment   Float?                @map("proposed_commitment")
+  creditConsumed       Boolean               @default(false) @map("credit_consumed")
+  assessedAt           DateTime?             @map("assessed_at")
+  expiresAt            DateTime?             @map("expires_at")
+  closedAt             DateTime?             @map("closed_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  organisation        Organisation             @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  applicant           User                     @relation("AssessmentApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  assessmentRequest   AssessmentRequest?       @relation(fields: [assessmentRequestId], references: [id])
+  policyVersion       PolicyVersion?           @relation(fields: [policyVersionId], references: [id])
+  assessmentSnapshot  AssessmentSnapshot       @relation(fields: [assessmentSnapshotId], references: [id])
+  consent             CompanyConsent           @relation(fields: [consentId], references: [id])
+  reviewer            User?                    @relation("AssessmentReviewer", fields: [reviewerId], references: [id])
+  criterionResults    CriterionResult[]
+  notes               CaseNote[]
+  informationRequests InformationRequest[]
+  decisions           CaseDecision[]
+  usageEvents         UsageEvent[]
+  auditEvents         OrganisationAuditEvent[]
+
+  @@index([organisationId, status])
+  @@index([organisationId, assessmentType])
+  @@index([applicantId, createdAt])
+  @@map("assessment_cases")
+}
+
+enum AssessmentSource {
+  user_shared
+  company_requested
+  api
+  refresh
+
+  @@map("assessment_source")
+}
+
+enum AssessmentCaseStatus {
+  pending_share
+  draft_request
+  invitation_sent
+  applicant_started
+  information_incomplete
+  awaiting_consent
+  ready_for_assessment
+  assessment_ready
+  under_review
+  information_requested
+  applicant_responded
+  escalated
+  review_complete
+  company_decision_recorded
+  refresh_requested
+  expired
+  archived
+  cancelled
+
+  @@map("assessment_case_status")
+}
+
+enum AssessmentOutcome {
+  meets_criteria
+  review_required
+  information_required
+  alternative_route_recommended
+  unable_to_assess
+
+  @@map("assessment_outcome")
+}
+
+enum AssessmentConfidence {
+  high
+  medium
+  low
+
+  @@map("assessment_confidence")
+}
+
+model CriterionResult {
+  id                 String                @id @default(cuid())
+  assessmentCaseId   String                @map("assessment_case_id")
+  policyRuleId       String?               @map("policy_rule_id")
+  result             CriterionResultStatus
+  observedValue      Json?                 @map("observed_value")
+  thresholdValue     Json?                 @map("threshold_value")
+  confidence         AssessmentConfidence?
+  evidenceReferences Json?                 @map("evidence_references")
+  assumptions        Json?
+  missingInformation Json?                 @map("missing_information")
+  createdAt          DateTime              @default(now()) @map("created_at")
+
+  assessmentCase AssessmentCase @relation(fields: [assessmentCaseId], references: [id], onDelete: Cascade)
+  policyRule     PolicyRule?    @relation(fields: [policyRuleId], references: [id])
+
+  @@index([assessmentCaseId, result])
+  @@map("criterion_results")
+}
+
+enum CriterionResultStatus {
+  pass
+  fail
+  review
+  missing
+  not_applicable
+
+  @@map("criterion_result_status")
+}
+
+model CaseNote {
+  id               String             @id @default(cuid())
+  assessmentCaseId String             @map("assessment_case_id")
+  organisationId   String             @map("organisation_id")
+  authorId         String             @map("author_id")
+  visibility       CaseNoteVisibility @default(internal)
+  body             String
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  assessmentCase AssessmentCase @relation(fields: [assessmentCaseId], references: [id], onDelete: Cascade)
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  author         User           @relation(fields: [authorId], references: [id])
+
+  @@index([organisationId, assessmentCaseId])
+  @@map("case_notes")
+}
+
+enum CaseNoteVisibility {
+  internal
+  applicant_visible
+
+  @@map("case_note_visibility")
+}
+
+model InformationRequest {
+  id                String                   @id @default(cuid())
+  assessmentCaseId  String                   @map("assessment_case_id")
+  requestType       String                   @map("request_type")
+  message           String
+  requestedFields   Json?                    @map("requested_fields")
+  status            InformationRequestStatus @default(open)
+  dueAt             DateTime?                @map("due_at")
+  createdById       String                   @map("created_by_id")
+  applicantResponse String?                  @map("applicant_response")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  respondedAt       DateTime?                @map("responded_at")
+  resolvedAt        DateTime?                @map("resolved_at")
+
+  assessmentCase AssessmentCase @relation(fields: [assessmentCaseId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentCaseId, status])
+  @@map("information_requests")
+}
+
+enum InformationRequestStatus {
+  open
+  applicant_responded
+  resolved
+  cancelled
+
+  @@map("information_request_status")
+}
+
+model CaseDecision {
+  id                          String             @id @default(cuid())
+  assessmentCaseId            String             @map("assessment_case_id")
+  organisationId              String             @map("organisation_id")
+  decision                    CompanyDecision
+  conditions                  Json?
+  rationale                   String
+  decisionMakerId             String             @map("decision_maker_id")
+  assessmentOutcomeAtDecision AssessmentOutcome? @map("assessment_outcome_at_decision")
+  overrideFlag                Boolean            @default(false) @map("override_flag")
+  overrideReason              String?            @map("override_reason")
+  createdAt                   DateTime           @default(now()) @map("created_at")
+
+  assessmentCase AssessmentCase @relation(fields: [assessmentCaseId], references: [id], onDelete: Cascade)
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  decisionMaker  User           @relation(fields: [decisionMakerId], references: [id])
+
+  @@index([organisationId, createdAt])
+  @@map("case_decisions")
+}
+
+enum CompanyDecision {
+  approved
+  approved_with_conditions
+  additional_information_required
+  guarantor_or_alternative_route_required
+  referred_for_manual_review
+  declined
+  withdrawn
+  expired_without_decision
+
+  @@map("company_decision")
+}
+
+model UsageEvent {
+  id                   String                      @id @default(cuid())
+  organisationId       String                      @map("organisation_id")
+  assessmentCaseId     String?                     @map("assessment_case_id")
+  assessmentSnapshotId String?                     @map("assessment_snapshot_id")
+  applicantId          String?                     @map("applicant_id")
+  eventType            UsageEventType              @map("event_type")
+  source               AssessmentSource?
+  quantity             Int                         @default(1)
+  unit                 UsageUnit                   @default(assessment_credit)
+  occurredAt           DateTime                    @default(now()) @map("occurred_at")
+  billingPeriodStart   DateTime?                   @map("billing_period_start")
+  billingPeriodEnd     DateTime?                   @map("billing_period_end")
+  pricingPlanId        String?                     @map("pricing_plan_id")
+  includedOrOverage    UsageBillingClassification? @map("included_or_overage")
+  unitPrice            Float?                      @map("unit_price")
+  currency             String                      @default("GBP")
+  initiatedByUserId    String?                     @map("initiated_by_user_id")
+  idempotencyKey       String                      @unique @map("idempotency_key")
+  reversalOfEventId    String?                     @map("reversal_of_event_id")
+  metadata             Json?
+  createdAt            DateTime                    @default(now()) @map("created_at")
+
+  organisation       Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  assessmentCase     AssessmentCase?     @relation(fields: [assessmentCaseId], references: [id])
+  assessmentSnapshot AssessmentSnapshot? @relation(fields: [assessmentSnapshotId], references: [id])
+  applicant          User?               @relation("UsageApplicant", fields: [applicantId], references: [id])
+  initiatedBy        User?               @relation("UsageInitiator", fields: [initiatedByUserId], references: [id])
+  reversalOf         UsageEvent?         @relation("UsageEventReversal", fields: [reversalOfEventId], references: [id])
+  reversals          UsageEvent[]        @relation("UsageEventReversal")
+
+  @@index([organisationId, occurredAt])
+  @@index([assessmentCaseId])
+  @@map("usage_events")
+}
+
+enum UsageEventType {
+  assessment_delivered
+  shared_profile_accepted
+  assessment_refreshed
+  assessment_api_delivered
+  manual_credit_granted
+  usage_event_reversed
+
+  @@map("usage_event_type")
+}
+
+enum UsageUnit {
+  assessment_credit
+
+  @@map("usage_unit")
+}
+
+enum UsageBillingClassification {
+  included
+  overage
+  manual
+  reversed
+
+  @@map("usage_billing_classification")
+}
+
+model OrganisationAuditEvent {
+  id                   String   @id @default(cuid())
+  organisationId       String   @map("organisation_id")
+  assessmentCaseId     String?  @map("assessment_case_id")
+  actorType            String   @map("actor_type")
+  actorId              String?  @map("actor_id")
+  action               String
+  targetType           String   @map("target_type")
+  targetId             String?  @map("target_id")
+  beforeStateReference String?  @map("before_state_reference")
+  afterStateReference  String?  @map("after_state_reference")
+  ipAddress            String?  @map("ip_address")
+  sessionId            String?  @map("session_id")
+  metadata             Json?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  assessmentCase AssessmentCase? @relation(fields: [assessmentCaseId], references: [id])
+
+  @@index([organisationId, createdAt])
+  @@index([assessmentCaseId, createdAt])
+  @@map("organisation_audit_events")
 }
 
 // ─── Statement Import Jobs ────────────────────────────────────────────────────
@@ -512,7 +1127,7 @@ model StatementImportJob {
   status      StatementImportJobStatus @default(processing)
   sourceType  String                   @default("pdf") @map("source_type")
   fileName    String?                  @map("file_name")
-  result      Json?                    // { imported, coverageStart, coverageEnd, ledgerVerified, overallScore, overallTier }
+  result      Json? // { imported, coverageStart, coverageEnd, ledgerVerified, overallScore, overallTier }
   error       String?
   createdAt   DateTime                 @default(now()) @map("created_at")
   completedAt DateTime?                @map("completed_at")
@@ -574,14 +1189,14 @@ model WaitlistEntry {
 // ─── Audit Events ─────────────────────────────────────────────────────────────
 
 model AuditEvent {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  eventType String    @map("event_type")
-  actorType String    @default("user") @map("actor_type")
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  actorType String   @default("user") @map("actor_type")
   metadata  Json?
-  ipAddress String?   @map("ip_address")
-  userAgent String?   @map("user_agent")
-  createdAt DateTime  @default(now()) @map("created_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

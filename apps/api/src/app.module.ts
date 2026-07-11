@@ -13,6 +13,8 @@ import { AuditModule } from './audit/audit.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { InsightsModule } from './insights/insights.module'
 import { CompassModule } from './compass/compass.module'
+import { OrganisationsModule } from './organisations/organisations.module'
+import { AssessmentsModule } from './assessments/assessments.module'
 
 @Module({
   controllers: [HealthController],
@@ -29,6 +31,8 @@ import { CompassModule } from './compass/compass.module'
     AnalyticsModule,
     InsightsModule,
     CompassModule,
+    OrganisationsModule,
+    AssessmentsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
