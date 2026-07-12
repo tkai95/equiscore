@@ -11,7 +11,10 @@ type RouteContext = {
 const LOCAL_API_URL = 'http://localhost:4000/api/v1'
 
 function backendApiUrl(): string {
-  return (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? LOCAL_API_URL).replace(/\/+$/, '')
+  return (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? LOCAL_API_URL).replace(
+    /\/+$/,
+    ''
+  )
 }
 
 function targetUrl(request: NextRequest, path: string[]): URL {
@@ -25,6 +28,9 @@ function proxiedRequestHeaders(request: NextRequest): Headers {
   headers.delete('host')
   headers.delete('connection')
   headers.delete('content-length')
+  // This is a trusted server-to-server proxy. Forwarding the browser Origin
+  // makes the API run its CORS browser checks against admin/partners hosts.
+  headers.delete('origin')
   return headers
 }
 

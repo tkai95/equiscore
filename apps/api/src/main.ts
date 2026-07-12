@@ -16,10 +16,20 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   app.use(helmet())
-  const allowedOrigins = (process.env['WEB_URL'] ?? 'http://localhost:3000')
+  const configuredOrigins = (process.env['WEB_URL'] ?? 'http://localhost:3000')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
+  const allowedOrigins = Array.from(
+    new Set([
+      ...configuredOrigins,
+      'http://localhost:3000',
+      'https://dev.equiscore.app',
+      'https://admin.equiscore.app',
+      'https://partners.equiscore.app',
+      'https://equiscore.app',
+    ])
+  )
   app.enableCors({
     origin: (origin, cb) => {
       if (!origin || allowedOrigins.some((o) => origin === o)) {
