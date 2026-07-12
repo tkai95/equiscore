@@ -1,11 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { SignInButton, UserButton, useAuth, useUser } from '@clerk/nextjs'
+import { useEffect } from 'react'
+import { UserButton, useAuth, useUser } from '@clerk/nextjs'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Clock, FileCheck2, ShieldCheck } from 'lucide-react'
 import { workspaceApi } from '@/lib/workspace-api'
-import { Button, Card, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
+import { absoluteConsumerUrl } from '@/lib/app-urls'
+import {
+  Button,
+  Card,
+  PageHeader,
+  PageLayout,
+  Section,
+  StatusPill,
+  buttonClasses,
+} from '@/components/ui'
 import { EquiScoreLogo } from '@/components/brand/logo'
 import { formatMaybeDate, label } from '@/components/workspace/workspace-table'
 
@@ -16,6 +26,16 @@ function pounds(value: number | null): string {
 export function AssessmentRequestCompletion({ requestToken }: { requestToken: string }) {
   const { getToken, isSignedIn } = useAuth()
   const { user } = useUser()
+  const requestPath = `/requests/${encodeURIComponent(requestToken)}`
+  const onboardingPath = `/onboarding?request=${encodeURIComponent(requestToken)}`
+  const signInUrl = absoluteConsumerUrl(`/sign-in?redirect_url=${encodeURIComponent(requestPath)}`)
+  const signUpUrl = absoluteConsumerUrl(
+    `/sign-up?redirect_url=${encodeURIComponent(onboardingPath)}`
+  )
+
+  useEffect(() => {
+    window.localStorage.setItem('equiscore:pending-assessment-request', requestToken)
+  }, [requestToken])
 
   const {
     data: request,
@@ -167,9 +187,14 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
                           </Button>
                         </div>
                       ) : (
-                        <SignInButton mode="modal">
-                          <Button>Sign in to continue</Button>
-                        </SignInButton>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Link href={signUpUrl} className={buttonClasses()}>
+                            Create profile
+                          </Link>
+                          <Link href={signInUrl} className={buttonClasses('secondary')}>
+                            Sign in
+                          </Link>
+                        </div>
                       )}
                     </div>
                   )}

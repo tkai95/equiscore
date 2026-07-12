@@ -26,6 +26,10 @@ export class ProfileService {
     const user = await db.user.findUnique({ where: { id: userId } })
     if (!user) throw new NotFoundException('User not found')
 
+    const monthlyIncomeDeclared = this.finiteNumber(data.monthlyIncomeDeclared)
+    const monthlyRentDeclared = this.finiteNumber(data.monthlyRentDeclared)
+    const employmentType = data.employmentType
+
     return db.$transaction(async (tx) => {
       const profile = await tx.userProfile.upsert({
         where: { userId },
@@ -36,8 +40,8 @@ export class ProfileService {
           residencyStatus: data.residencyStatus,
           ukMoveDate: data.ukMoveDate ? new Date(data.ukMoveDate) : undefined,
           employmentType: data.employmentType,
-          monthlyIncomeDeclared: data.monthlyIncomeDeclared,
-          monthlyRentDeclared: data.monthlyRentDeclared,
+          monthlyIncomeDeclared,
+          monthlyRentDeclared,
           profileStage: 'profile_building',
         },
         create: {
@@ -47,9 +51,9 @@ export class ProfileService {
           nationality: data.nationality,
           residencyStatus: data.residencyStatus,
           ukMoveDate: data.ukMoveDate ? new Date(data.ukMoveDate) : undefined,
-          employmentType: data.employmentType,
-          monthlyIncomeDeclared: data.monthlyIncomeDeclared,
-          monthlyRentDeclared: data.monthlyRentDeclared,
+          employmentType,
+          monthlyIncomeDeclared,
+          monthlyRentDeclared,
           profileStage: 'profile_building',
         },
       })
@@ -79,25 +83,25 @@ export class ProfileService {
         data: { isCurrent: false },
       })
 
-      if (data.employmentType !== 'unemployed') {
+      if (employmentType && employmentType !== 'unemployed') {
         await tx.employmentProfile.create({
           data: {
             userId,
-            employmentType: data.employmentType,
+            employmentType,
             employerName: data.employerName,
             jobTitle: data.jobTitle,
-            monthlyIncomeDeclared: data.monthlyIncomeDeclared,
+            monthlyIncomeDeclared,
             payFrequency: data.payFrequency,
             isCurrent: true,
           },
         })
       }
 
-      if (data.monthlyRentDeclared && data.monthlyRentDeclared > 0) {
+      if (monthlyRentDeclared && monthlyRentDeclared > 0) {
         await tx.rentalProfile.create({
           data: {
             userId,
-            monthlyRentDeclared: data.monthlyRentDeclared,
+            monthlyRentDeclared,
             landlordName: data.landlordName,
             tenancyStartDate: data.tenancyStartDate ? new Date(data.tenancyStartDate) : undefined,
             isCurrent: true,
@@ -152,5 +156,9 @@ export class ProfileService {
       where: { userId },
       data: { profileStage: stage as never },
     })
+  }
+
+  private finiteNumber(value: number | null | undefined): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined
   }
 }

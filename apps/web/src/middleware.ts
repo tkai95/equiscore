@@ -55,6 +55,31 @@ function isAdminHost(req: NextRequest): boolean {
   return host === 'admin.equiscore.app'
 }
 
+function consumerAppBaseUrl(): URL {
+  const configured = process.env.NEXT_PUBLIC_CONSUMER_APP_URL ?? 'https://dev.equiscore.app'
+  try {
+    return new URL(configured)
+  } catch {
+    return new URL('https://dev.equiscore.app')
+  }
+}
+
+function partnerConsumerRedirect(req: NextRequest): URL | null {
+  if (!isPartnersHost(req)) return null
+
+  const { pathname, search } = req.nextUrl
+  if (
+    !matchesPrefix(pathname, ['/requests', '/onboarding', '/dashboard', '/trust-score', '/share'])
+  ) {
+    return null
+  }
+
+  const url = consumerAppBaseUrl()
+  url.pathname = pathname
+  url.search = search
+  return url
+}
+
 function partnerWorkspaceRewrite(req: NextRequest): URL | null {
   if (!isPartnersHost(req)) return null
 
@@ -97,6 +122,9 @@ function adminRewrite(req: NextRequest): URL | null {
 
 export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const p = req.nextUrl.pathname
+  const consumerRedirectUrl = partnerConsumerRedirect(req)
+  if (consumerRedirectUrl) return NextResponse.redirect(consumerRedirectUrl)
+
   const rewriteUrl = partnerWorkspaceRewrite(req) ?? adminRewrite(req)
   const isPartnerWorkspacePath =
     isPartnersHost(req) && (p === '/' || p.startsWith('/o/') || p.startsWith('/workspace'))

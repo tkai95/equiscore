@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, ExternalLink, FileClock, Plus } from 'lucide-react'
 import { workspaceApi, type CreateWorkspaceAssessmentRequestInput } from '@/lib/workspace-api'
+import { absoluteConsumerUrl } from '@/lib/app-urls'
 import { Button, Card, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
 import {
   Cell,
@@ -26,9 +27,7 @@ const ASSESSMENT_TYPES: Array<{ value: AssessmentType; label: string }> = [
 
 function absoluteRequestUrl(path: string | null | undefined): string | null {
   if (!path) return null
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  if (typeof window === 'undefined') return path
-  return `${window.location.origin}${path}`
+  return absoluteConsumerUrl(path)
 }
 
 export function AssessmentRequestsView({ organisationSlug }: { organisationSlug: string }) {

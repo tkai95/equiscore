@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,8 +25,11 @@ const STEPS = [
 export function OnboardingWizard() {
   const { getToken } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState(1)
-  const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data & Step4Data>>({})
+  const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data & Step4Data>>(
+    {}
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -34,6 +37,27 @@ export function OnboardingWizard() {
   const currentSchema = schemas[step - 1]!
 
   const form = useForm({ resolver: zodResolver(currentSchema as never), mode: 'onChange' })
+
+  const pendingRequestToken =
+    searchParams.get('request') ??
+    (typeof window !== 'undefined'
+      ? window.localStorage.getItem('equiscore:pending-assessment-request')
+      : null)
+
+  const afterOnboardingPath = pendingRequestToken
+    ? `/requests/${encodeURIComponent(pendingRequestToken)}?onboarding_complete=true`
+    : '/dashboard?onboarding_complete=true'
+
+  const completeAndRedirect = async (
+    data: Partial<Step1Data & Step2Data & Step3Data & Step4Data>
+  ) => {
+    const token = await getToken()
+    await api.profile.completeOnboarding(token!, data)
+    if (pendingRequestToken && typeof window !== 'undefined') {
+      window.localStorage.removeItem('equiscore:pending-assessment-request')
+    }
+    router.push(afterOnboardingPath)
+  }
 
   const handleNext = async (data: Record<string, unknown>) => {
     const merged = { ...formData, ...data }
@@ -48,9 +72,7 @@ export function OnboardingWizard() {
     setIsSubmitting(true)
     setSubmitError(null)
     try {
-      const token = await getToken()
-      await api.profile.completeOnboarding(token!, merged)
-      router.push('/dashboard?onboarding_complete=true')
+      await completeAndRedirect(merged)
     } catch (err) {
       console.error('Onboarding failed', err)
       setSubmitError("We couldn't save your profile. Please check your connection and try again.")
@@ -69,9 +91,7 @@ export function OnboardingWizard() {
     setIsSubmitting(true)
     setSubmitError(null)
     try {
-      const token = await getToken()
-      await api.profile.completeOnboarding(token!, formData)
-      router.push('/dashboard?onboarding_complete=true')
+      await completeAndRedirect(formData)
     } catch (err) {
       console.error('Onboarding failed', err)
       setSubmitError("We couldn't save your profile. Please check your connection and try again.")
@@ -81,15 +101,17 @@ export function OnboardingWizard() {
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-line bg-surface-card">
+    <div className="rounded-card border-line bg-surface-card overflow-hidden border">
       {/* Progress header */}
-      <div className="border-b border-line-subtle p-6">
-        <div className="mb-4 flex items-center justify-between text-sm text-content-secondary">
-          <span>Step {step} of {STEPS.length}</span>
+      <div className="border-line-subtle border-b p-6">
+        <div className="text-content-secondary mb-4 flex items-center justify-between text-sm">
+          <span>
+            Step {step} of {STEPS.length}
+          </span>
           <span>
             {STEPS[step - 1]?.label}
             {STEPS[step - 1]?.optional && (
-              <span className="ml-1.5 text-xs text-content-muted">(optional)</span>
+              <span className="text-content-muted ml-1.5 text-xs">(optional)</span>
             )}
           </span>
         </div>
@@ -115,9 +137,9 @@ export function OnboardingWizard() {
       </div>
 
       {/* Navigation */}
-      <div className="border-t border-line-subtle p-6">
+      <div className="border-line-subtle border-t p-6">
         {submitError && (
-          <p className="mb-4 text-sm text-danger-strong" role="alert">
+          <p className="text-danger-strong mb-4 text-sm" role="alert">
             {submitError}
           </p>
         )}
