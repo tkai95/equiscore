@@ -16,14 +16,12 @@ export class AuthService {
       email_addresses: Array<{ email_address: string; id: string }>
       primary_email_address_id: string
     }
-    const primary = data.email_addresses.find(
-      (e) => e.id === data.primary_email_address_id
-    )
+    const primary = data.email_addresses.find((e) => e.id === data.primary_email_address_id)
     return primary?.email_address ?? data.email_addresses[0]?.email_address ?? ''
   }
 
   async syncUser(clerkId: string, email: string | undefined) {
-    const resolvedEmail = email || (await this.fetchEmailFromClerk(clerkId))
+    const resolvedEmail = (email || (await this.fetchEmailFromClerk(clerkId))).trim().toLowerCase()
     const user = await db.user.upsert({
       where: { authProviderId: clerkId },
       update: { email: resolvedEmail },

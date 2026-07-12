@@ -15,6 +15,7 @@ import { InsightsModule } from './insights/insights.module'
 import { CompassModule } from './compass/compass.module'
 import { OrganisationsModule } from './organisations/organisations.module'
 import { AssessmentsModule } from './assessments/assessments.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   controllers: [HealthController],
@@ -33,6 +34,7 @@ import { AssessmentsModule } from './assessments/assessments.module'
     CompassModule,
     OrganisationsModule,
     AssessmentsModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

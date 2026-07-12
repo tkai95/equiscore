@@ -22,36 +22,41 @@ model User {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  profile                     UserProfile?
-  addresses                   UserAddress[]
-  employment                  EmploymentProfile[]
-  bankConnections             BankConnection[]
-  documents                   UploadedDocument[]
-  rentalProfiles              RentalProfile[]
-  trustFeatures               TrustFeature[]
-  trustScores                 TrustScore[]
-  sharedProfiles              SharedProfile[]
-  statementImportJobs         StatementImportJob[]
-  insightQuestionAnswers      InsightQuestionAnswer[]
-  auditEvents                 AuditEvent[]
-  organisationMemberships     OrganisationMember[]
-  createdAssessmentRequests   AssessmentRequest[]     @relation("AssessmentRequestCreator")
-  applicantAssessmentRequests AssessmentRequest[]     @relation("AssessmentRequestApplicant")
-  companyConsents             CompanyConsent[]
-  assessmentSnapshots         AssessmentSnapshot[]
-  applicantAssessmentCases    AssessmentCase[]        @relation("AssessmentApplicant")
-  assignedAssessmentCases     AssessmentCase[]        @relation("AssessmentReviewer")
-  createdPolicies             Policy[]                @relation("PolicyCreator")
-  createdPolicyVersions       PolicyVersion[]         @relation("PolicyVersionCreator")
-  approvedPolicyVersions      PolicyVersion[]         @relation("PolicyVersionApprover")
-  caseNotes                   CaseNote[]
-  caseDecisions               CaseDecision[]
-  applicantUsageEvents        UsageEvent[]            @relation("UsageApplicant")
-  initiatedUsageEvents        UsageEvent[]            @relation("UsageInitiator")
-  commitmentSettings          CommitmentSetting[]
-  reminders                   Reminder[]
-  savingsGoals                SavingsGoal[]
-  compassDismissals           CompassDismissal[]
+  profile                         UserProfile?
+  addresses                       UserAddress[]
+  employment                      EmploymentProfile[]
+  bankConnections                 BankConnection[]
+  documents                       UploadedDocument[]
+  rentalProfiles                  RentalProfile[]
+  trustFeatures                   TrustFeature[]
+  trustScores                     TrustScore[]
+  sharedProfiles                  SharedProfile[]
+  statementImportJobs             StatementImportJob[]
+  insightQuestionAnswers          InsightQuestionAnswer[]
+  auditEvents                     AuditEvent[]
+  organisationMemberships         OrganisationMember[]
+  createdAssessmentRequests       AssessmentRequest[]       @relation("AssessmentRequestCreator")
+  applicantAssessmentRequests     AssessmentRequest[]       @relation("AssessmentRequestApplicant")
+  companyConsents                 CompanyConsent[]
+  assessmentSnapshots             AssessmentSnapshot[]
+  applicantAssessmentCases        AssessmentCase[]          @relation("AssessmentApplicant")
+  assignedAssessmentCases         AssessmentCase[]          @relation("AssessmentReviewer")
+  createdPolicies                 Policy[]                  @relation("PolicyCreator")
+  createdPolicyVersions           PolicyVersion[]           @relation("PolicyVersionCreator")
+  approvedPolicyVersions          PolicyVersion[]           @relation("PolicyVersionApprover")
+  caseNotes                       CaseNote[]
+  caseDecisions                   CaseDecision[]
+  applicantUsageEvents            UsageEvent[]              @relation("UsageApplicant")
+  initiatedUsageEvents            UsageEvent[]              @relation("UsageInitiator")
+  organisationInvitationsSent     OrganisationInvitation[]  @relation("OrganisationInvitationInviter")
+  organisationInvitationsAccepted OrganisationInvitation[]  @relation("OrganisationInvitationAccepter")
+  internalAdminAccesses           InternalAdminAccess[]     @relation("InternalAdminAccessUser")
+  grantedInternalAdminAccesses    InternalAdminAccess[]     @relation("InternalAdminAccessGrantor")
+  internalAdminAuditEvents        InternalAdminAuditEvent[] @relation("InternalAdminAuditActor")
+  commitmentSettings              CommitmentSetting[]
+  reminders                       Reminder[]
+  savingsGoals                    SavingsGoal[]
+  compassDismissals               CompassDismissal[]
 
   @@map("users")
 }
@@ -533,17 +538,19 @@ model Organisation {
   createdAt                  DateTime           @default(now()) @map("created_at")
   updatedAt                  DateTime           @updatedAt @map("updated_at")
 
-  members             OrganisationMember[]
-  assessmentRequests  AssessmentRequest[]
-  companyConsents     CompanyConsent[]
-  assessmentSnapshots AssessmentSnapshot[]
-  assessmentCases     AssessmentCase[]
-  policies            Policy[]
-  policyVersions      PolicyVersion[]
-  caseNotes           CaseNote[]
-  caseDecisions       CaseDecision[]
-  usageEvents         UsageEvent[]
-  auditEvents         OrganisationAuditEvent[]
+  members                  OrganisationMember[]
+  invitations              OrganisationInvitation[]
+  assessmentRequests       AssessmentRequest[]
+  companyConsents          CompanyConsent[]
+  assessmentSnapshots      AssessmentSnapshot[]
+  assessmentCases          AssessmentCase[]
+  policies                 Policy[]
+  policyVersions           PolicyVersion[]
+  caseNotes                CaseNote[]
+  caseDecisions            CaseDecision[]
+  usageEvents              UsageEvent[]
+  auditEvents              OrganisationAuditEvent[]
+  internalAdminAuditEvents InternalAdminAuditEvent[]
 
   @@map("organisations")
 }
@@ -575,6 +582,40 @@ model OrganisationMember {
   @@index([userId, status])
   @@index([organisationId, role])
   @@map("organisation_members")
+}
+
+model OrganisationInvitation {
+  id             String                       @id @default(cuid())
+  organisationId String                       @map("organisation_id")
+  email          String
+  role           OrganisationMemberRole       @default(reviewer)
+  status         OrganisationInvitationStatus @default(pending)
+  token          String                       @unique
+  invitedById    String?                      @map("invited_by_id")
+  acceptedById   String?                      @map("accepted_by_id")
+  expiresAt      DateTime                     @map("expires_at")
+  acceptedAt     DateTime?                    @map("accepted_at")
+  revokedAt      DateTime?                    @map("revoked_at")
+  metadata       Json?
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("OrganisationInvitationInviter", fields: [invitedById], references: [id])
+  acceptedBy   User?        @relation("OrganisationInvitationAccepter", fields: [acceptedById], references: [id])
+
+  @@index([email, status])
+  @@index([organisationId, status])
+  @@map("organisation_invitations")
+}
+
+enum OrganisationInvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+
+  @@map("organisation_invitation_status")
 }
 
 enum OrganisationMemberRole {
@@ -1114,6 +1155,65 @@ model OrganisationAuditEvent {
   @@index([organisationId, createdAt])
   @@index([assessmentCaseId, createdAt])
   @@map("organisation_audit_events")
+}
+
+model InternalAdminAccess {
+  id          String              @id @default(cuid())
+  userId      String              @unique @map("user_id")
+  role        InternalAdminRole   @default(readonly)
+  status      InternalAdminStatus @default(active)
+  grantedById String?             @map("granted_by_id")
+  grantedAt   DateTime            @default(now()) @map("granted_at")
+  revokedAt   DateTime?           @map("revoked_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  user      User  @relation("InternalAdminAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("InternalAdminAccessGrantor", fields: [grantedById], references: [id])
+
+  @@index([status, role])
+  @@map("internal_admin_access")
+}
+
+enum InternalAdminRole {
+  owner
+  admin
+  support
+  billing
+  compliance
+  readonly
+
+  @@map("internal_admin_role")
+}
+
+enum InternalAdminStatus {
+  active
+  suspended
+  revoked
+
+  @@map("internal_admin_status")
+}
+
+model InternalAdminAuditEvent {
+  id             String             @id @default(cuid())
+  actorUserId    String?            @map("actor_user_id")
+  actorEmail     String?            @map("actor_email")
+  actorRole      InternalAdminRole? @map("actor_role")
+  action         String
+  targetType     String             @map("target_type")
+  targetId       String?            @map("target_id")
+  organisationId String?            @map("organisation_id")
+  metadata       Json?
+  ipAddress      String?            @map("ip_address")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  actor        User?         @relation("InternalAdminAuditActor", fields: [actorUserId], references: [id])
+  organisation Organisation? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([organisationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("internal_admin_audit_events")
 }
 
 // ─── Statement Import Jobs ────────────────────────────────────────────────────

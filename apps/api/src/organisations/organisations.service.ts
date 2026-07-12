@@ -36,7 +36,13 @@ export class OrganisationsService {
     })
   }
 
-  async listForUser(userId: string) {
+  async listForUser(userId: string, email?: string) {
+    await this.claimPendingInvitations(userId, email)
+    await db.organisationMember.updateMany({
+      where: { userId, status: 'active', organisation: { status: 'active' } },
+      data: { lastActiveAt: new Date() },
+    })
+
     const memberships = await db.organisationMember.findMany({
       where: { userId, status: 'active', organisation: { status: 'active' } },
       orderBy: { joinedAt: 'desc' },
@@ -89,6 +95,11 @@ export class OrganisationsService {
     if (!membership) throw new NotFoundException('Organisation not found')
 
     const role = membership.role as OrganisationRole
+    await db.organisationMember.update({
+      where: { id: membership.id },
+      data: { lastActiveAt: new Date() },
+    })
+
     return {
       organisationId: membership.organisation.id,
       organisationSlug: membership.organisation.slug,
@@ -131,7 +142,12 @@ export class OrganisationsService {
         where: {
           organisationId: context.organisationId,
           eventType: {
-            in: ['assessment_delivered', 'shared_profile_accepted', 'assessment_refreshed', 'assessment_api_delivered'],
+            in: [
+              'assessment_delivered',
+              'shared_profile_accepted',
+              'assessment_refreshed',
+              'assessment_api_delivered',
+            ],
           },
         },
         _sum: { quantity: true },
@@ -178,5 +194,82 @@ export class OrganisationsService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 64)
+  }
+
+  private async claimPendingInvitations(userId: string, email: string | undefined) {
+    const normalisedEmail = email?.trim().toLowerCase()
+    if (!normalisedEmail) return
+
+    const now = new Date()
+    await db.organisationInvitation.updateMany({
+      where: { email: normalisedEmail, status: 'pending', expiresAt: { lte: now } },
+      data: { status: 'expired' },
+    })
+
+    const invitations = await db.organisationInvitation.findMany({
+      where: {
+        email: normalisedEmail,
+        status: 'pending',
+        expiresAt: { gt: now },
+        organisation: { status: 'active' },
+      },
+      include: { organisation: { select: { id: true } } },
+    })
+
+    if (invitations.length === 0) return
+
+    await db.$transaction(async (tx) => {
+      for (const invitation of invitations) {
+        const member = await tx.organisationMember.upsert({
+          where: {
+            organisationId_userId: {
+              organisationId: invitation.organisationId,
+              userId,
+            },
+          },
+          update: {
+            role: invitation.role,
+            status: 'active',
+            invitedAt: invitation.createdAt,
+            joinedAt: now,
+            lastActiveAt: now,
+          },
+          create: {
+            organisationId: invitation.organisationId,
+            userId,
+            role: invitation.role,
+            status: 'active',
+            invitedAt: invitation.createdAt,
+            joinedAt: now,
+            lastActiveAt: now,
+          },
+        })
+
+        await tx.organisationInvitation.update({
+          where: { id: invitation.id },
+          data: {
+            status: 'accepted',
+            acceptedById: userId,
+            acceptedAt: now,
+          },
+        })
+
+        await tx.organisationAuditEvent.create({
+          data: {
+            organisationId: invitation.organisationId,
+            actorType: 'partner_user',
+            actorId: userId,
+            action: 'partner_invitation_accepted',
+            targetType: 'organisation_member',
+            targetId: member.id,
+            metadata: {
+              invitationId: invitation.id,
+              email: normalisedEmail,
+              role: invitation.role,
+            },
+          },
+        })
+      }
+    })
   }
 }

@@ -9,18 +9,12 @@ import {
   BarChart3,
   Building2,
   ClipboardList,
-  FileClock,
-  Gauge,
-  Landmark,
   LifeBuoy,
-  ListChecks,
   Lock,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings,
   ShieldCheck,
-  Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -28,25 +22,15 @@ import { cn } from '@/lib/utils'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { ChatWidget } from '@/components/chat/chat-widget'
 
-const ORG_NAV = [
-  { href: '', label: 'Overview', icon: Gauge },
-  { href: '/assessments', label: 'Assessments', icon: ClipboardList },
-  { href: '/requests', label: 'Requests', icon: FileClock },
-  { href: '/shared', label: 'Shared with us', icon: ShieldCheck },
-  { href: '/policies', label: 'Policies', icon: ListChecks },
-  { href: '/usage', label: 'Usage', icon: BarChart3 },
-  { href: '/audit', label: 'Audit log', icon: Activity },
-  { href: '/settings', label: 'Team & settings', icon: Settings },
+const ADMIN_NAV = [
+  { href: '/admin', label: 'Overview', icon: ShieldCheck, exact: true },
+  { href: '/admin/organisations', label: 'Organisations', icon: Building2 },
+  { href: '/admin/usage', label: 'Usage', icon: BarChart3 },
+  { href: '/admin/activity', label: 'Activity', icon: Activity },
+  { href: '/admin/audit', label: 'Admin audit', icon: ClipboardList },
 ]
 
-function organisationBase(pathname: string): string | null {
-  const parts = pathname.split('/').filter(Boolean)
-  const orgIndex = parts.indexOf('o')
-  const slug = orgIndex >= 0 ? parts[orgIndex + 1] : undefined
-  return slug ? `/workspace/o/${slug}` : null
-}
-
-function WorkspaceNav({
+function AdminNav({
   collapsed = false,
   onNavigate,
 }: {
@@ -54,46 +38,26 @@ function WorkspaceNav({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
-  const base = organisationBase(pathname)
 
   return (
     <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-      <NavLink
-        href="/workspace"
-        label="Organisations"
-        icon={Landmark}
-        pathname={pathname}
-        exact
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-
-      {base && (
-        <>
-          {!collapsed && (
-            <div className="text-sidebar-muted px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide">
-              Current organisation
-            </div>
-          )}
-          {ORG_NAV.map((item) => (
-            <NavLink
-              key={item.label}
-              href={`${base}${item.href}`}
-              label={item.label}
-              icon={item.icon}
-              pathname={pathname}
-              exact={item.href === ''}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </>
-      )}
+      {ADMIN_NAV.map((item) => (
+        <NavLink
+          key={item.label}
+          href={item.href}
+          label={item.label}
+          icon={item.icon}
+          pathname={pathname}
+          exact={item.exact}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      ))}
     </nav>
   )
 }
 
-function WorkspaceFooter({ collapsed = false }: { collapsed?: boolean }) {
+function AdminFooter({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div
       className={cn(
@@ -132,18 +96,18 @@ function WorkspaceFooter({ collapsed = false }: { collapsed?: boolean }) {
   )
 }
 
-function WorkspaceSidebar() {
+function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('workspace-sidebar-collapsed')
+    const saved = window.localStorage.getItem('admin-sidebar-collapsed')
     if (saved === '1') setCollapsed(true)
   }, [])
 
   const toggle = () => {
     setCollapsed((current) => {
       const next = !current
-      window.localStorage.setItem('workspace-sidebar-collapsed', next ? '1' : '0')
+      window.localStorage.setItem('admin-sidebar-collapsed', next ? '1' : '0')
       return next
     })
   }
@@ -184,19 +148,19 @@ function WorkspaceSidebar() {
       {!collapsed && (
         <div className="border-sidebar-border bg-sidebar-active mx-3 mb-3 rounded-lg border px-3 py-2">
           <div className="text-sidebar-text flex items-center gap-2 text-sm font-medium">
-            <Building2 className="h-[18px] w-[18px]" />
-            Company workspace
+            <ShieldCheck className="h-[18px] w-[18px]" />
+            Internal admin
           </div>
         </div>
       )}
 
-      <WorkspaceNav collapsed={collapsed} />
-      <WorkspaceFooter collapsed={collapsed} />
+      <AdminNav collapsed={collapsed} />
+      <AdminFooter collapsed={collapsed} />
     </aside>
   )
 }
 
-function WorkspaceMobileTopBar() {
+function AdminMobileTopBar() {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
 
@@ -221,7 +185,7 @@ function WorkspaceMobileTopBar() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Link href="/workspace" aria-label="Company workspace">
+        <Link href="/admin" aria-label="EquiScore admin">
           <EquiScoreLogo width={124} className="brightness-0 invert" />
         </Link>
         <span className="w-9" aria-hidden />
@@ -236,7 +200,7 @@ function WorkspaceMobileTopBar() {
           />
           <div className="bg-sidebar absolute inset-y-0 left-0 flex w-[280px] max-w-[85%] flex-col shadow-xl">
             <div className="flex items-center justify-between px-6 pb-5 pt-6">
-              <Link href="/workspace" aria-label="Company workspace" onClick={() => setOpen(false)}>
+              <Link href="/admin" aria-label="EquiScore admin" onClick={() => setOpen(false)}>
                 <EquiScoreLogo width={140} className="brightness-0 invert" />
               </Link>
               <button
@@ -249,12 +213,12 @@ function WorkspaceMobileTopBar() {
             </div>
             <div className="border-sidebar-border bg-sidebar-active mx-3 mb-3 rounded-lg border px-3 py-2">
               <div className="text-sidebar-text flex items-center gap-2 text-sm font-medium">
-                <Building2 className="h-[18px] w-[18px]" />
-                Company workspace
+                <ShieldCheck className="h-[18px] w-[18px]" />
+                Internal admin
               </div>
             </div>
-            <WorkspaceNav onNavigate={() => setOpen(false)} />
-            <WorkspaceFooter />
+            <AdminNav onNavigate={() => setOpen(false)} />
+            <AdminFooter />
           </div>
         </div>
       )}
@@ -262,13 +226,13 @@ function WorkspaceMobileTopBar() {
   )
 }
 
-export function WorkspaceShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-surface-page flex h-screen overflow-hidden">
-      <WorkspaceSidebar />
+      <AdminSidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <WorkspaceMobileTopBar />
+        <AdminMobileTopBar />
         <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
 

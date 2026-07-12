@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -18,10 +18,9 @@ export class OrganisationsController {
   @Post()
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a company organisation for the current user' })
-  async create(@CurrentUser() user: RequestUser, @Body() body: { name: string; slug?: string }) {
-    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
-    return this.organisations.createForOwner(dbUser.id, body)
+  @ApiOperation({ summary: 'Organisation creation is managed by EquiScore admin' })
+  async create(@Body() _body: { name: string; slug?: string }) {
+    throw new ForbiddenException('Organisation creation is managed in EquiScore admin')
   }
 
   @Get()
@@ -30,7 +29,7 @@ export class OrganisationsController {
   @ApiOperation({ summary: 'List company organisations for the current user' })
   async list(@CurrentUser() user: RequestUser) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
-    return this.organisations.listForUser(dbUser.id)
+    return this.organisations.listForUser(dbUser.id, dbUser.email)
   }
 
   @Get(':organisationSlug/overview')
