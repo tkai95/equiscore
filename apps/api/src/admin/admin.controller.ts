@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { AdminService } from './admin.service'
@@ -28,6 +28,27 @@ export class AdminController {
   @ApiOperation({ summary: 'List all partner organisations' })
   organisations() {
     return this.admin.listOrganisations()
+  }
+
+  @Get('consumers')
+  @ApiOperation({ summary: 'List consumer accounts and support signals' })
+  consumers(@Query('q') query?: string) {
+    return this.admin.listConsumers(query)
+  }
+
+  @Get('internal-admins')
+  @ApiOperation({ summary: 'List internal admin access and invitations' })
+  internalAdmins() {
+    return this.admin.listInternalAdmins()
+  }
+
+  @Post('internal-admins/invitations')
+  @ApiOperation({ summary: 'Invite an EquiScore internal admin' })
+  inviteInternalAdmin(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Body() body: { email: string; role?: string }
+  ) {
+    return this.admin.inviteInternalAdmin(admin, body)
   }
 
   @Post('organisations')

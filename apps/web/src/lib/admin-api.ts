@@ -84,9 +84,90 @@ export interface AdminOverview {
     deliveredAssessments: number
     usageThisMonth: number
     activePartnerMembers30d: number
+    totalConsumers: number
+    consumerSignupsThisMonth: number
   }
   recentOrganisations: AdminOrganisation[]
   recentAuditEvents: AdminAuditEvent[]
+}
+
+export interface AdminConsumer {
+  id: string
+  email: string
+  status: string
+  compassEnabled: boolean
+  createdAt: string
+  updatedAt: string
+  profile: {
+    fullName: string | null
+    profileStage: string
+    employmentType: string | null
+  } | null
+  latestScore: {
+    overallScore: number
+    overallTier: string
+    computedAt: string
+    validUntil: string | null
+  } | null
+  latestActivity: { eventType: string; createdAt: string } | null
+  internalAdmin: { role: string; status: string } | null
+  partnerMemberships: Array<{
+    role: string
+    status: string
+    organisation: { id: string; name: string; slug: string }
+  }>
+  counts: {
+    bankConnections: number
+    documents: number
+    trustScores: number
+    sharedProfiles: number
+    applicantAssessmentCases: number
+    auditEvents: number
+  }
+}
+
+export interface AdminConsumers {
+  metrics: {
+    totalConsumers: number
+    signupsThisMonth: number
+    activeConsumers30d: number
+    scoredConsumers: number
+    bankConnectedConsumers: number
+  }
+  users: AdminConsumer[]
+}
+
+export interface InternalAdminAccess {
+  id: string
+  user: AdminPerson
+  role: string
+  status: string
+  source: string
+  grantedBy: AdminPerson | null
+  grantedAt: string
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InternalAdminInvitation {
+  id: string
+  email: string
+  role: string
+  status: string
+  token: string
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
+  invitedBy: AdminPerson | null
+  acceptedBy: AdminPerson | null
+}
+
+export interface InternalAdmins {
+  admins: InternalAdminAccess[]
+  invitations: InternalAdminInvitation[]
 }
 
 export interface AdminUsageEvent {
@@ -147,6 +228,21 @@ export interface AdminOrganisationAuditEvent {
 export const adminApi = {
   me: (token: string) => adminFetch('/admin/me', {}, token),
   overview: (token: string) => adminFetch<AdminOverview>('/admin/overview', {}, token),
+  consumers: (token: string, query?: string) =>
+    adminFetch<AdminConsumers>(
+      `/admin/consumers${query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`,
+      {},
+      token
+    ),
+  internalAdmins: {
+    list: (token: string) => adminFetch<InternalAdmins>('/admin/internal-admins', {}, token),
+    invite: (token: string, data: { email: string; role?: string }) =>
+      adminFetch<InternalAdminInvitation>(
+        '/admin/internal-admins/invitations',
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+  },
   organisations: {
     list: (token: string) => adminFetch<AdminOrganisation[]>('/admin/organisations', {}, token),
     create: (

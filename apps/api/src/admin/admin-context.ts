@@ -37,7 +37,7 @@ export const INTERNAL_ADMIN_PERMISSIONS: Record<InternalAdminRole, InternalAdmin
     'admin:manage_access',
     'admin:manage_billing',
   ],
-  support: ['admin:read', 'admin:manage_organisations', 'admin:manage_access'],
+  support: ['admin:read'],
   billing: ['admin:read', 'admin:manage_billing'],
   compliance: ['admin:read', 'admin:manage_compliance'],
   readonly: ['admin:read'],

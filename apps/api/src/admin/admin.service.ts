@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { db } from '@equiscore/database'
+import type { Prisma } from '@equiscore/database'
 import { randomBytes } from 'crypto'
 import type { OrganisationRole } from '../organisations/permissions'
 import {
@@ -30,6 +31,11 @@ interface InviteMemberInput {
   role?: string
 }
 
+interface InviteInternalAdminInput {
+  email: string
+  role?: string
+}
+
 const ORGANISATION_ROLES: OrganisationRole[] = [
   'owner',
   'admin',
@@ -40,12 +46,20 @@ const ORGANISATION_ROLES: OrganisationRole[] = [
   'auditor',
 ]
 
+const INTERNAL_ADMIN_ROLES: InternalAdminRole[] = [
+  'owner',
+  'admin',
+  'support',
+  'billing',
+  'compliance',
+  'readonly',
+]
+
 @Injectable()
 export class AdminService {
   async resolveAdminContext(userId: string, email: string): Promise<InternalAdminContext> {
     const normalisedEmail = this.normaliseEmail(email)
     const bootstrap = this.bootstrapAdminEmails().has(normalisedEmail)
-    const access = await db.internalAdminAccess.findUnique({ where: { userId } })
 
     if (bootstrap) {
       const activeAccess = await db.internalAdminAccess.upsert({
@@ -63,6 +77,19 @@ export class AdminService {
       }
     }
 
+    const invitedAccess = await this.claimPendingInternalAdminInvitation(userId, normalisedEmail)
+    if (invitedAccess?.status === 'active') {
+      const role = invitedAccess.role as InternalAdminRole
+      return {
+        userId,
+        email: normalisedEmail,
+        role,
+        permissions: permissionsForInternalAdminRole(role),
+        source: 'database',
+      }
+    }
+
+    const access = await db.internalAdminAccess.findUnique({ where: { userId } })
     if (access?.status === 'active') {
       const role = access.role as InternalAdminRole
       return {
@@ -77,6 +104,241 @@ export class AdminService {
     throw new ForbiddenException('EquiScore internal admin access is required')
   }
 
+  async listConsumers(query?: string) {
+    const start = this.startOfMonth()
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const q = query?.trim()
+    const where: Prisma.UserWhereInput = q
+      ? {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' } },
+            { profile: { fullName: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : {}
+
+    const [
+      totalConsumers,
+      signupsThisMonth,
+      scoredConsumers,
+      bankConnectedConsumers,
+      activeAuditUsers,
+      users,
+    ] = await Promise.all([
+      db.user.count({ where }),
+      db.user.count({ where: { ...where, createdAt: { gte: start } } }),
+      db.user.count({ where: { ...where, trustScores: { some: {} } } }),
+      db.user.count({
+        where: { ...where, bankConnections: { some: { connectionStatus: 'active' } } },
+      }),
+      db.auditEvent.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo }, user: where },
+        distinct: ['userId'],
+        select: { userId: true },
+      }),
+      db.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          profile: true,
+          trustScores: {
+            orderBy: { computedAt: 'desc' },
+            take: 1,
+            select: { overallScore: true, overallTier: true, computedAt: true, validUntil: true },
+          },
+          auditEvents: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { eventType: true, createdAt: true },
+          },
+          internalAdminAccesses: {
+            select: { role: true, status: true },
+          },
+          organisationMemberships: {
+            select: {
+              role: true,
+              status: true,
+              organisation: { select: { id: true, name: true, slug: true } },
+            },
+          },
+          _count: {
+            select: {
+              bankConnections: true,
+              documents: true,
+              trustScores: true,
+              sharedProfiles: true,
+              applicantAssessmentCases: true,
+              auditEvents: true,
+            },
+          },
+        },
+      }),
+    ])
+
+    return {
+      metrics: {
+        totalConsumers,
+        signupsThisMonth,
+        activeConsumers30d: activeAuditUsers.length,
+        scoredConsumers,
+        bankConnectedConsumers,
+      },
+      users: users.map((user) => {
+        const latestScore = user.trustScores[0] ?? null
+        const latestAudit = user.auditEvents[0] ?? null
+        const internalAdminAccess = user.internalAdminAccesses.find(
+          (access) => access.status === 'active'
+        )
+        const activeMemberships = user.organisationMemberships.filter(
+          (membership) => membership.status === 'active'
+        )
+
+        return {
+          id: user.id,
+          email: user.email,
+          status: user.status,
+          compassEnabled: user.compassEnabled,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          profile: user.profile
+            ? {
+                fullName: user.profile.fullName,
+                profileStage: user.profile.profileStage,
+                employmentType: user.profile.employmentType,
+              }
+            : null,
+          latestScore,
+          latestActivity: latestAudit,
+          internalAdmin: internalAdminAccess
+            ? { role: internalAdminAccess.role, status: internalAdminAccess.status }
+            : null,
+          partnerMemberships: activeMemberships.map((membership) => ({
+            role: membership.role,
+            status: membership.status,
+            organisation: membership.organisation,
+          })),
+          counts: user._count,
+        }
+      }),
+    }
+  }
+
+  async listInternalAdmins() {
+    const [accesses, invitations] = await Promise.all([
+      db.internalAdminAccess.findMany({
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        include: {
+          user: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          grantedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        },
+      }),
+      db.internalAdminInvitation.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          acceptedBy: {
+            select: { id: true, email: true, profile: { select: { fullName: true } } },
+          },
+        },
+      }),
+    ])
+
+    return {
+      admins: accesses.map((access) => ({
+        id: access.id,
+        user: this.mapMemberPerson(access.user),
+        role: access.role,
+        status: access.status,
+        source: this.bootstrapAdminEmails().has(this.normaliseEmail(access.user.email))
+          ? 'bootstrap_env'
+          : 'database',
+        grantedBy: access.grantedBy ? this.mapMemberPerson(access.grantedBy) : null,
+        grantedAt: access.grantedAt,
+        revokedAt: access.revokedAt,
+        createdAt: access.createdAt,
+        updatedAt: access.updatedAt,
+      })),
+      invitations: invitations.map((invitation) => this.mapInternalAdminInvitation(invitation)),
+    }
+  }
+
+  async inviteInternalAdmin(admin: InternalAdminContext, input: InviteInternalAdminInput) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const email = this.normaliseEmail(input.email)
+    if (!email) throw new ConflictException('Invite email is required')
+
+    const role = this.parseInternalAdminRole(input.role ?? 'readonly')
+    if (role === 'owner' && admin.role !== 'owner') {
+      throw new ForbiddenException('Only an owner can invite another owner')
+    }
+
+    const existingUser = await db.user.findUnique({
+      where: { email },
+      include: { internalAdminAccesses: true },
+    })
+    const activeAccess = existingUser?.internalAdminAccesses.find(
+      (access) => access.status === 'active'
+    )
+    if (activeAccess) throw new ConflictException('That user is already an active internal admin')
+
+    const now = new Date()
+    const token = this.makeToken()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    await db.internalAdminInvitation.updateMany({
+      where: { email, status: 'pending', expiresAt: { lte: now } },
+      data: { status: 'expired' },
+    })
+
+    const invitation = await db.$transaction(async (tx) => {
+      const existingPending = await tx.internalAdminInvitation.findFirst({
+        where: { email, status: 'pending' },
+      })
+
+      const saved = existingPending
+        ? await tx.internalAdminInvitation.update({
+            where: { id: existingPending.id },
+            data: {
+              role,
+              token,
+              invitedById: admin.userId,
+              expiresAt,
+              metadata: { source: 'internal_admin_reinvite' },
+            },
+          })
+        : await tx.internalAdminInvitation.create({
+            data: {
+              email,
+              role,
+              token,
+              invitedById: admin.userId,
+              expiresAt,
+              metadata: { source: 'internal_admin_invite' },
+            },
+          })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: existingPending
+            ? 'internal_admin_invitation_resent'
+            : 'internal_admin_invitation_created',
+          targetType: 'internal_admin_invitation',
+          targetId: saved.id,
+          metadata: { email, role },
+        },
+      })
+
+      return saved
+    })
+
+    return this.mapInternalAdminInvitation(invitation)
+  }
+
   async getOverview() {
     const start = this.startOfMonth()
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -87,6 +349,8 @@ export class AdminService {
       deliveredAssessments,
       usageThisMonth,
       activePartnerMembers30d,
+      totalConsumers,
+      consumerSignupsThisMonth,
       recentAuditEvents,
     ] = await Promise.all([
       db.organisation.count(),
@@ -99,6 +363,8 @@ export class AdminService {
       db.organisationMember.count({
         where: { status: 'active', lastActiveAt: { gte: thirtyDaysAgo } },
       }),
+      db.user.count(),
+      db.user.count({ where: { createdAt: { gte: start } } }),
       db.internalAdminAuditEvent.findMany({
         orderBy: { createdAt: 'desc' },
         take: 8,
@@ -115,6 +381,8 @@ export class AdminService {
         deliveredAssessments,
         usageThisMonth: usageThisMonth._sum.quantity ?? 0,
         activePartnerMembers30d,
+        totalConsumers,
+        consumerSignupsThisMonth,
       },
       recentOrganisations: organisations.slice(0, 5),
       recentAuditEvents: recentAuditEvents.map((event) => this.mapInternalAuditEvent(event)),
@@ -584,6 +852,70 @@ export class AdminService {
     throw new ConflictException('Unsupported organisation role')
   }
 
+  private parseInternalAdminRole(value: string): InternalAdminRole {
+    if (INTERNAL_ADMIN_ROLES.includes(value as InternalAdminRole)) return value as InternalAdminRole
+    throw new ConflictException('Unsupported internal admin role')
+  }
+
+  private async claimPendingInternalAdminInvitation(userId: string, email: string) {
+    if (!email) return null
+
+    const now = new Date()
+    await db.internalAdminInvitation.updateMany({
+      where: { email, status: 'pending', expiresAt: { lte: now } },
+      data: { status: 'expired' },
+    })
+
+    const invitation = await db.internalAdminInvitation.findFirst({
+      where: { email, status: 'pending', expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!invitation) return null
+
+    return db.$transaction(async (tx) => {
+      const access = await tx.internalAdminAccess.upsert({
+        where: { userId },
+        update: {
+          role: invitation.role,
+          status: 'active',
+          grantedById: invitation.invitedById,
+          grantedAt: now,
+          revokedAt: null,
+        },
+        create: {
+          userId,
+          role: invitation.role,
+          status: 'active',
+          grantedById: invitation.invitedById,
+          grantedAt: now,
+        },
+      })
+
+      await tx.internalAdminInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: 'accepted',
+          acceptedById: userId,
+          acceptedAt: now,
+        },
+      })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: userId,
+          actorEmail: email,
+          actorRole: invitation.role,
+          action: 'internal_admin_invitation_accepted',
+          targetType: 'internal_admin_access',
+          targetId: access.id,
+          metadata: { invitationId: invitation.id, invitedById: invitation.invitedById },
+        },
+      })
+
+      return access
+    })
+  }
+
   private mapMemberPerson(user: {
     id: string
     email: string
@@ -619,6 +951,36 @@ export class AdminService {
       revokedAt: invitation.revokedAt,
       createdAt: invitation.createdAt,
       updatedAt: invitation.updatedAt,
+    }
+  }
+
+  private mapInternalAdminInvitation(invitation: {
+    id: string
+    email: string
+    role: string
+    status: string
+    token: string
+    expiresAt: Date
+    acceptedAt: Date | null
+    revokedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    invitedBy?: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+    acceptedBy?: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+  }) {
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      status: invitation.status,
+      token: invitation.token,
+      expiresAt: invitation.expiresAt,
+      acceptedAt: invitation.acceptedAt,
+      revokedAt: invitation.revokedAt,
+      createdAt: invitation.createdAt,
+      updatedAt: invitation.updatedAt,
+      invitedBy: invitation.invitedBy ? this.mapMemberPerson(invitation.invitedBy) : null,
+      acceptedBy: invitation.acceptedBy ? this.mapMemberPerson(invitation.acceptedBy) : null,
     }
   }
 

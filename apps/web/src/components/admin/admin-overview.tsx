@@ -54,6 +54,8 @@ export function AdminOverview() {
                 <Metric label="Active partners" value={data.metrics.activeOrganisations} />
                 <Metric label="Usage this month" value={data.metrics.usageThisMonth} />
                 <Metric label="Active members 30d" value={data.metrics.activePartnerMembers30d} />
+                <Metric label="Consumers" value={data.metrics.totalConsumers} />
+                <Metric label="Consumer sign-ups" value={data.metrics.consumerSignupsThisMonth} />
               </MetricGroup>
             </Section>
           </Card>

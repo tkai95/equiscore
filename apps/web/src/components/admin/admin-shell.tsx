@@ -15,6 +15,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
+  UserCog,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -25,8 +27,10 @@ import { ChatWidget } from '@/components/chat/chat-widget'
 const ADMIN_NAV = [
   { href: '/admin', label: 'Overview', icon: ShieldCheck, exact: true },
   { href: '/admin/organisations', label: 'Organisations', icon: Building2 },
+  { href: '/admin/consumers', label: 'Consumers', icon: Users },
   { href: '/admin/usage', label: 'Usage', icon: BarChart3 },
   { href: '/admin/activity', label: 'Activity', icon: Activity },
+  { href: '/admin/internal-admins', label: 'Internal admins', icon: UserCog },
   { href: '/admin/audit', label: 'Admin audit', icon: ClipboardList },
 ]
 
