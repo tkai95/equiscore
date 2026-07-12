@@ -66,8 +66,8 @@ export function OverviewSection({
           <StatTile label="Savings" value={money(o.monthlySavings)} hint="Moved to savings" />
         </div>
         {(o.internalTransfersMonthly > 0 || o.personalTransfersMonthly > 0) && (
-          <p className="mt-3 flex items-start gap-2 text-xs text-gray-500">
-            <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <p className="mt-3 flex items-start gap-2 text-xs text-content-secondary">
+            <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-content-muted" />
             <span>
               {o.internalTransfersMonthly > 0 && (
                 <>You move about {money(o.internalTransfersMonthly)}/mo between your own accounts. </>
@@ -87,12 +87,12 @@ export function OverviewSection({
         <Card>
           <CardTitle title="What supports your profile" />
           {o.profileImpact.length === 0 ? (
-            <p className="text-sm text-gray-500">Add more evidence to surface positive signals.</p>
+            <p className="text-sm text-content-secondary">Add more evidence to surface positive signals.</p>
           ) : (
             <ul className="space-y-2.5">
               {o.profileImpact.map((s, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <li key={i} className="flex items-start gap-2.5 text-sm text-content-secondary">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success-strong" />
                   {s}
                 </li>
               ))}
@@ -103,12 +103,12 @@ export function OverviewSection({
         <Card>
           <CardTitle title="Top things to review" />
           {o.topOpportunities.length === 0 ? (
-            <p className="text-sm text-gray-500">Nothing pressing right now. Nice.</p>
+            <p className="text-sm text-content-secondary">Nothing pressing right now. Nice.</p>
           ) : (
             <ul className="space-y-2.5">
               {o.topOpportunities.map((s, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <li key={i} className="flex items-start gap-2.5 text-sm text-content-secondary">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
                   {s}
                 </li>
               ))}
@@ -132,7 +132,7 @@ function MonthlyReviewCard({ data, onDrill }: { data: CompassPayload; onDrill: D
         right={
           <button
             onClick={() => onDrill({ type: 'month', key: r.month, title: `${r.label}`, subtitle: 'Money in and out' })}
-            className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            className="shrink-0 rounded-lg border border-line bg-surface-card px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-hover"
           >
             View month
           </button>
@@ -150,15 +150,15 @@ function MonthlyReviewCard({ data, onDrill }: { data: CompassPayload; onDrill: D
           <div className="mt-2 space-y-1.5">
             {r.drivers.map((d) => (
               <div key={d.label} className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-gray-700">
+                <span className="flex items-center gap-2 text-content-secondary">
                   {d.direction === 'up' ? (
-                    <TrendingUp className="h-3.5 w-3.5 text-rose-400" />
+                    <TrendingUp className="h-3.5 w-3.5 text-warning-strong" />
                   ) : (
-                    <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />
+                    <TrendingDown className="h-3.5 w-3.5 text-success-strong" />
                   )}
                   {d.label}
                 </span>
-                <span className={cn('font-semibold tabular-nums', d.direction === 'up' ? 'text-rose-600' : 'text-emerald-600')}>
+                <span className={cn('font-semibold tabular-nums', d.direction === 'up' ? 'text-warning-strong' : 'text-success-strong')}>
                   {signed(d.delta)} vs last month
                 </span>
               </div>
@@ -178,17 +178,17 @@ function RemindersStrip({
   actions: CompassActions
 }) {
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+    <div className="rounded-card bg-warning-soft p-4">
       <div className="mb-2 flex items-center gap-2">
-        <Bell className="h-4 w-4 text-amber-600" />
-        <p className="text-sm font-semibold text-amber-900">Reminders</p>
+        <Bell className="h-4 w-4 text-warning-strong" />
+        <p className="text-sm font-semibold text-warning-strong">Reminders</p>
       </div>
       <div className="space-y-2">
         {reminders.map((rem) => (
-          <div key={rem.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/70 p-2.5">
+          <div key={rem.id} className="flex items-center justify-between gap-3 rounded-panel bg-surface-card p-2.5">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-800">{rem.title}</p>
-              <p className="text-xs text-gray-500">
+              <p className="truncate text-sm font-medium text-content">{rem.title}</p>
+              <p className="text-xs text-content-muted">
                 {rem.daysUntilDue > 0
                   ? `Due in ${rem.daysUntilDue} day${rem.daysUntilDue === 1 ? '' : 's'} (${formatDate(rem.dueDate)})`
                   : `Was due ${formatDate(rem.dueDate)}`}
@@ -198,7 +198,7 @@ function RemindersStrip({
               <button
                 onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'completed' })}
                 disabled={reminderBusy(actions, rem.id)}
-                className="rounded-lg p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-40"
+                className="rounded-lg p-1.5 text-success-strong transition-colors hover:bg-success-soft disabled:opacity-40"
                 aria-label="Mark done"
                 title="Mark done"
               >
@@ -207,7 +207,7 @@ function RemindersStrip({
               <button
                 onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'dismissed' })}
                 disabled={reminderBusy(actions, rem.id)}
-                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 disabled:opacity-40"
+                className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-hover disabled:opacity-40"
                 aria-label="Dismiss"
                 title="Dismiss"
               >
@@ -227,12 +227,12 @@ const FLOW_META: Record<
   CompassPayload['moneyMap']['flows'][number]['kind'],
   { tone: 'brand' | 'amber' | 'rose'; dot: string }
 > = {
-  income: { tone: 'brand', dot: 'bg-emerald-500' },
-  personal: { tone: 'amber', dot: 'bg-amber-400' },
-  internal: { tone: 'amber', dot: 'bg-gray-400' },
-  bills: { tone: 'rose', dot: 'bg-rose-400' },
-  discretionary: { tone: 'rose', dot: 'bg-rose-300' },
-  savings: { tone: 'brand', dot: 'bg-brand' },
+  income: { tone: 'brand', dot: 'bg-success-strong' },
+  personal: { tone: 'amber', dot: 'bg-chart-5' },
+  internal: { tone: 'amber', dot: 'bg-content-muted' },
+  bills: { tone: 'rose', dot: 'bg-warning-bar' },
+  discretionary: { tone: 'rose', dot: 'bg-chart-6' },
+  savings: { tone: 'brand', dot: 'bg-brand-600' },
 }
 
 export function MoneyMapSection({ data }: { data: CompassPayload }) {
@@ -251,13 +251,13 @@ export function MoneyMapSection({ data }: { data: CompassPayload }) {
           <FlowColumn title="Money out" flows={outflows} maxAmt={maxAmt} align="left" />
         </div>
         {internal && (
-          <div className="mt-5 flex items-start gap-3 rounded-lg bg-gray-50 p-3">
-            <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+          <div className="mt-5 flex items-start gap-3 rounded-panel bg-surface-inset p-3">
+            <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-content-muted" />
             <div>
-              <p className="text-sm font-medium text-gray-800">
+              <p className="text-sm font-medium text-content">
                 {money(internal.monthly)}/mo moves between your own accounts
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">{internal.detail}</p>
+              <p className="mt-0.5 text-xs text-content-muted">{internal.detail}</p>
             </div>
           </div>
         )}
@@ -266,16 +266,16 @@ export function MoneyMapSection({ data }: { data: CompassPayload }) {
       <Card>
         <CardTitle title="Your accounts" subtitle={m.note} />
         {m.accounts.length === 0 ? (
-          <p className="text-sm text-gray-500">No accounts detected yet.</p>
+          <p className="text-sm text-content-secondary">No accounts detected yet.</p>
         ) : (
           <div className="space-y-2">
             {m.accounts.map((a, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
+              <div key={i} className="flex items-center justify-between gap-3 rounded-panel border border-line-subtle p-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Wallet className="h-4 w-4 shrink-0 text-gray-400" />
+                  <Wallet className="h-4 w-4 shrink-0 text-content-muted" />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-800">{a.label}</p>
-                    <p className="truncate text-xs text-gray-500">{a.note}</p>
+                    <p className="truncate text-sm font-medium text-content">{a.label}</p>
+                    <p className="truncate text-xs text-content-muted">{a.note}</p>
                   </div>
                 </div>
                 <Pill tone={a.connected ? 'good' : 'neutral'}>{a.connected ? 'Connected' : 'Inferred'}</Pill>
@@ -302,20 +302,20 @@ function FlowColumn({
     <div>
       <Label>{title}</Label>
       <div className="mt-3 space-y-3">
-        {flows.length === 0 && <p className="text-sm text-gray-400">Nothing detected.</p>}
+        {flows.length === 0 && <p className="text-sm text-content-muted">Nothing detected.</p>}
         {flows.map((f) => (
           <div key={f.id}>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex min-w-0 items-center gap-2 text-gray-700">
+              <span className="flex min-w-0 items-center gap-2 text-content-secondary">
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', FLOW_META[f.kind].dot)} />
                 <span className="truncate">{f.kind === 'income' || f.kind === 'personal' ? f.from : f.to}</span>
               </span>
-              <span className="shrink-0 font-semibold tabular-nums text-gray-900">{money(f.monthly)}</span>
+              <span className="shrink-0 font-semibold tabular-nums text-content">{money(f.monthly)}</span>
             </div>
             <div className="mt-1.5">
               <Bar value={f.monthly / maxAmt} tone={FLOW_META[f.kind].tone} />
             </div>
-            <p className="mt-1 text-xs text-gray-400">{f.detail}</p>
+            <p className="mt-1 text-xs text-content-muted">{f.detail}</p>
           </div>
         ))}
       </div>
@@ -360,7 +360,7 @@ export function IncomeSection({ data, onDrill }: { data: CompassPayload; onDrill
           </div>
         )}
         {inc.personalTransfersMonthly > 0 && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50/60 p-3 text-xs text-amber-800 ring-1 ring-amber-100">
+          <p className="mt-3 flex items-start gap-2 rounded-panel bg-warning-soft p-3 text-xs text-warning-strong">
             <MinusCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             About {money(inc.personalTransfersMonthly)}/mo comes in from individuals. We treat this as personal transfers,
             not income, so it does not inflate your affordability.
@@ -371,20 +371,20 @@ export function IncomeSection({ data, onDrill }: { data: CompassPayload; onDrill
       <Card>
         <CardTitle title="Where your income comes from" />
         {inc.sources.length === 0 ? (
-          <p className="text-sm text-gray-500">No recurring income sources detected yet.</p>
+          <p className="text-sm text-content-secondary">No recurring income sources detected yet.</p>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-line-subtle">
             {inc.sources.map((s) => (
               <DrillRow key={s.key} onClick={() => onDrill({ type: 'income', key: s.key, title: s.name, subtitle: 'Money received' })}>
-                <CircleDollarSign className="h-4 w-4 shrink-0 text-emerald-500" />
+                <CircleDollarSign className="h-4 w-4 shrink-0 text-success-strong" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-gray-800">{s.name}</span>
-                  <span className="block text-xs text-gray-500">
+                  <span className="block truncate text-sm font-medium text-content">{s.name}</span>
+                  <span className="block text-xs text-content-muted">
                     {s.monthsPresent} month{s.monthsPresent === 1 ? '' : 's'} seen
                     {s.pendingConfirmation ? ' · awaiting your confirmation' : ''}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{money(s.monthlyAverage)}/mo</span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-content">{money(s.monthlyAverage)}/mo</span>
               </DrillRow>
             ))}
           </div>
@@ -416,21 +416,21 @@ export function SpendingSection({ data, onDrill }: { data: CompassPayload; onDri
           />
         ) : (
           <>
-        <p className="mb-1 text-sm text-gray-500">
-          About <span className="font-semibold text-gray-800">{money(sp.averageMonthlySpend)}</span> a month. Tap a
+        <p className="mb-1 text-sm text-content-secondary">
+          About <span className="font-semibold text-content">{money(sp.averageMonthlySpend)}</span> a month. Tap a
           category to see the merchants and payments behind it.
         </p>
-        <div className="mt-3 divide-y divide-gray-50">
+        <div className="mt-3 divide-y divide-line-subtle">
           {cats.map((c) => (
             <DrillRow key={c.key} onClick={() => onDrill({ type: 'category', key: c.key, title: c.label, subtitle: 'Spending breakdown' })}>
               <span className="min-w-0 flex-1">
                 <span className="mb-1 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 truncate text-sm font-medium text-gray-800">
+                  <span className="flex items-center gap-2 truncate text-sm font-medium text-content">
                     {c.label}
                     {c.essential ? <Pill tone="neutral">Essential</Pill> : <Pill tone="neutral">Flexible</Pill>}
                     {c.unconfirmed && <Pill tone="warn">Check</Pill>}
                   </span>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{money(c.monthlyAverage)}/mo</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-content">{money(c.monthlyAverage)}/mo</span>
                 </span>
                 <Bar value={c.monthlyAverage / maxAmt} tone={c.essential ? 'brand' : 'amber'} />
               </span>
@@ -481,10 +481,10 @@ export function BillsSection({
           <CardTitle title="Upcoming reminders" subtitle="We will surface these when they are due so you can review before anything renews." />
           <div className="space-y-2">
             {data.reminders.map((rem) => (
-              <div key={rem.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
+              <div key={rem.id} className="flex items-center justify-between gap-3 rounded-panel border border-line-subtle p-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-800">{rem.title}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="truncate text-sm font-medium text-content">{rem.title}</p>
+                  <p className="text-xs text-content-muted">
                     {rem.type === 'renewal' ? 'Renews' : 'Due'} {formatDate(rem.dueDate)}
                     {rem.daysUntilDue > 0 ? ` · in ${days(rem.daysUntilDue)}` : ' · now due'}
                   </p>
@@ -494,7 +494,7 @@ export function BillsSection({
                   <button
                     onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'completed' })}
                     disabled={reminderBusy(actions, rem.id)}
-                    className="rounded-lg p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-40"
+                    className="rounded-lg p-1.5 text-success-strong transition-colors hover:bg-success-soft disabled:opacity-40"
                     aria-label="Mark done"
                     title="Mark done"
                   >
@@ -503,7 +503,7 @@ export function BillsSection({
                   <button
                     onClick={() => actions.updateReminder.mutate({ id: rem.id, status: 'dismissed' })}
                     disabled={reminderBusy(actions, rem.id)}
-                    className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 disabled:opacity-40"
+                    className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-hover disabled:opacity-40"
                     aria-label="Remove"
                     title="Remove"
                   >
@@ -557,32 +557,32 @@ function CommitmentRow({
   }
 
   return (
-    <div className="rounded-lg border border-gray-100">
+    <div className="rounded-panel border border-line-subtle">
       <button
         onClick={() => onDrill({ type: 'commitment', key: c.key, title: c.name, subtitle: 'Payment history' })}
-        className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+        className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover"
       >
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium text-gray-800">{c.name}</span>
+            <span className="truncate text-sm font-medium text-content">{c.name}</span>
             {c.essential && <Pill tone="neutral">Essential</Pill>}
             {c.setting?.confirmed && <Pill tone="good">Confirmed</Pill>}
             {c.returnedCount > 0 && <Pill tone="warn">{c.returnedCount} returned</Pill>}
           </span>
-          <span className="mt-0.5 block text-xs text-gray-500">
+          <span className="mt-0.5 block text-xs text-content-muted">
             {money(c.amount)} · {c.cadence.replace('_', ' ')}
             {c.typicalDayOfMonth ? ` · around the ${ordinal(c.typicalDayOfMonth)}` : ''}
             {' · '}
             {c.occurrences - c.missedCount}/{c.occurrences} on time
           </span>
           {c.reminder ? (
-            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-700">
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-warning-strong">
               <Bell className="h-3 w-3" />
               Renewal reminder set for {formatDate(c.reminder.dueDate)}
             </span>
           ) : (
             c.nextExpected && (
-              <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500">
+              <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-content-muted">
                 <CalendarClock className="h-3 w-3" />
                 Next expected {formatDate(c.nextExpected.date)}
                 {c.nextExpected.inDays >= 0 ? ` (in ${c.nextExpected.inDays} day${c.nextExpected.inDays === 1 ? '' : 's'})` : ''}
@@ -590,13 +590,13 @@ function CommitmentRow({
             )
           )}
         </span>
-        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{money(c.monthlyEquivalent)}/mo</span>
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-content">{money(c.monthlyEquivalent)}/mo</span>
       </button>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-50 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line-subtle px-3 py-2">
         <button
           onClick={() => setRenewOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brand-50"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-brand-900 hover:bg-brand-50"
         >
           <CalendarClock className="h-3.5 w-3.5" />
           {c.setting?.renewalDate ? 'Edit renewal' : 'Add renewal date'}
@@ -604,7 +604,7 @@ function CommitmentRow({
         <button
           onClick={() => actions.confirmCommitment.mutate({ key: c.key, status: 'inactive' })}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-hover"
         >
           <X className="h-3.5 w-3.5" />
           No longer active
@@ -612,28 +612,28 @@ function CommitmentRow({
       </div>
 
       {renewOpen && (
-        <div className="flex flex-wrap items-center gap-3 border-t border-gray-50 bg-gray-50/60 px-3 py-3">
-          <label className="flex items-center gap-2 text-xs text-gray-600">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle bg-surface-inset px-3 py-3">
+          <label className="flex items-center gap-2 text-xs text-content-secondary">
             Renews on
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="rounded-md border border-gray-200 px-2 py-1 text-sm focus:border-brand focus:outline-none"
+              className="rounded-lg border border-line px-2 py-1 text-sm focus:border-brand-600 focus:outline-none"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-600">
+          <label className="flex items-center gap-1.5 text-xs text-content-secondary">
             <input type="checkbox" checked={remind} onChange={(e) => setRemind(e.target.checked)} className="accent-brand" />
             Remind me before it renews
           </label>
           <button
             onClick={save}
             disabled={busy || !date}
-            className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
           >
             {busy ? 'Saving…' : 'Save'}
           </button>
-          {failed && <span className="text-xs text-rose-600">Couldn&apos;t save. Try again.</span>}
+          {failed && <span className="text-xs text-danger-strong">Couldn&apos;t save. Try again.</span>}
         </div>
       )}
     </div>
@@ -685,21 +685,21 @@ export function ResilienceSection({ data }: { data: CompassPayload }) {
           {eb.monthsCovered != null ? (
             <>
               <div className="flex items-end justify-between">
-                <p className="text-3xl font-semibold tabular-nums text-gray-900">
+                <p className="text-3xl font-semibold tabular-nums text-content">
                   {eb.monthsCovered.toFixed(1)}
-                  <span className="ml-1 text-base font-normal text-gray-500">months covered</span>
+                  <span className="ml-1 text-base font-normal text-content-secondary">months covered</span>
                 </p>
-                <p className="text-sm text-gray-500">target 3.0</p>
+                <p className="text-sm text-content-secondary">target 3.0</p>
               </div>
               <div className="mt-3">
                 <Bar value={bufferProgress} tone={bufferProgress >= 1 ? 'brand' : 'amber'} />
               </div>
-              <p className="mt-2 text-xs text-gray-500">{eb.note}</p>
+              <p className="mt-2 text-xs text-content-muted">{eb.note}</p>
             </>
           ) : (
-            <div className="flex items-start gap-2.5 rounded-lg bg-gray-50 p-3">
-              <PiggyBank className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-              <p className="text-sm text-gray-600">{eb.note}</p>
+            <div className="flex items-start gap-2.5 rounded-panel bg-surface-inset p-3">
+              <PiggyBank className="mt-0.5 h-4 w-4 shrink-0 text-content-muted" />
+              <p className="text-sm text-content-secondary">{eb.note}</p>
             </div>
           )}
         </Card>
@@ -720,23 +720,23 @@ export function ResilienceSection({ data }: { data: CompassPayload }) {
           <CardTitle title="Your months, compared" subtitle="Use your tightest month as a planning baseline." />
           <div className="grid gap-3 sm:grid-cols-2">
             {r.bestMonth && (
-              <div className="flex items-center gap-3 rounded-lg bg-emerald-50/50 p-3 ring-1 ring-emerald-100">
-                <TrendingUp className="h-5 w-5 shrink-0 text-emerald-500" />
+              <div className="flex items-center gap-3 rounded-panel bg-success-soft p-3">
+                <TrendingUp className="h-5 w-5 shrink-0 text-success-strong" />
                 <div>
-                  <p className="text-xs text-gray-500">Best month</p>
-                  <p className="text-sm font-semibold text-gray-800">{r.bestMonth.label}</p>
+                  <p className="text-xs text-content-secondary">Best month</p>
+                  <p className="text-sm font-semibold text-content">{r.bestMonth.label}</p>
                 </div>
-                <p className="ml-auto text-sm font-semibold tabular-nums text-emerald-700">{signed(r.bestMonth.surplus)}</p>
+                <p className="ml-auto text-sm font-semibold tabular-nums text-success-strong">{signed(r.bestMonth.surplus)}</p>
               </div>
             )}
             {r.tightestMonth && (
-              <div className="flex items-center gap-3 rounded-lg bg-amber-50/50 p-3 ring-1 ring-amber-100">
-                <ArrowDownRight className="h-5 w-5 shrink-0 text-amber-500" />
+              <div className="flex items-center gap-3 rounded-panel bg-warning-soft p-3">
+                <ArrowDownRight className="h-5 w-5 shrink-0 text-warning-strong" />
                 <div>
-                  <p className="text-xs text-gray-500">Tightest month</p>
-                  <p className="text-sm font-semibold text-gray-800">{r.tightestMonth.label}</p>
+                  <p className="text-xs text-content-secondary">Tightest month</p>
+                  <p className="text-sm font-semibold text-content">{r.tightestMonth.label}</p>
                 </div>
-                <p className="ml-auto text-sm font-semibold tabular-nums text-amber-700">{signed(r.tightestMonth.surplus)}</p>
+                <p className="ml-auto text-sm font-semibold tabular-nums text-warning-strong">{signed(r.tightestMonth.surplus)}</p>
               </div>
             )}
           </div>
@@ -763,8 +763,8 @@ function RatioRow({ label, value, warnAbove }: { label: string; value: number; w
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="text-gray-700">{label}</span>
-        <span className={cn('font-semibold tabular-nums', warn ? 'text-amber-600' : 'text-gray-900')}>{pct(value)}</span>
+        <span className="text-content-secondary">{label}</span>
+        <span className={cn('font-semibold tabular-nums', warn ? 'text-warning-strong' : 'text-content')}>{pct(value)}</span>
       </div>
       <Bar value={value} tone={warn ? 'amber' : 'brand'} />
     </div>
@@ -775,11 +775,11 @@ function Signal({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2.5 text-sm">
       {ok ? (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-success-strong" />
       ) : (
-        <MinusCircle className="h-4 w-4 shrink-0 text-gray-300" />
+        <MinusCircle className="h-4 w-4 shrink-0 text-content-muted" />
       )}
-      <span className={ok ? 'text-gray-700' : 'text-gray-400'}>{label}</span>
+      <span className={ok ? 'text-content-secondary' : 'text-content-muted'}>{label}</span>
     </div>
   )
 }
@@ -802,11 +802,11 @@ export function SavingsSection({ data, actions }: { data: CompassPayload; action
         ) : (
           <div className="space-y-3">
             {ops.map((o) => (
-              <div key={o.id} className="relative rounded-xl border border-gray-200 p-4">
+              <div key={o.id} className="relative rounded-card border border-line p-4">
                 <button
                   onClick={() => actions.dismissOpportunity.mutate(o.id)}
                   disabled={actions.dismissOpportunity.isPending && actions.dismissOpportunity.variables === o.id}
-                  className="absolute right-2 top-2 rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500 disabled:opacity-40"
+                  className="absolute right-2 top-2 rounded-lg p-1 text-content-muted transition-colors hover:bg-surface-hover hover:text-content-secondary disabled:opacity-40"
                   aria-label="Dismiss this suggestion"
                   title="Dismiss"
                 >
@@ -814,15 +814,15 @@ export function SavingsSection({ data, actions }: { data: CompassPayload; action
                 </button>
                 <div className="flex items-start justify-between gap-3 pr-6">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{o.title}</p>
-                    <p className="mt-1 text-sm text-gray-600">{o.description}</p>
+                    <p className="text-sm font-semibold text-content">{o.title}</p>
+                    <p className="mt-1 text-sm text-content-secondary">{o.description}</p>
                   </div>
                   {o.estimatedSavingHigh != null && (
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold tabular-nums text-emerald-700">
+                      <p className="text-sm font-semibold tabular-nums text-success-strong">
                         {money(o.estimatedSavingLow ?? 0)}–{money(o.estimatedSavingHigh)}
                       </p>
-                      <p className="text-[11px] text-gray-400">per month</p>
+                      <p className="text-[11px] text-content-muted">per month</p>
                     </div>
                   )}
                 </div>
@@ -833,12 +833,12 @@ export function SavingsSection({ data, actions }: { data: CompassPayload; action
                     <Pill tone="good">up to {money(o.estimatedAnnualHigh)}/yr</Pill>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-gray-400">Why you are seeing this: {o.reason}</p>
+                <p className="mt-2 text-xs text-content-muted">Why you are seeing this: {o.reason}</p>
               </div>
             ))}
           </div>
         )}
-        <p className="mt-4 text-xs text-gray-400">
+        <p className="mt-4 text-xs text-content-muted">
           Provider comparisons are coming later. For now, these highlight where a review may pay off.
         </p>
       </Card>
@@ -878,7 +878,7 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
         right={
           <button
             onClick={() => setEditing((e) => !e)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface-card px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-hover"
           >
             <Target className="h-3.5 w-3.5" />
             {goal.suggested ? 'Set goal' : 'Adjust'}
@@ -887,12 +887,12 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
       />
 
       <div className="flex items-end justify-between">
-        <p className="text-2xl font-semibold tabular-nums text-gray-900">
+        <p className="text-2xl font-semibold tabular-nums text-content">
           {money(goal.currentSaved)}
-          <span className="ml-1 text-base font-normal text-gray-500">of {money(goal.targetAmount)}</span>
+          <span className="ml-1 text-base font-normal text-content-secondary">of {money(goal.targetAmount)}</span>
         </p>
         {goal.monthsToGoal != null && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-content-secondary">
             {goal.monthsToGoal === 0
               ? 'Target reached'
               : `about ${goal.monthsToGoal} month${goal.monthsToGoal === 1 ? '' : 's'} to go`}
@@ -902,7 +902,7 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
       <div className="mt-3">
         <Bar value={progress} tone={progress >= 1 ? 'brand' : 'amber'} />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-content-secondary">
         <span>Gap {money(goal.gap)}</span>
         {goal.monthlyContribution != null && <span>Saving {money(goal.monthlyContribution)}/mo</span>}
         {goal.onTrack != null && (
@@ -911,11 +911,11 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
       </div>
 
       {editing && (
-        <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-4">
-          <label className="text-xs text-gray-600">
+        <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-line-subtle pt-4">
+          <label className="text-xs text-content-secondary">
             Target amount
-            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
-              <span className="text-sm text-gray-400">£</span>
+            <div className="mt-1 flex items-center rounded-lg border border-line px-2">
+              <span className="text-sm text-content-muted">£</span>
               <input
                 type="number"
                 min="1"
@@ -925,10 +925,10 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
               />
             </div>
           </label>
-          <label className="text-xs text-gray-600">
+          <label className="text-xs text-content-secondary">
             Monthly saving (optional)
-            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
-              <span className="text-sm text-gray-400">£</span>
+            <div className="mt-1 flex items-center rounded-lg border border-line px-2">
+              <span className="text-sm text-content-muted">£</span>
               <input
                 type="number"
                 min="0"
@@ -939,9 +939,9 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
               />
             </div>
           </label>
-          <label className="text-xs text-gray-600">
+          <label className="text-xs text-content-secondary">
             Reach it within (months, optional)
-            <div className="mt-1 flex items-center rounded-md border border-gray-200 px-2">
+            <div className="mt-1 flex items-center rounded-lg border border-line px-2">
               <input
                 type="number"
                 min="1"
@@ -955,11 +955,11 @@ function GoalCard({ goal, actions }: { goal: NonNullable<CompassPayload['goal']>
           <button
             onClick={save}
             disabled={busy}
-            className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
           >
             {busy ? 'Saving…' : 'Save goal'}
           </button>
-          {failed && <span className="text-xs text-rose-600">Couldn&apos;t save. Try again.</span>}
+          {failed && <span className="text-xs text-danger-strong">Couldn&apos;t save. Try again.</span>}
         </div>
       )}
     </Card>
@@ -995,20 +995,20 @@ export function ImpactSection({ data }: { data: CompassPayload }) {
               <a
                 key={i.id}
                 href={i.href}
-                className="flex items-start gap-3 rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+                className="flex items-start gap-3 rounded-panel border border-line-subtle p-3 transition-colors hover:bg-surface-hover"
               >
-                <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-800">{i.title}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{i.detail}</p>
+                  <p className="text-sm font-medium text-content">{i.title}</p>
+                  <p className="mt-0.5 text-xs text-content-muted">{i.detail}</p>
                 </div>
                 {i.estimatedGain != null && (
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-strong">
                     +{i.estimatedGain}
                     {i.reachesTier ? ` → ${i.reachesTier}` : ''}
                   </span>
                 )}
-                <ArrowRight className="mt-0.5 hidden h-4 w-4 shrink-0 text-gray-300 sm:block" />
+                <ArrowRight className="mt-0.5 hidden h-4 w-4 shrink-0 text-content-muted sm:block" />
               </a>
             ))}
           </div>

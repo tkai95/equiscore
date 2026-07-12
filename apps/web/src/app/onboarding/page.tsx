@@ -1,18 +1,19 @@
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { EquiScoreLogo } from '@/components/brand/logo'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Complete your profile' }
 
 export default function OnboardingPage() {
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-surface-page">
       <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="mb-8 text-center">
-          <a href="/dashboard" className="text-xl font-bold text-brand">
-            Equiscore
+        <div className="mb-8 flex flex-col items-center text-center">
+          <a href="/dashboard" aria-label="EquiScore" className="inline-flex">
+            <EquiScoreLogo width={150} />
           </a>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">Build your trust profile</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-content">Build your trust profile</h1>
+          <p className="mt-2 text-content-secondary">
             This takes about 5 minutes. Your data is encrypted and never sold.
           </p>
         </div>

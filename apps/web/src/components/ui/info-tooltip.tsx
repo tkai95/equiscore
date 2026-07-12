@@ -17,7 +17,7 @@ export function InfoTooltip({ label, children }: { label: string; children: Reac
           <button
             type="button"
             aria-label={label}
-            className="inline-flex items-center text-gray-300 transition-colors hover:text-gray-500 focus:outline-none focus-visible:text-gray-500"
+            className="inline-flex items-center text-content-muted transition-colors hover:text-content-secondary focus:outline-none focus-visible:text-content-secondary"
           >
             <HelpCircle className="h-3.5 w-3.5" />
           </button>

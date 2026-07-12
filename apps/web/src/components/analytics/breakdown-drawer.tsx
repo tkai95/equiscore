@@ -37,7 +37,7 @@ export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; on
       {isLoading || !data ? (
         <div className="space-y-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-10 animate-pulse rounded-lg bg-gray-100" />
+            <div key={i} className="h-10 animate-pulse rounded-panel bg-surface-hover" />
           ))}
         </div>
       ) : data.kind === 'category' ? (
@@ -52,10 +52,10 @@ export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; on
               <div className="space-y-1.5">
                 {data.merchants.map((m) => (
                   <div key={m.name} className="flex items-center justify-between text-sm">
-                    <span className="min-w-0 truncate text-gray-700">{m.name}</span>
-                    <span className="shrink-0 tabular-nums text-gray-500">
+                    <span className="min-w-0 truncate text-content-secondary">{m.name}</span>
+                    <span className="shrink-0 tabular-nums text-content-muted">
                       {formatCurrency(m.total)}
-                      <span className="ml-1 text-xs text-gray-400">×{m.count}</span>
+                      <span className="ml-1 text-xs text-content-muted">×{m.count}</span>
                     </span>
                   </div>
                 ))}
@@ -101,8 +101,8 @@ export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; on
               <div className="space-y-1.5">
                 {data.categories.map((c) => (
                   <div key={c.label} className="flex items-center justify-between text-sm">
-                    <span className="min-w-0 truncate text-gray-700">{c.label}</span>
-                    <span className="shrink-0 tabular-nums text-gray-500">{formatCurrency(c.total)}</span>
+                    <span className="min-w-0 truncate text-content-secondary">{c.label}</span>
+                    <span className="shrink-0 tabular-nums text-content-muted">{formatCurrency(c.total)}</span>
                   </div>
                 ))}
               </div>
@@ -121,11 +121,11 @@ export function BreakdownDrawer({ spec, onClose }: { spec: DrawerSpec | null; on
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'in' | 'out' }) {
   return (
-    <div className="rounded-lg bg-gray-50 px-3 py-2.5">
-      <p className="text-xs text-gray-400">{label}</p>
+    <div className="rounded-panel bg-surface-inset px-3 py-2.5">
+      <p className="text-xs text-content-muted">{label}</p>
       <p
         className={`mt-0.5 text-sm font-semibold tabular-nums ${
-          tone === 'in' ? 'text-emerald-600' : tone === 'out' ? 'text-rose-600' : 'text-gray-900'
+          tone === 'in' ? 'text-success-strong' : tone === 'out' ? 'text-danger-strong' : 'text-content'
         }`}
       >
         {value}
@@ -137,25 +137,25 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'in
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-muted">{title}</h3>
       {children}
     </div>
   )
 }
 
 function TxnList({ rows, positive }: { rows: TxnRow[]; positive?: boolean }) {
-  if (rows.length === 0) return <p className="text-sm text-gray-400">No transactions found.</p>
+  if (rows.length === 0) return <p className="text-sm text-content-muted">No transactions found.</p>
   return (
-    <div className="divide-y divide-gray-50">
+    <div className="divide-y divide-line-subtle">
       {rows.map((t, i) => (
         <div key={`${t.date}-${i}`} className="flex items-center justify-between gap-3 py-2">
           <div className="min-w-0">
-            <p className="truncate text-sm text-gray-700">{t.description || 'Transaction'}</p>
-            <p className="text-xs text-gray-400">{formatDate(t.date)}</p>
+            <p className="truncate text-sm text-content-secondary">{t.description || 'Transaction'}</p>
+            <p className="text-xs text-content-muted">{formatDate(t.date)}</p>
           </div>
           <span
             className={`shrink-0 text-sm font-medium tabular-nums ${
-              positive ? 'text-emerald-600' : 'text-gray-900'
+              positive ? 'text-success-strong' : 'text-content'
             }`}
           >
             {positive ? '+' : ''}

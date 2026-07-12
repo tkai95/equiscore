@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import { FileText, Upload, Trash2, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
+import { Button, Card, PageTitle, StatusPill, type StatusTone } from '@/components/ui'
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   passport: 'Passport',
@@ -76,11 +77,14 @@ interface UploadedDocument {
   uploadedAt: string
 }
 
-const STATUS_CONFIG = {
-  pending: { icon: Clock, label: 'Checking…', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  verified: { icon: CheckCircle, label: 'Verified', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  rejected: { icon: XCircle, label: 'Couldn’t verify', className: 'bg-red-50 text-red-700 ring-red-200' },
-  needs_review: { icon: AlertCircle, label: 'Needs review', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
+const STATUS_CONFIG: Record<
+  UploadedDocument['verificationStatus'],
+  { icon: typeof Clock; label: string; tone: StatusTone }
+> = {
+  pending: { icon: Clock, label: 'Checking…', tone: 'warning' },
+  verified: { icon: CheckCircle, label: 'Verified', tone: 'success' },
+  rejected: { icon: XCircle, label: 'Couldn’t verify', tone: 'danger' },
+  needs_review: { icon: AlertCircle, label: 'Needs review', tone: 'warning' },
 }
 
 const IDENTITY_TYPES = ['passport', 'national_id', 'biometric_residence_permit', 'driving_licence']
@@ -231,28 +235,28 @@ export function DocumentsView() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-        <p className="text-gray-600">Upload supporting documents to strengthen your trust profile.</p>
+        <PageTitle>Documents</PageTitle>
+        <p className="mt-1 text-sm text-content-secondary">Upload supporting documents to strengthen your trust profile.</p>
       </div>
 
       {/* Upload panel */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <h2 className="mb-1 font-semibold text-gray-900">Upload a document</h2>
-        <p className="mb-4 text-sm text-gray-500">
+      <Card padding="md">
+        <h2 className="mb-1 font-semibold text-content">Upload a document</h2>
+        <p className="mb-4 text-sm text-content-secondary">
           Identity and supporting documents. Uploading a{' '}
           <strong>bank statement</strong>?{' '}
-          <Link href="/dashboard/connections" className="font-medium text-brand hover:underline">
+          <Link href="/dashboard/connections" className="font-medium text-brand-900 hover:underline">
             Add it on Bank connections
           </Link>{' '}
           instead — we&apos;ll read it and build your profile.
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Document type</label>
+            <label className="mb-1.5 block text-sm font-medium text-content">Document type</label>
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-lg border border-line bg-surface-card px-3 py-2.5 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             >
               <option value="">Select a type…</option>
               {DOCUMENT_CATEGORIES.map((cat) => (
@@ -275,40 +279,40 @@ export function DocumentsView() {
               onChange={handleFileChange}
               disabled={!selectedType || isUploading}
             />
-            <button
+            <Button
               onClick={() => fileInputRef.current?.click()}
-              disabled={!selectedType || isUploading}
-              className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface shadow-sm hover:bg-brand-dark disabled:opacity-50"
+              disabled={!selectedType}
+              loading={isUploading}
             >
-              <Upload className="h-4 w-4" />
+              {!isUploading && <Upload className="h-4 w-4" />}
               {isUploading ? 'Uploading…' : 'Choose file'}
-            </button>
+            </Button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-gray-400">Accepted: PDF, JPEG, PNG, WebP · Max 10 MB</p>
+        <p className="mt-2 text-xs text-content-muted">Accepted: PDF, JPEG, PNG, WebP · Max 10 MB</p>
         {uploadError && (
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-danger-strong">
             <XCircle className="h-4 w-4 shrink-0" />
             {uploadError}
           </p>
         )}
-      </div>
+      </Card>
 
       {/* Document list */}
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-2xl bg-gray-100" />
+            <div key={i} className="h-20 animate-pulse rounded-card bg-surface-hover" />
           ))}
         </div>
       ) : documents.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cream">
-            <FileText className="h-8 w-8 text-brand" />
+        <div className="flex flex-col items-center gap-4 rounded-card border border-line bg-surface-card py-16">
+          <div className="flex h-16 w-16 items-center justify-center rounded-card bg-brand-50 text-brand-900">
+            <FileText className="h-8 w-8" />
           </div>
           <div className="text-center">
-            <p className="font-semibold text-gray-900">No documents uploaded yet</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="font-semibold text-content">No documents uploaded yet</p>
+            <p className="mt-1 text-sm text-content-secondary">
               Identity and financial documents improve your verification score.
             </p>
           </div>
@@ -317,7 +321,7 @@ export function DocumentsView() {
         <div className="space-y-6">
           {DOCUMENT_CATEGORIES.filter((cat) => groupedDocs[cat.label]).map((cat) => (
             <div key={cat.label}>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-content-muted">
                 {cat.label}
               </h3>
               <div className="space-y-2">
@@ -328,16 +332,16 @@ export function DocumentsView() {
                   return (
                     <div
                       key={doc.id}
-                      className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100"
+                      className="flex items-start gap-4 rounded-card border border-line bg-surface-card p-4"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50">
-                        <FileText className="h-5 w-5 text-gray-400" />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-surface-inset">
+                        <FileText className="h-5 w-5 text-content-muted" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">
+                        <p className="truncate text-sm font-medium text-content">
                           {DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-content-muted">
                           {formatDate(doc.uploadedAt)}
                           {doc.fileSizeBytes != null && ` · ${formatBytes(doc.fileSizeBytes)}`}
                         </p>
@@ -346,31 +350,28 @@ export function DocumentsView() {
                             className={cn(
                               'mt-1 text-xs',
                               doc.verificationStatus === 'verified'
-                                ? 'text-emerald-700'
+                                ? 'text-success-strong'
                                 : doc.verificationStatus === 'rejected'
-                                  ? 'text-red-600'
+                                  ? 'text-danger-strong'
                                   : doc.verificationStatus === 'needs_review'
-                                    ? 'text-amber-700'
-                                    : 'text-gray-500'
+                                    ? 'text-warning-strong'
+                                    : 'text-content-secondary'
                             )}
                           >
                             {detail}
                           </p>
                         )}
                       </div>
-                      <span
-                        className={cn(
-                          'flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
-                          status.className
-                        )}
-                      >
-                        <StatusIcon className={cn('h-3 w-3', doc.verificationStatus === 'pending' && 'animate-spin')} />
-                        {status.label}
-                      </span>
+                      <StatusPill
+                        status={status.tone}
+                        label={status.label}
+                        icon={<StatusIcon className={cn(doc.verificationStatus === 'pending' && 'animate-spin')} />}
+                        className="shrink-0"
+                      />
                       <button
                         onClick={() => deleteMutation.mutate(doc.id)}
                         disabled={deletingId === doc.id}
-                        className="ml-2 shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                        className="ml-2 shrink-0 rounded-lg p-1.5 text-content-muted transition-colors hover:bg-danger-soft hover:text-danger-strong disabled:opacity-40"
                         title="Delete document"
                       >
                         <Trash2 className="h-4 w-4" />

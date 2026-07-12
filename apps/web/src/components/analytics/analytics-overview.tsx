@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
+import { Card, PageTitle, Section } from '@/components/ui'
 import { MonthlyFlowChart } from './monthly-flow-chart'
 import { InsightProfileView } from './insight-profile-view'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
@@ -34,11 +35,32 @@ function monthLabel(key: string): string {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <p className="text-base text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{value}</p>
-      {sub && <p className="mt-1 text-sm text-gray-400">{sub}</p>}
-    </div>
+    <Card padding="none" className="p-5">
+      <p className="text-sm text-content-secondary">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-content">{value}</p>
+      {sub && <p className="mt-1 text-sm text-content-muted">{sub}</p>}
+    </Card>
+  )
+}
+
+/** Section heading moved inside the panel: header · divider · content. */
+function Panel({
+  title,
+  action,
+  children,
+}: {
+  title: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <Card padding="none">
+      <div className="flex items-center justify-between gap-4 border-b border-line-subtle px-5 py-4">
+        <h3 className="text-base font-semibold text-content">{title}</h3>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div className="p-5">{children}</div>
+    </Card>
   )
 }
 
@@ -75,8 +97,8 @@ export function AnalyticsOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Financial insights</h1>
-        <p className="mt-1 text-base text-gray-500">
+        <PageTitle>Financial insights</PageTitle>
+        <p className="mt-1 max-w-2xl text-sm text-content-secondary">
           What your bank data says about your income, spending, and reliability, from Open Banking or
           an uploaded statement.
         </p>
@@ -88,10 +110,7 @@ export function AnalyticsOverview() {
       {hasData && (
         <>
           {/* ── Monthly trends ──────────────────────────────────────────── */}
-          <div>
-            <h2 className="mb-3 text-base font-semibold uppercase tracking-wide text-gray-500">
-              Monthly trends
-            </h2>
+          <Section title="Monthly trends">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatCard
                 label={`Latest month${latest ? ` · ${monthLabel(latest.month)}` : ''}`}
@@ -116,55 +135,54 @@ export function AnalyticsOverview() {
 
             {/* Best / tightest month */}
             {best && tightest && (
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4">
-                  <ArrowUpRight className="h-5 w-5 shrink-0 text-emerald-500" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Card padding="none" className="flex items-center gap-3 p-4">
+                  <ArrowUpRight className="h-5 w-5 shrink-0 text-success-strong" />
                   <div>
-                    <p className="text-xs text-gray-500">Strongest surplus month</p>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-xs text-content-muted">Strongest surplus month</p>
+                    <p className="text-sm font-semibold tabular-nums text-content">
                       {monthLabel(best.month)} · {best.net >= 0 ? '+' : ''}
                       {formatCurrency(best.net)}
                     </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4">
-                  <ArrowDownRight className="h-5 w-5 shrink-0 text-rose-500" />
+                </Card>
+                <Card padding="none" className="flex items-center gap-3 p-4">
+                  <ArrowDownRight className="h-5 w-5 shrink-0 text-danger-strong" />
                   <div>
-                    <p className="text-xs text-gray-500">Tightest month</p>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-xs text-content-muted">Tightest month</p>
+                    <p className="text-sm font-semibold tabular-nums text-content">
                       {monthLabel(tightest.month)} · {tightest.net >= 0 ? '+' : ''}
                       {formatCurrency(tightest.net)}
                     </p>
                   </div>
-                </div>
+                </Card>
               </div>
             )}
 
             {/* Income vs expenses */}
-            <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-700">Income vs expenses</h3>
-                <span className="text-sm text-gray-400">Tap a month for detail</span>
-              </div>
+            <Panel
+              title="Income vs expenses"
+              action={<span className="text-sm text-content-muted">Tap a month for detail</span>}
+            >
               <MonthlyFlowChart
                 data={monthly.map((m) => ({ month: m.month, income: m.income, expenses: m.spend, net: m.net }))}
                 onSelectMonth={(m) =>
                   setMonthDrawer({ type: 'month', key: m, title: monthLabel(m), subtitle: 'Cashflow for this month' })
                 }
               />
-            </div>
-          </div>
+            </Panel>
+          </Section>
         </>
       )}
 
       {!hasData && !profile && (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <TrendingUp className="mx-auto h-8 w-8 text-gray-300" />
-          <p className="mt-3 text-sm font-medium text-gray-600">No transaction data yet</p>
-          <p className="mt-1 text-xs text-gray-400">
+        <Card padding="none" className="border-dashed p-10 text-center">
+          <TrendingUp className="mx-auto h-8 w-8 text-content-muted" />
+          <p className="mt-3 text-sm font-medium text-content">No transaction data yet</p>
+          <p className="mt-1 text-xs text-content-muted">
             Connect a bank account or upload a statement to see your trends.
           </p>
-        </div>
+        </Card>
       )}
 
       <BreakdownDrawer spec={monthDrawer} onClose={() => setMonthDrawer(null)} />

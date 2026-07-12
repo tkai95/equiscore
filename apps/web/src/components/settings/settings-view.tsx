@@ -4,7 +4,8 @@ import { useAuth, useUser, SignOutButton } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { LogOut, User, Shield, ChevronRight } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
+import { Card, PageLayout, PageTitle } from '@/components/ui'
 
 const STAGE_LABELS: Record<string, string> = {
   created: 'Account created',
@@ -31,20 +32,23 @@ interface UserProfile {
   createdAt: string
 }
 
+/** Report-style panel: heading, hairline divider, then content. */
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-      <h2 className="mb-4 font-semibold text-gray-900">{title}</h2>
-      {children}
-    </div>
+    <Card padding="none">
+      <div className="border-b border-line-subtle px-5 py-4">
+        <h2 className="text-base font-semibold text-content">{title}</h2>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </Card>
   )
 }
 
 function SettingsRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-3 first:pt-0 last:pb-0 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900">{value}</span>
+    <div className="flex items-center justify-between border-b border-line-subtle py-3 first:pt-0 last:border-0 last:pb-0">
+      <span className="text-sm text-content-secondary">{label}</span>
+      <span className="text-sm font-medium text-content">{value}</span>
     </div>
   )
 }
@@ -64,19 +68,16 @@ export function SettingsView() {
   const stageIndex = STAGE_ORDER.indexOf(profile?.profileStage ?? 'created')
 
   return (
-    <div className="space-y-8">
+    <PageLayout>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600">Manage your account and profile preferences.</p>
+        <PageTitle>Settings</PageTitle>
+        <p className="mt-1 text-sm text-content-secondary">Manage your account and profile preferences.</p>
       </div>
 
       {/* Account details */}
       <SectionCard title="Account">
         <SettingsRow label="Email address" value={user?.primaryEmailAddress?.emailAddress ?? '—'} />
-        <SettingsRow
-          label="Name"
-          value={user?.fullName ?? user?.firstName ?? '—'}
-        />
+        <SettingsRow label="Name" value={user?.fullName ?? user?.firstName ?? '—'} />
         <SettingsRow
           label="Member since"
           value={user?.createdAt ? formatDate(user.createdAt.toISOString()) : '—'}
@@ -93,25 +94,25 @@ export function SettingsView() {
               return (
                 <div key={stage} className="flex items-center gap-3">
                   <div
-                    className={
-                      done
-                        ? 'h-2.5 w-2.5 rounded-full bg-brand'
-                        : 'h-2.5 w-2.5 rounded-full border-2 border-gray-200'
-                    }
+                    className={cn(
+                      'h-2.5 w-2.5 rounded-full',
+                      done ? 'bg-brand' : 'border border-line bg-surface-inset',
+                    )}
                   />
                   <span
-                    className={
+                    className={cn(
+                      'text-sm',
                       current
-                        ? 'text-sm font-semibold text-brand'
+                        ? 'font-semibold text-brand-900'
                         : done
-                        ? 'text-sm text-gray-700'
-                        : 'text-sm text-gray-400'
-                    }
+                          ? 'text-content'
+                          : 'text-content-muted',
+                    )}
                   >
                     {STAGE_LABELS[stage]}
                   </span>
                   {current && (
-                    <span className="rounded-full bg-cream px-2 py-0.5 text-xs font-medium text-brand border border-[#D8D6C9]">
+                    <span className="rounded-lg bg-brand px-2 py-0.5 text-xs font-medium text-cream-surface">
                       Current
                     </span>
                   )}
@@ -127,23 +128,23 @@ export function SettingsView() {
         <div className="space-y-1">
           <a
             href="/dashboard/profile"
-            className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm text-content transition-colors hover:bg-surface-hover"
           >
             <div className="flex items-center gap-2.5">
-              <User className="h-4 w-4 text-gray-400" />
+              <User className="h-4 w-4 text-content-muted" />
               Edit profile information
             </div>
-            <ChevronRight className="h-4 w-4 text-gray-300" />
+            <ChevronRight className="h-4 w-4 text-content-muted/60" />
           </a>
           <a
             href="/dashboard/share"
-            className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm text-content transition-colors hover:bg-surface-hover"
           >
             <div className="flex items-center gap-2.5">
-              <Shield className="h-4 w-4 text-gray-400" />
+              <Shield className="h-4 w-4 text-content-muted" />
               Manage share links
             </div>
-            <ChevronRight className="h-4 w-4 text-gray-300" />
+            <ChevronRight className="h-4 w-4 text-content-muted/60" />
           </a>
         </div>
       </SectionCard>
@@ -151,12 +152,12 @@ export function SettingsView() {
       {/* Sign out */}
       <SectionCard title="Session">
         <SignOutButton redirectUrl="/sign-in">
-          <button className="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">
+          <button className="inline-flex h-9 items-center gap-2 rounded-lg border border-danger-border px-4 text-sm font-medium text-danger-strong transition-colors hover:bg-danger-soft">
             <LogOut className="h-4 w-4" />
             Sign out
           </button>
         </SignOutButton>
       </SectionCard>
-    </div>
+    </PageLayout>
   )
 }

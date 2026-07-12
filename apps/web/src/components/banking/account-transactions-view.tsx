@@ -4,9 +4,10 @@ import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useState, useMemo } from 'react'
-import { ArrowLeft, TrendingUp, TrendingDown, Search } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Button, PageTitle } from '@/components/ui'
 
 interface Transaction {
   id: string
@@ -30,22 +31,34 @@ interface Account {
 }
 
 // How each category maps to a scoring signal
-const CATEGORY_META: Record<string, { label: string; signal: string; signalClass: string }> = {
-  salary:             { label: 'Salary',        signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
-  gig_income:         { label: 'Gig Income',    signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
-  government_benefit: { label: 'Gov Benefit',   signal: 'Income',      signalClass: 'bg-emerald-100 text-emerald-700' },
-  rent_payment:       { label: 'Rent',          signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
-  loan_repayment:     { label: 'Loan',          signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
-  utilities:          { label: 'Utilities',     signal: 'Commitment',  signalClass: 'bg-[#EBF2EF] text-[#3D6658]' },
-  groceries:          { label: 'Groceries',     signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
-  transport:          { label: 'Transport',     signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
-  healthcare:         { label: 'Healthcare',    signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
-  education:          { label: 'Education',     signal: 'Living',      signalClass: 'bg-gray-100 text-gray-600' },
-  entertainment:      { label: 'Entertainment', signal: 'Discretionary', signalClass: 'bg-orange-100 text-orange-700' },
-  cash_withdrawal:    { label: 'Cash',          signal: 'Discretionary', signalClass: 'bg-orange-100 text-orange-700' },
-  savings_transfer:   { label: 'Savings',       signal: 'Savings',     signalClass: 'bg-teal-100 text-teal-700' },
-  investment:         { label: 'Investment',    signal: 'Savings',     signalClass: 'bg-teal-100 text-teal-700' },
-  other:              { label: 'Other',         signal: '—',           signalClass: 'text-gray-400' },
+// Category → signal group. Colour is derived from the signal group via
+// SIGNAL_TONE so the palette stays consistent with the design system.
+const CATEGORY_META: Record<string, { label: string; signal: string }> = {
+  salary:             { label: 'Salary',        signal: 'Income' },
+  gig_income:         { label: 'Gig Income',    signal: 'Income' },
+  government_benefit: { label: 'Gov Benefit',   signal: 'Income' },
+  rent_payment:       { label: 'Rent',          signal: 'Commitment' },
+  loan_repayment:     { label: 'Loan',          signal: 'Commitment' },
+  utilities:          { label: 'Utilities',     signal: 'Commitment' },
+  groceries:          { label: 'Groceries',     signal: 'Living' },
+  transport:          { label: 'Transport',     signal: 'Living' },
+  healthcare:         { label: 'Healthcare',    signal: 'Living' },
+  education:          { label: 'Education',     signal: 'Living' },
+  entertainment:      { label: 'Entertainment', signal: 'Discretionary' },
+  cash_withdrawal:    { label: 'Cash',          signal: 'Discretionary' },
+  savings_transfer:   { label: 'Savings',       signal: 'Savings' },
+  investment:         { label: 'Investment',    signal: 'Savings' },
+  other:              { label: 'Other',         signal: '—' },
+}
+
+// One tone per signal group, drawn from system tokens (no raw emerald/teal/hex).
+const SIGNAL_TONE: Record<string, string> = {
+  Income:        'bg-success-soft text-success-strong',
+  Commitment:    'bg-brand-50 text-brand-900',
+  Savings:       'bg-info-soft text-info-strong',
+  Living:        'bg-surface-inset text-content-secondary',
+  Discretionary: 'bg-warning-soft text-warning-strong',
+  '—':           'text-content-muted',
 }
 
 const SIGNAL_ORDER = ['Income', 'Commitment', 'Savings', 'Living', 'Discretionary', '—']
@@ -108,9 +121,9 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <div className="h-6 w-40 animate-pulse rounded bg-gray-100" />
-        <div className="h-20 animate-pulse rounded-2xl bg-gray-100" />
-        <div className="h-96 animate-pulse rounded-2xl bg-gray-100" />
+        <div className="h-6 w-40 animate-pulse rounded bg-surface-hover" />
+        <div className="h-20 animate-pulse rounded-card bg-surface-hover" />
+        <div className="h-96 animate-pulse rounded-card bg-surface-hover" />
       </div>
     )
   }
@@ -127,15 +140,15 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
       <div>
         <Link
           href="/dashboard/connections"
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+          className="mb-3 inline-flex items-center gap-1.5 text-sm text-content-secondary hover:text-content"
         >
           <ArrowLeft className="h-4 w-4" />
           Bank connections
         </Link>
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{account.accountName ?? 'Account'}</h1>
-            <p className="text-sm text-gray-500">
+            <PageTitle>{account.accountName ?? 'Account'}</PageTitle>
+            <p className="text-sm text-content-secondary">
               {account.bankConnection.institutionName ?? 'Connected bank'}
               {' · '}
               {account.accountType.replace('_', ' ')}
@@ -143,8 +156,8 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
           </div>
           {account.currentBalance !== null && (
             <div className="text-right">
-              <p className="text-2xl font-bold text-gray-900">{fmt(account.currentBalance, currency)}</p>
-              <p className="text-xs text-gray-500">Current balance</p>
+              <p className="text-2xl font-semibold tabular-nums text-content">{fmt(account.currentBalance, currency)}</p>
+              <p className="text-xs text-content-muted">Current balance</p>
             </div>
           )}
         </div>
@@ -152,36 +165,36 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
 
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs text-gray-500">Transactions</p>
-          <p className="mt-1 text-xl font-bold text-gray-900">{account.transactions.length}</p>
+        <div className="rounded-card border border-line bg-surface-card p-4">
+          <p className="text-xs text-content-muted">Transactions</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-content">{account.transactions.length}</p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs text-gray-500">Total in</p>
-          <p className="mt-1 text-xl font-bold text-emerald-600">{fmt(totalCredit, currency)}</p>
+        <div className="rounded-card border border-line bg-surface-card p-4">
+          <p className="text-xs text-content-muted">Total in</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-success-strong">{fmt(totalCredit, currency)}</p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs text-gray-500">Total out</p>
-          <p className="mt-1 text-xl font-bold text-red-500">{fmt(totalDebit, currency)}</p>
+        <div className="rounded-card border border-line bg-surface-card p-4">
+          <p className="text-xs text-content-muted">Total out</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-content">{fmt(totalDebit, currency)}</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             placeholder="Search transactions…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
+            className="h-9 rounded-lg border border-line bg-surface-card pl-8 pr-3 text-sm text-content placeholder:text-content-muted focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
           />
         </div>
         <select
           value={filterSignal}
           onChange={e => setFilterSignal(e.target.value)}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
+          className="h-9 rounded-lg border border-line bg-surface-card px-3 text-sm text-content-secondary focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
         >
           <option value="All">All signals</option>
           {SIGNAL_ORDER.filter(s => s !== '—').map(s => (
@@ -191,35 +204,35 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
         <select
           value={filterDirection}
           onChange={e => setFilterDirection(e.target.value)}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
+          className="h-9 rounded-lg border border-line bg-surface-card px-3 text-sm text-content-secondary focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
         >
           <option value="All">In &amp; Out</option>
           <option value="Credit">Money in</option>
           <option value="Debit">Money out</option>
         </select>
         {(search || filterSignal !== 'All' || filterDirection !== 'All') && (
-          <button
+          <Button
+            variant="secondary"
             onClick={() => { setSearch(''); setFilterSignal('All'); setFilterDirection('All') }}
-            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-500 hover:bg-gray-50"
           >
             Clear
-          </button>
+          </Button>
         )}
-        <span className="ml-auto self-center text-sm text-gray-400">
+        <span className="ml-auto self-center text-sm text-content-muted">
           {filtered.length} of {account.transactions.length}
         </span>
       </div>
 
       {/* Table */}
       {grouped.length === 0 ? (
-        <div className="rounded-2xl bg-white py-16 text-center shadow-sm ring-1 ring-gray-100">
-          <p className="text-gray-500">No transactions match your filters</p>
+        <div className="rounded-card border border-line bg-surface-card py-16 text-center">
+          <p className="text-content-secondary">No transactions match your filters</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div className="overflow-hidden rounded-card border border-line bg-surface-card">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-line-subtle bg-surface-inset text-left text-xs font-semibold uppercase tracking-wide text-content-muted">
                 <th className="px-4 py-3 w-24">Date</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 w-36">Category</th>
@@ -234,15 +247,15 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                 return (
                   <>
                     {/* Month group header */}
-                    <tr key={`header-${key}`} className="border-b border-gray-100 bg-cream/60">
+                    <tr key={`header-${key}`} className="border-b border-line-subtle bg-surface-inset">
                       <td colSpan={3} className="px-4 py-2">
-                        <span className="font-semibold text-gray-700">{monthLabel(key)}</span>
-                        <span className="ml-2 text-xs text-gray-500">{txns.length} transactions</span>
+                        <span className="font-semibold text-content">{monthLabel(key)}</span>
+                        <span className="ml-2 text-xs text-content-muted">{txns.length} transactions</span>
                       </td>
-                      <td colSpan={2} className="px-4 py-2 text-right text-xs">
-                        <span className="text-emerald-600 font-medium">+{fmt(credit, currency)}</span>
-                        <span className="mx-2 text-gray-300">·</span>
-                        <span className="text-red-500 font-medium">−{fmt(debit, currency)}</span>
+                      <td colSpan={2} className="px-4 py-2 text-right text-xs tabular-nums">
+                        <span className="font-medium text-success-strong">+{fmt(credit, currency)}</span>
+                        <span className="mx-2 text-content-muted/50">·</span>
+                        <span className="font-medium text-content-secondary">−{fmt(debit, currency)}</span>
                       </td>
                     </tr>
                     {txns.map((txn, i) => {
@@ -254,20 +267,20 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                         <tr
                           key={txn.id}
                           className={cn(
-                            'border-b border-gray-50 transition-colors hover:bg-gray-50/50',
+                            'border-b border-line-subtle transition-colors hover:bg-surface-hover',
                             i === txns.length - 1 && 'border-b-0'
                           )}
                         >
                           {/* Date */}
-                          <td className="px-4 py-3 tabular-nums text-gray-500 whitespace-nowrap">
+                          <td className="px-4 py-3 tabular-nums text-content-secondary whitespace-nowrap">
                             {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                           </td>
 
                           {/* Description */}
                           <td className="px-4 py-3 max-w-xs">
-                            <p className="font-medium text-gray-900 truncate">{name}</p>
+                            <p className="font-medium text-content truncate">{name}</p>
                             {hasSecondary && (
-                              <p className="text-xs text-gray-400 truncate">{txn.description}</p>
+                              <p className="text-xs text-content-muted truncate">{txn.description}</p>
                             )}
                           </td>
 
@@ -275,7 +288,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                           <td className="px-4 py-3">
                             <span className={cn(
                               'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                              meta.signalClass
+                              SIGNAL_TONE[meta.signal]
                             )}>
                               {meta.label}
                             </span>
@@ -285,24 +298,20 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
                           <td className="px-4 py-3">
                             {meta.signal !== '—' ? (
                               <span className={cn(
-                                'inline-block rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
-                                meta.signal === 'Income'        && 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                                meta.signal === 'Commitment'    && 'bg-[#EBF2EF] text-[#3D6658] ring-[#B5CEC8]',
-                                meta.signal === 'Savings'       && 'bg-teal-50 text-teal-700 ring-teal-200',
-                                meta.signal === 'Living'        && 'bg-gray-50 text-gray-600 ring-gray-200',
-                                meta.signal === 'Discretionary' && 'bg-orange-50 text-orange-700 ring-orange-200',
+                                'inline-block rounded-md px-2 py-0.5 text-xs font-semibold',
+                                SIGNAL_TONE[meta.signal]
                               )}>
                                 {meta.signal}
                               </span>
                             ) : (
-                              <span className="text-xs text-gray-300">—</span>
+                              <span className="text-xs text-content-muted">—</span>
                             )}
                           </td>
 
                           {/* Amount */}
                           <td className={cn(
                             'px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap',
-                            txn.direction === 'credit' ? 'text-emerald-600' : 'text-gray-900'
+                            txn.direction === 'credit' ? 'text-success-strong' : 'text-content'
                           )}>
                             {txn.direction === 'credit' ? '+' : '−'}
                             {fmt(txn.amount, txn.currency)}

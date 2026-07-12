@@ -86,8 +86,8 @@ export function ImportJobsChip() {
 
   if (done?.status === 'completed') {
     return (
-      <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+      <div className="flex items-center gap-2 rounded-full bg-success-soft px-3 py-1.5 text-sm font-medium text-success-strong ring-1 ring-success-strong/20">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-success-strong" />
         <span>
           Statement analysed
           {done.result ? ` — ${done.result.overallTier} / ${done.result.overallScore}` : ''}
@@ -95,13 +95,13 @@ export function ImportJobsChip() {
         <Link
           href="/dashboard/analytics"
           onClick={() => dismiss(done.id)}
-          className="font-semibold underline underline-offset-2 hover:text-emerald-900"
+          className="font-semibold underline underline-offset-2 hover:text-success-strong"
         >
           View insights
         </Link>
         <button
           onClick={() => dismiss(done.id)}
-          className="ml-0.5 rounded-full p-0.5 hover:bg-emerald-100"
+          className="ml-0.5 rounded-full p-0.5 hover:bg-success-soft"
           aria-label="Dismiss"
         >
           <X className="h-3.5 w-3.5" />

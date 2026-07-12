@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button, Card, PageTitle, StatusPill } from '@/components/ui'
 import { EnableBankingConnect } from './enable-banking-connect'
 
 interface BankAccount {
@@ -274,39 +275,35 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bank connections</h1>
-          <p className="text-gray-600">Connect your bank account to strengthen your Trust Portfolio.</p>
+          <PageTitle>Bank connections</PageTitle>
+          <p className="mt-1 text-sm text-content-secondary">Connect your bank account to strengthen your Trust Portfolio.</p>
         </div>
         {hasAccounts && (
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshCw className={cn('h-4 w-4', syncMutation.isPending && 'animate-spin')} />
+          <Button variant="secondary" onClick={() => syncMutation.mutate()} loading={syncMutation.isPending}>
+            {!syncMutation.isPending && <RefreshCw className="h-4 w-4" />}
             {syncMutation.isPending ? 'Syncing…' : 'Sync now'}
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Status banners */}
       {bankConnected && (
-        <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
-          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+        <div className="flex items-center gap-3 rounded-panel bg-success-soft px-4 py-3 text-sm text-success-strong">
+          <CheckCircle className="h-4 w-4 shrink-0 text-success-strong" />
           Bank connected successfully — your transactions are being imported.
         </div>
       )}
       {bankError && (
-        <div className="flex items-center gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-          <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+        <div className="flex items-center gap-3 rounded-panel bg-danger-soft px-4 py-3 text-sm text-danger-strong">
+          <AlertCircle className="h-4 w-4 shrink-0 text-danger-strong" />
           Something went wrong connecting your bank. Please try again.
         </div>
       )}
       {disconnectMutation.isError && (
-        <div className="flex items-center gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-          <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+        <div className="flex items-center gap-3 rounded-panel bg-danger-soft px-4 py-3 text-sm text-danger-strong">
+          <AlertCircle className="h-4 w-4 shrink-0 text-danger-strong" />
           We couldn&apos;t disconnect that bank. Please try again.
         </div>
       )}
@@ -315,7 +312,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(2)].map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-2xl bg-gray-100" />
+            <div key={i} className="h-40 animate-pulse rounded-card bg-surface-hover" />
           ))}
         </div>
       ) : hasAccounts ? (
@@ -324,33 +321,28 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
           {bankGroups.map((connection) => {
             const isConfirming = confirm?.kind === 'bank' && confirm.ids[0] === connection.id
             return (
-              <div
+              <Card
                 key={connection.id}
-                className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100"
+                padding="none"
+                className="overflow-hidden"
               >
                 {/* Bank header */}
-                <div className="flex items-center gap-4 border-b border-gray-100 px-5 py-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cream">
-                    <Landmark className="h-5 w-5 text-brand" />
+                <div className="flex items-center gap-4 border-b border-line-subtle px-5 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-brand-50 text-brand-900">
+                    <Landmark className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-gray-900">{connection.label}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="truncate font-semibold text-content">{connection.label}</p>
+                    <p className="text-xs text-content-muted">
                       {connection.accounts.length}{' '}
                       {connection.accounts.length === 1 ? 'account' : 'accounts'} · Last synced:{' '}
                       {formatDate(connection.lastSyncedAt)}
                     </p>
                   </div>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-medium',
-                      connection.connectionStatus === 'active'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-amber-100 text-amber-700'
-                    )}
-                  >
-                    {connection.connectionStatus}
-                  </span>
+                  <StatusPill
+                    status={connection.connectionStatus === 'active' ? 'success' : 'warning'}
+                    label={connection.connectionStatus}
+                  />
                   {!isConfirming && (
                     <button
                       onClick={() =>
@@ -362,7 +354,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                         })
                       }
                       disabled={isDisconnecting}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-content-muted transition-colors hover:bg-danger-soft hover:text-danger-strong disabled:opacity-50"
                     >
                       <Unlink className="h-4 w-4" />
                       Disconnect
@@ -383,53 +375,53 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 )}
 
                 {/* Accounts within this bank */}
-                <div className="divide-y divide-gray-50">
+                <div className="divide-y divide-line-subtle">
                   {connection.accounts.map((account) => {
                     const Icon = ACCOUNT_TYPE_ICONS[account.accountType]
                     return (
                       <Link
                         key={account.id}
                         href={`/dashboard/connections/${account.id}`}
-                        className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50"
+                        className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover"
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cream">
-                          <Icon className="h-4 w-4 text-brand" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-brand-50 text-brand-900">
+                          <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-gray-900">{account.accountName}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="truncate font-medium text-content">{account.accountName}</p>
+                          <p className="text-sm text-content-secondary">
                             {ACCOUNT_TYPE_LABELS[account.accountType]}
                           </p>
                         </div>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-lg font-semibold tabular-nums text-content">
                           {formatBalance(account.currentBalance, account.currency)}
                         </p>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-content-muted" />
                       </Link>
                     )
                   })}
                 </div>
-              </div>
+              </Card>
             )
           })}
 
           {/* Uploaded statements — all grouped under one header, multi-select disconnect */}
           {uploadGroups.length > 0 && (
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-              <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cream">
-                  <FileSpreadsheet className="h-5 w-5 text-brand" />
+            <Card padding="none" className="overflow-hidden">
+              <div className="flex flex-wrap items-center gap-3 border-b border-line-subtle px-5 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-brand-50 text-brand-900">
+                  <FileSpreadsheet className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-900">Uploaded statements</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-semibold text-content">Uploaded statements</p>
+                  <p className="text-xs text-content-muted">
                     {uploadGroups.length} {uploadGroups.length === 1 ? 'statement' : 'statements'}
                   </p>
                 </div>
                 {uploadGroups.length > 1 && (
                   <button
                     onClick={toggleAllUploads}
-                    className="text-xs font-medium text-gray-500 transition-colors hover:text-brand"
+                    className="text-xs font-medium text-content-secondary transition-colors hover:text-brand-900"
                   >
                     {allUploadsSelected ? 'Clear selection' : 'Select all'}
                   </button>
@@ -437,7 +429,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 <button
                   onClick={confirmUploads}
                   disabled={selectedUploads.size === 0 || isDisconnecting}
-                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 transition-colors enabled:hover:bg-red-50 enabled:hover:text-red-600 disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-content-muted transition-colors enabled:hover:bg-danger-soft enabled:hover:text-danger-strong disabled:opacity-40"
                 >
                   <Unlink className="h-4 w-4" />
                   Disconnect{selectedUploads.size > 0 ? ` (${selectedUploads.size})` : ''}
@@ -456,7 +448,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 />
               )}
 
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-line-subtle">
                 {uploadGroups.map((group) => {
                   const account = group.accounts[0]!
                   const selected = selectedUploads.has(group.id)
@@ -465,7 +457,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                       key={group.id}
                       className={cn(
                         'flex items-center gap-3 px-5 py-4 transition-colors',
-                        selected ? 'bg-red-50/40' : 'hover:bg-gray-50'
+                        selected ? 'bg-danger-soft/50' : 'hover:bg-surface-hover'
                       )}
                     >
                       <input
@@ -480,32 +472,32 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                         className="flex min-w-0 flex-1 items-center gap-4"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-gray-900">{account.accountName}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="truncate font-medium text-content">{account.accountName}</p>
+                          <p className="text-sm text-content-secondary">
                             {ACCOUNT_TYPE_LABELS[account.accountType]} · Uploaded{' '}
                             {formatDate(group.lastSyncedAt)}
                           </p>
                         </div>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-lg font-semibold tabular-nums text-content">
                           {formatBalance(account.currentBalance, account.currency)}
                         </p>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-content-muted" />
                       </Link>
                     </div>
                   )
                 })}
               </div>
-            </div>
+            </Card>
           )}
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-4 rounded-2xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cream">
-            <Landmark className="h-8 w-8 text-brand" />
+        <div className="flex flex-col items-center gap-4 rounded-card border border-line bg-surface-card py-16">
+          <div className="flex h-16 w-16 items-center justify-center rounded-card bg-brand-50 text-brand-900">
+            <Landmark className="h-8 w-8" />
           </div>
           <div className="text-center">
-            <p className="font-semibold text-gray-900">No bank connected yet</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="font-semibold text-content">No bank connected yet</p>
+            <p className="mt-1 text-sm text-content-secondary">
               Linking your bank adds income and spending signals to your trust score.
             </p>
           </div>
@@ -514,19 +506,15 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
 
       {/* Connect button */}
       <div className={cn(hasAccounts && 'pt-2')}>
-        <button
-          onClick={() => connectMutation.mutate()}
-          disabled={connectMutation.isPending}
-          className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface shadow-sm transition-colors hover:bg-brand-dark disabled:opacity-60"
-        >
-          <Landmark className="h-4 w-4" />
+        <Button size="lg" onClick={() => connectMutation.mutate()} loading={connectMutation.isPending}>
+          {!connectMutation.isPending && <Landmark className="h-4 w-4" />}
           {connectMutation.isPending
             ? 'Redirecting…'
             : hasAccounts
               ? 'Connect another bank'
               : 'Connect your bank'}
-        </button>
-        <p className="mt-2 text-xs text-gray-400">
+        </Button>
+        <p className="mt-2 text-xs text-content-muted">
           Powered by TrueLayer · Secure Open Banking · Read-only access
         </p>
         <div className="mt-3">
@@ -535,14 +523,14 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
       </div>
 
       {/* Upload a statement — the no-open-banking path */}
-      <div className="rounded-2xl border border-dashed border-[#D8D6C9] bg-cream/50 p-5">
+      <div className="rounded-card border border-dashed border-line bg-surface-inset p-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-gray-100">
-            <FileSpreadsheet className="h-5 w-5 text-brand" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-brand-50 text-brand-900">
+            <FileSpreadsheet className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-gray-900">Can&apos;t connect a bank? Upload a statement</p>
-            <p className="mt-0.5 text-sm text-gray-500">
+            <p className="font-medium text-content">Can&apos;t connect a bank? Upload a statement</p>
+            <p className="mt-0.5 text-sm text-content-secondary">
               Upload a <strong>PDF</strong> bank statement (a download or a photo works), or a{' '}
               <strong>CSV</strong> export from your banking app — we&apos;ll read it and build your
               profile. Nothing is shared without your say-so.
@@ -563,27 +551,27 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
 
             {/* Step 1 — the file is being sent. */}
             {uploading && (
-              <div className="mt-3 flex items-center gap-2.5 rounded-lg bg-white px-3.5 py-2.5 text-sm font-medium text-charcoal-mid ring-1 ring-[#D8D6C9]">
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+              <div className="mt-3 flex items-center gap-2.5 rounded-panel border border-line bg-surface-card px-3.5 py-2.5 text-sm font-medium text-content-secondary">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-900" />
                 {startPdfMut.isPending ? 'Uploading your statement…' : 'Reading your statement…'}
               </div>
             )}
 
             {/* Step 2 — the background read is running. The user is free to leave. */}
             {!uploading && pdfProcessing && (
-              <div className="mt-3 rounded-lg bg-white px-3.5 py-2.5 text-sm text-charcoal-mid ring-1 ring-[#D8D6C9]">
-                <p className="flex items-center gap-2 font-medium">
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+              <div className="mt-3 rounded-panel border border-line bg-surface-card px-3.5 py-2.5 text-sm text-content-secondary">
+                <p className="flex items-center gap-2 font-medium text-content">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-900" />
                   Statement uploaded — reading it now
                 </p>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-content-muted">
                   This can take a couple of minutes. You can leave this page or close the tab, and
-                  we&apos;ll show a ✓ up top when it&apos;s done.
+                  we&apos;ll confirm up top when it&apos;s done.
                 </p>
                 <button
                   onClick={() => activeJobId && cancelMut.mutate(activeJobId)}
                   disabled={cancelMut.isPending}
-                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-content-muted transition-colors hover:text-danger-strong disabled:opacity-50"
                 >
                   <X className="h-3.5 w-3.5" />
                   {cancelMut.isPending ? 'Cancelling…' : 'Cancel'}
@@ -595,17 +583,17 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
             {jobDone && <ImportSummary data={activeJob!.result!} />}
             {csvDone && <ImportSummary data={importCsvMut.data!} />}
             {activeJob?.status === 'failed' && (
-              <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
+              <div className="mt-3 rounded-panel bg-danger-soft px-3.5 py-2.5 text-sm text-danger-strong">
                 {activeJob.error || "We couldn't read that statement. Try a clearer copy or a CSV export."}
               </div>
             )}
             {activeJob?.status === 'cancelled' && (
-              <div className="mt-3 rounded-lg bg-cream px-3.5 py-2.5 text-sm text-charcoal-mid ring-1 ring-[#D8D6C9]">
+              <div className="mt-3 rounded-panel border border-line bg-surface-card px-3.5 py-2.5 text-sm text-content-secondary">
                 Import cancelled. Nothing was saved — you can upload again whenever you&apos;re ready.
               </div>
             )}
             {(startPdfMut.isError || importCsvMut.isError) && (
-              <div className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-800 ring-1 ring-red-200">
+              <div className="mt-3 rounded-panel bg-danger-soft px-3.5 py-2.5 text-sm text-danger-strong">
                 {((startPdfMut.error ?? importCsvMut.error) as Error)?.message ||
                   "We couldn't read that file. Make sure it's a CSV export or a clear PDF."}
               </div>
@@ -613,13 +601,14 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
 
             {/* Action — hidden while a file is uploading or being read. */}
             {!busy && (
-              <button
+              <Button
+                variant="secondary"
+                className="mt-3"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
               >
                 <Upload className="h-4 w-4" />
                 {hasResult ? 'Upload another statement' : 'Upload a statement (PDF or CSV)'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -653,19 +642,19 @@ function DisconnectConfirm({
   onCancel: () => void
 }) {
   return (
-    <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+    <div className="border-b border-line-subtle bg-danger-soft px-5 py-4">
       <div className="flex gap-3">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger-strong" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-red-900">{title}</p>
-          <p className="mt-1 text-sm text-red-800">{body}</p>
+          <p className="text-sm font-semibold text-danger-strong">{title}</p>
+          <p className="mt-1 text-sm text-danger-strong">{body}</p>
 
           {/* Concrete, dry-run score impact */}
-          <div className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm ring-1 ring-red-100">
+          <div className="mt-3 rounded-panel border border-line bg-surface-card px-3 py-2 text-sm">
             {impactLoading || !impact ? (
-              <span className="text-red-800/70">Calculating score impact…</span>
+              <span className="text-content-secondary">Calculating score impact…</span>
             ) : impact.delta < 0 ? (
-              <span className="text-red-900">
+              <span className="text-content">
                 Your score would drop from{' '}
                 <strong>
                   {impact.current.overallTier} / {impact.current.overallScore}
@@ -677,7 +666,7 @@ function DisconnectConfirm({
                 ({impact.delta}).
               </span>
             ) : (
-              <span className="text-red-900">
+              <span className="text-content">
                 Your score would stay at{' '}
                 <strong>
                   {impact.projected.overallTier} / {impact.projected.overallScore}
@@ -688,20 +677,18 @@ function DisconnectConfirm({
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <button
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={onConfirm}
               disabled={isDisconnecting}
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              loading={isDisconnecting}
             >
               {isDisconnecting ? 'Disconnecting…' : 'Yes, disconnect'}
-            </button>
-            <button
-              onClick={onCancel}
-              disabled={isDisconnecting}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={onCancel} disabled={isDisconnecting}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -712,7 +699,7 @@ function DisconnectConfirm({
 /** Shared success summary for a completed import (PDF job result or CSV result). */
 function ImportSummary({ data }: { data: StatementImportResult }) {
   return (
-    <div className="mt-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200">
+    <div className="mt-3 rounded-panel bg-success-soft px-3.5 py-2.5 text-sm text-success-strong">
       Imported <strong>{data.imported}</strong> transactions
       {data.imported > 0 && (
         <>
@@ -727,17 +714,18 @@ function ImportSummary({ data }: { data: StatementImportResult }) {
       .{' '}
       <Link
         href="/dashboard/analytics"
-        className="font-semibold underline underline-offset-2 hover:text-emerald-900"
+        className="font-semibold underline underline-offset-2 hover:opacity-80"
       >
         View insights
       </Link>
       {data.ledgerVerified && (
-        <span className="mt-1 block text-xs text-emerald-700/80">
-          ✓ Statement ledger verified — every balance reconciles.
+        <span className="mt-1 flex items-center gap-1.5 text-xs text-success-strong">
+          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+          Statement ledger verified — every balance reconciles.
         </span>
       )}
       {data.skipped > 0 && (
-        <span className="mt-1 block text-xs text-emerald-700/80">
+        <span className="mt-1 block text-xs text-success-strong">
           {data.skipped} rows couldn&apos;t be read and were skipped.
         </span>
       )}

@@ -78,13 +78,13 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
         <>
       <Card>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-content">
             {MONTHS[month]} {year}
           </h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setOffset((o) => o - 1)}
-              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
+              className="rounded-lg p-1.5 text-content-secondary transition-colors hover:bg-surface-hover"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -92,14 +92,14 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
             {offset !== 0 && (
               <button
                 onClick={() => setOffset(0)}
-                className="rounded-lg px-2 py-1 text-xs font-medium text-brand hover:bg-brand-50"
+                className="rounded-lg px-2 py-1 text-xs font-medium text-brand-900 hover:bg-brand-50"
               >
                 Today
               </button>
             )}
             <button
               onClick={() => setOffset((o) => o + 1)}
-              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
+              className="rounded-lg p-1.5 text-content-secondary transition-colors hover:bg-surface-hover"
               aria-label="Next month"
             >
               <ChevronRight className="h-4 w-4" />
@@ -110,7 +110,7 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
         {/* Month grid */}
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            <div key={d} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-content-muted">
               {d}
             </div>
           ))}
@@ -122,11 +122,11 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
               <div
                 key={day}
                 className={cn(
-                  'min-h-[64px] rounded-lg border p-1.5 sm:min-h-[84px]',
-                  isToday ? 'border-brand bg-brand-50/40' : 'border-gray-100',
+                  'min-h-[64px] rounded-panel border p-1.5 sm:min-h-[84px]',
+                  isToday ? 'border-brand-600 bg-brand-50' : 'border-line-subtle',
                 )}
               >
-                <div className={cn('text-[11px] font-medium', isToday ? 'text-brand' : 'text-gray-400')}>{day}</div>
+                <div className={cn('text-[11px] font-medium', isToday ? 'text-brand-900' : 'text-content-muted')}>{day}</div>
                 <div className="mt-0.5 space-y-0.5">
                   {events.slice(0, 3).map((e) => (
                     <div
@@ -134,26 +134,26 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
                       title={`${e.label} · ${money(e.amount)}`}
                       className={cn(
                         'truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight sm:text-[11px]',
-                        e.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700',
+                        e.direction === 'in' ? 'bg-success-soft text-success-strong' : 'bg-warning-soft text-warning-strong',
                       )}
                     >
                       <span className="hidden sm:inline">{e.direction === 'in' ? '+' : '−'}</span>
                       {money(e.amount)}
                     </div>
                   ))}
-                  {events.length > 3 && <div className="px-1 text-[10px] text-gray-400">+{events.length - 3} more</div>}
+                  {events.length > 3 && <div className="px-1 text-[10px] text-content-muted">+{events.length - 3} more</div>}
                 </div>
               </div>
             )
           })}
         </div>
 
-        <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+        <div className="mt-3 flex items-center gap-4 text-xs text-content-secondary">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded bg-emerald-200" /> Money in
+            <span className="h-2.5 w-2.5 rounded bg-success-strong" /> Money in
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded bg-rose-200" /> Money out
+            <span className="h-2.5 w-2.5 rounded bg-warning-bar" /> Money out
           </span>
         </div>
       </Card>
@@ -161,23 +161,23 @@ export function CalendarSection({ data }: { data: CompassPayload }) {
       {/* Chronological ledger — clearest read, and the primary view on mobile */}
       <Card>
         <CardTitle title="This month's schedule" subtitle="Every guaranteed amount, in the order it lands." />
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-line-subtle">
           {ordered.map((e) => (
             <div key={e.id} className="flex items-center gap-3 py-2.5">
-              <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg bg-gray-50 text-center">
-                <span className="text-sm font-semibold leading-none text-gray-700">{e.day}</span>
+              <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-panel bg-surface-inset text-center">
+                <span className="text-sm font-semibold leading-none text-content-secondary">{e.day}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-gray-800">{e.label}</span>
+                  <span className="truncate text-sm font-medium text-content">{e.label}</span>
                   {e.confidence === 'medium' && <Pill tone="neutral">≈</Pill>}
                 </div>
-                <span className="text-xs capitalize text-gray-400">{e.cadence.replace('_', ' ')}</span>
+                <span className="text-xs capitalize text-content-muted">{e.cadence.replace('_', ' ')}</span>
               </div>
               <span
                 className={cn(
                   'flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums',
-                  e.direction === 'in' ? 'text-emerald-600' : 'text-rose-600',
+                  e.direction === 'in' ? 'text-success-strong' : 'text-warning-strong',
                 )}
               >
                 {e.direction === 'in' ? (
@@ -210,17 +210,17 @@ function UnscheduledCard({ cal }: { cal: CompassPayload['calendar'] }) {
         title="Recurring, no fixed date"
         subtitle="Predictable amounts that don't land on a set day each month, such as weekly or four-weekly payments."
       />
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-line-subtle">
         {cal.unscheduled.map((e) => (
           <div key={e.id} className="flex items-center gap-3 py-2.5">
             <div className="min-w-0 flex-1">
-              <span className="truncate text-sm font-medium text-gray-800">{e.label}</span>
-              <span className="block text-xs capitalize text-gray-400">{e.cadence.replace('_', ' ')}</span>
+              <span className="truncate text-sm font-medium text-content">{e.label}</span>
+              <span className="block text-xs capitalize text-content-muted">{e.cadence.replace('_', ' ')}</span>
             </div>
             <span
               className={cn(
                 'flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums',
-                e.direction === 'in' ? 'text-emerald-600' : 'text-rose-600',
+                e.direction === 'in' ? 'text-success-strong' : 'text-warning-strong',
               )}
             >
               {e.direction === 'in' ? '+' : '−'}
@@ -230,7 +230,7 @@ function UnscheduledCard({ cal }: { cal: CompassPayload['calendar'] }) {
         ))}
       </div>
       {parts.length > 0 && (
-        <p className="mt-3 text-xs text-gray-400">Roughly {parts.join(' and ')} from these.</p>
+        <p className="mt-3 text-xs text-content-muted">Roughly {parts.join(' and ')} from these.</p>
       )}
     </Card>
   )

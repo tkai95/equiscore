@@ -102,7 +102,7 @@ export function CompassView() {
                 onClick={() => setTab(t.id)}
                 className={cn(
                   'flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-                  active ? 'bg-brand text-cream-surface' : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+                  active ? 'bg-brand-900 text-white' : 'text-content-secondary hover:bg-surface-hover hover:text-content',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -146,24 +146,24 @@ function Header({ status, asOf, months }: { status: string | null; asOf: string 
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="flex items-center gap-2.5 text-[28px] font-semibold text-gray-900">
-          <CompassIcon className="h-7 w-7 text-brand" />
+        <h1 className="flex items-center gap-2.5 text-[28px] font-semibold text-content">
+          <CompassIcon className="h-7 w-7 text-brand-900" />
           Compass
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-content-secondary">
           Your money, explained. What you earn, where it goes, and how to strengthen your position.
         </p>
       </div>
       {status && (
-        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-card px-3 py-2 text-xs text-content-secondary">
           <span
             className={cn(
               'h-2 w-2 rounded-full',
-              status === 'current' ? 'bg-emerald-500' : status === 'expiring_soon' ? 'bg-amber-400' : 'bg-gray-300',
+              status === 'current' ? 'bg-success-strong' : status === 'expiring_soon' ? 'bg-warning-bar' : 'bg-content-muted',
             )}
           />
           {FRESHNESS_LABEL[status] ?? 'Status'}
-          {months > 0 && <span className="text-gray-400">· {months} mo of history</span>}
+          {months > 0 && <span className="text-content-muted">· {months} mo of history</span>}
         </div>
       )}
     </div>
@@ -173,8 +173,8 @@ function Header({ status, asOf, months }: { status: string | null; asOf: string 
 function Upsell() {
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <div className="bg-brand px-8 py-10 text-cream-surface">
+      <div className="overflow-hidden rounded-card border border-line bg-surface-card">
+        <div className="bg-brand-900 px-8 py-10 text-cream-surface">
           <CompassIcon className="mb-3 h-8 w-8" />
           <h1 className="text-2xl font-semibold">EquiScore Compass</h1>
           <p className="mt-2 max-w-lg text-sm text-cream-surface/80">
@@ -191,22 +191,22 @@ function Upsell() {
               ['Resilience & savings', 'Your buffer, surplus and practical ways to save.'],
             ].map(([t, d]) => (
               <li key={t} className="flex items-start gap-2.5">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
                 <span>
-                  <span className="block text-sm font-medium text-gray-900">{t}</span>
-                  <span className="block text-sm text-gray-500">{d}</span>
+                  <span className="block text-sm font-medium text-content">{t}</span>
+                  <span className="block text-sm text-content-secondary">{d}</span>
                 </span>
               </li>
             ))}
           </ul>
           <div className="mt-6 flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 rounded-lg bg-surface-inset px-3 py-2 text-sm text-content-secondary">
               <Lock className="h-4 w-4" />
               Compass is part of a subscription plan
             </div>
             <Link
               href="/dashboard"
-              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-line bg-surface-card px-4 py-2 text-sm font-medium text-content hover:bg-surface-hover"
             >
               Back to dashboard
             </Link>
@@ -230,13 +230,13 @@ function NoData() {
 function Skeleton({ bare }: { bare?: boolean }) {
   const body = (
     <div className="space-y-4">
-      <div className="h-8 w-48 animate-pulse rounded-lg bg-gray-100" />
+      <div className="h-8 w-48 animate-pulse rounded-lg bg-surface-hover" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-lg bg-gray-100" />
+          <div key={i} className="h-20 animate-pulse rounded-lg bg-surface-hover" />
         ))}
       </div>
-      <div className="h-40 animate-pulse rounded-xl bg-gray-100" />
+      <div className="h-40 animate-pulse rounded-card bg-surface-hover" />
     </div>
   )
   if (bare) return <Card>{body}</Card>

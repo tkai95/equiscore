@@ -6,6 +6,9 @@ interface Props {
   form: UseFormReturn<Step3Data>
 }
 
+const inputClass =
+  'w-full rounded-lg border border-line px-3 py-2.5 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
+
 const EMPLOYMENT_OPTIONS = [
   { value: 'employed_full_time', label: 'Employed full-time' },
   { value: 'employed_part_time', label: 'Employed part-time' },
@@ -25,17 +28,17 @@ export function Step3Employment({ form }: Props) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Work and income</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-lg font-semibold text-content">Work and income</h2>
+        <p className="text-sm text-content-secondary">
           Tell us how you earn. All types of income are welcome.
         </p>
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Employment type</label>
+        <label className="mb-1.5 block text-sm font-medium text-content">Employment type</label>
         <select
           {...register('employmentType')}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+          className={inputClass}
         >
           <option value="">Select your situation</option>
           {EMPLOYMENT_OPTIONS.map((o) => (
@@ -43,62 +46,62 @@ export function Step3Employment({ form }: Props) {
           ))}
         </select>
         {errors.employmentType && (
-          <p className="mt-1 text-xs text-red-600">{errors.employmentType.message}</p>
+          <p className="mt-1 text-xs text-danger-strong">{errors.employmentType.message}</p>
         )}
       </div>
 
       {showEmployerFields && (
         <>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Employer name <span className="text-gray-400">(optional)</span>
+            <label className="mb-1.5 block text-sm font-medium text-content">
+              Employer name <span className="text-content-muted">(optional)</span>
             </label>
             <input
               {...register('employerName')}
               placeholder="e.g. Acme Ltd"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className={inputClass}
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Job title <span className="text-gray-400">(optional)</span>
+            <label className="mb-1.5 block text-sm font-medium text-content">
+              Job title <span className="text-content-muted">(optional)</span>
             </label>
             <input
               {...register('jobTitle')}
               placeholder="e.g. Software Engineer"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className={inputClass}
             />
           </div>
         </>
       )}
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Monthly income (take-home) <span className="text-gray-400">(optional)</span>
+        <label className="mb-1.5 block text-sm font-medium text-content">
+          Monthly income (take-home) <span className="text-content-muted">(optional)</span>
         </label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">£</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted">£</span>
           <input
             {...register('monthlyIncomeDeclared', { valueAsNumber: true })}
             type="number"
             min="0"
             step="100"
             placeholder="0"
-            className="w-full rounded-lg border border-gray-200 py-2.5 pl-7 pr-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-lg border border-line py-2.5 pl-7 pr-3 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-content-muted">
           This is self-declared and will be verified against your bank data later.
         </p>
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Pay frequency <span className="text-gray-400">(optional)</span>
+        <label className="mb-1.5 block text-sm font-medium text-content">
+          Pay frequency <span className="text-content-muted">(optional)</span>
         </label>
         <select
           {...register('payFrequency')}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+          className={inputClass}
         >
           <option value="">Select frequency</option>
           <option value="weekly">Weekly</option>

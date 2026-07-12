@@ -24,19 +24,19 @@ export function Drawer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-charcoal/30 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-content/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
           className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right"
           aria-describedby={undefined}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-line-subtle px-6 py-4">
             <div className="min-w-0">
-              <Dialog.Title className="truncate text-base font-semibold text-gray-900">
+              <Dialog.Title className="truncate text-base font-semibold text-content">
                 {title}
               </Dialog.Title>
-              {subtitle && <p className="mt-0.5 text-sm text-gray-500">{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 text-sm text-content-secondary">{subtitle}</p>}
             </div>
-            <Dialog.Close className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+            <Dialog.Close className="shrink-0 rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-hover hover:text-content-secondary">
               <X className="h-5 w-5" />
             </Dialog.Close>
           </div>

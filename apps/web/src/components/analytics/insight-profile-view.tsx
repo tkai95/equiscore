@@ -22,6 +22,7 @@ import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { TIER_LABELS } from '@equiscore/shared'
 import type { TrustTier } from '@equiscore/shared'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
+import { Card as UICard, Display, StatusPill, buttonClasses, type StatusTone } from '@/components/ui'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
 // Mirrors the InsightProfile shape returned by GET /insights/profile.
@@ -134,11 +135,12 @@ interface CanonicalScore {
   validUntil?: string | null
 }
 
-const CONSISTENCY_STYLE: Record<Consistency, string> = {
-  very_consistent: 'bg-emerald-50 text-emerald-700',
-  consistent: 'bg-teal-50 text-teal-700',
-  variable: 'bg-amber-50 text-amber-700',
-  one_off: 'bg-gray-100 text-gray-500',
+// Two-tone semantics: green = consistent/reliable, amber = variable, neutral = one-off.
+const CONSISTENCY_TONE: Record<Consistency, StatusTone> = {
+  very_consistent: 'success',
+  consistent: 'success',
+  variable: 'warning',
+  one_off: 'neutral',
 }
 const CONSISTENCY_LABEL: Record<Consistency, string> = {
   very_consistent: 'Very consistent',
@@ -171,19 +173,19 @@ const EVIDENCE_BY_SOURCE: Record<Source, { type: string; verified: string }> = {
   test: { type: 'Sample data', verified: 'Sample data, not verified' },
 }
 
-const STATUS_BADGE: Record<ScoreStatus, { label: string; className: string }> = {
-  current: { label: 'Current', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  expiring_soon: { label: 'Expiring soon', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  expired: { label: 'Expired', className: 'bg-gray-100 text-gray-600 ring-gray-200' },
-  evidence_withdrawn: { label: 'Evidence withdrawn', className: 'bg-red-50 text-red-700 ring-red-200' },
-  insufficient_evidence: { label: 'Insufficient evidence', className: 'bg-gray-100 text-gray-600 ring-gray-200' },
+const STATUS_BADGE: Record<ScoreStatus, { label: string; tone: StatusTone }> = {
+  current: { label: 'Current', tone: 'success' },
+  expiring_soon: { label: 'Expiring soon', tone: 'warning' },
+  expired: { label: 'Expired', tone: 'neutral' },
+  evidence_withdrawn: { label: 'Evidence withdrawn', tone: 'danger' },
+  insufficient_evidence: { label: 'Insufficient evidence', tone: 'neutral' },
 }
 
-const AFFORDABILITY_RATING: Record<AffordabilityRating, { label: string; badge: string }> = {
-  comfortable: { label: 'Comfortable', badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  manageable: { label: 'Manageable', badge: 'bg-teal-50 text-teal-700 ring-teal-200' },
-  stretched: { label: 'Stretched', badge: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  at_risk: { label: 'At risk', badge: 'bg-red-50 text-red-700 ring-red-200' },
+const AFFORDABILITY_RATING: Record<AffordabilityRating, { label: string; tone: StatusTone }> = {
+  comfortable: { label: 'Comfortable', tone: 'success' },
+  manageable: { label: 'Manageable', tone: 'success' },
+  stretched: { label: 'Stretched', tone: 'warning' },
+  at_risk: { label: 'At risk', tone: 'danger' },
 }
 
 const ordinal = (n: number) => {
@@ -202,7 +204,8 @@ const ordinal = (n: number) => {
 }
 const cadenceLabel = (c: string) => c.replace('_', '-').replace(/\b\w/g, (m) => m.toUpperCase())
 
-function Card({
+/** Section heading moved inside the panel: header · divider · content. */
+function Panel({
   title,
   subtitle,
   help,
@@ -214,14 +217,16 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
-      <div className="flex items-center gap-1.5">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {help && <InfoTooltip label={`How ${title} is calculated`}>{help}</InfoTooltip>}
+    <UICard padding="none">
+      <div className="border-b border-line-subtle px-6 py-4">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-base font-semibold text-content">{title}</h2>
+          {help && <InfoTooltip label={`How ${title} is calculated`}>{help}</InfoTooltip>}
+        </div>
+        {subtitle && <p className="mt-1 text-sm text-content-secondary">{subtitle}</p>}
       </div>
-      {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
-      <div className="mt-4">{children}</div>
-    </div>
+      <div className="p-6">{children}</div>
+    </UICard>
   )
 }
 
@@ -267,17 +272,17 @@ export function InsightProfileView() {
   })
 
   if (isLoading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+    return <div className="h-64 animate-pulse rounded-card bg-surface-hover" />
   }
   if (!profile || profile.period.transactionCount === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
-        <ShieldCheck className="mx-auto h-8 w-8 text-gray-300" />
-        <p className="mt-3 text-sm font-medium text-gray-600">No financial evidence yet</p>
-        <p className="mt-1 text-xs text-gray-400">
+      <UICard padding="none" className="border-dashed p-10 text-center">
+        <ShieldCheck className="mx-auto h-8 w-8 text-content-muted" />
+        <p className="mt-3 text-sm font-medium text-content">No financial evidence yet</p>
+        <p className="mt-1 text-xs text-content-muted">
           Connect a bank account or upload a statement to build your insight profile.
         </p>
-      </div>
+      </UICard>
     )
   }
 
@@ -295,66 +300,52 @@ export function InsightProfileView() {
   return (
     <div className="space-y-6">
       {/* ── 1. EquiScore profile: the judgement, up top ───────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <UICard padding="md">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="text-sm font-medium uppercase tracking-wide text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">
             Your EquiScore profile
           </p>
           {badge && (
-            <span
-              className={cn(
-                'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1',
-                badge.className
-              )}
-            >
-              <Clock className="h-3 w-3" />
-              {badge.label}
-            </span>
+            <StatusPill status={badge.tone} icon={<Clock />} label={badge.label} />
           )}
         </div>
 
         {score ? (
-          <div className="mt-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-4xl font-bold text-gray-900">
-                Trust Portfolio: Tier {score.overallTier}
-              </span>
-              <span className="rounded-lg bg-gray-100 px-3 py-1 text-lg font-semibold tabular-nums text-gray-700">
-                {score.overallScore}
-                <span className="font-medium text-gray-400"> / 100</span>
-              </span>
+          <div className="mt-3 flex items-end gap-4">
+            <Display size="score" className="text-brand-900">
+              {score.overallScore}
+            </Display>
+            <div className="pb-1.5">
+              <p className="text-sm text-content-muted">out of 100</p>
+              <p className="text-lg font-semibold text-content">
+                Tier {score.overallTier} · {TIER_LABELS[score.overallTier]}
+              </p>
             </div>
           </div>
         ) : (
-          <div className="mt-2">
-            <span className="text-2xl font-semibold text-gray-400">Not yet generated</span>
+          <div className="mt-3">
+            <p className="text-2xl font-semibold text-content-muted">Not yet generated</p>
+            <p className="mt-2 text-sm text-content-secondary">
+              Generate your assessment on the{' '}
+              <a href="/dashboard/trust-score" className="font-medium text-brand-900 hover:underline">
+                Assessment
+              </a>{' '}
+              page to see it here.
+            </p>
           </div>
         )}
-        {score ? (
-          <p className="mt-2 text-lg font-semibold text-gray-900">
-            {TIER_LABELS[score.overallTier]}
-          </p>
-        ) : (
-          <p className="mt-2 text-base text-gray-500">
-            Generate your assessment on the{' '}
-            <a href="/dashboard/trust-score" className="font-medium text-brand hover:underline">
-              Assessment
-            </a>{' '}
-            page to see it here.
-          </p>
-        )}
-        <p className="mt-0.5 text-base text-gray-500">{evidence.verified}</p>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-3 text-sm text-content-secondary">{evidence.verified}</p>
+        <p className="mt-1 text-sm text-content-muted">
           Based on {profile.period.months}{' '}
           {profile.period.months === 1 ? 'month' : 'months'} of evidence ·{' '}
           {profile.period.transactionCount.toLocaleString()} transactions
         </p>
 
         {/* Plain-English summary of the financial behaviour behind the score */}
-        <p className="mt-4 max-w-3xl text-base leading-relaxed text-gray-700">{profile.summary}</p>
+        <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-content-secondary">{profile.summary}</p>
 
         {/* Evidence + freshness */}
-        <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-5 text-base sm:grid-cols-4">
+        <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line-subtle pt-5 text-base sm:grid-cols-4">
           <Field label="Evidence type" value={evidence.type} />
           <Field
             label="Financial data as of"
@@ -369,62 +360,60 @@ export function InsightProfileView() {
             value={score?.validUntil ? formatDate(score.validUntil) : '—'}
           />
         </dl>
-      </div>
+      </UICard>
 
       {/* ── 2. Key strengths + what could improve ─────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Key strengths" subtitle="Signals traditional credit checks may miss">
+        <Panel title="Key strengths" subtitle="Signals traditional credit checks may miss">
           {strengths.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-content-muted">
               Add more financial evidence to surface your strengths.
             </p>
           ) : (
             <div className="space-y-2">
               {strengths.map(([key, label]) => (
                 <div key={key} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                  <span className="text-gray-700">{label}</span>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-success-strong" />
+                  <span className="text-content-secondary">{label}</span>
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </Panel>
 
-        <Card title="What could improve this profile">
+        <Panel title="What could improve this profile">
           {profile.overall.limitingFactors.length === 0 ? (
-            <div className="flex items-center gap-2 text-sm text-emerald-700">
+            <div className="flex items-center gap-2 text-sm text-success-strong">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               Nothing significant is holding this profile back.
             </div>
           ) : (
             <ul className="space-y-2">
               {profile.overall.limitingFactors.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+                <li key={f} className="flex items-start gap-2 text-sm text-content-secondary">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-content-muted" />
                   {f}
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
       </div>
 
       {/* ── Affordability ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <UICard padding="md">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-lg font-semibold text-gray-900">Affordability</h2>
+            <h2 className="text-base font-semibold text-content">Affordability</h2>
             <InfoTooltip label="How affordability is calculated">
               Worked out from take-home income and real monthly outgoings: what is left after
               essential costs, how rent compares to income, and whether a 20% income drop could be
               absorbed.
             </InfoTooltip>
           </div>
-          <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium ring-1', affStyle.badge)}>
-            {affStyle.label}
-          </span>
+          <StatusPill status={affStyle.tone} label={affStyle.label} />
         </div>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-content-secondary">
           Based on take-home income of {formatCurrency(aff.monthlyIncome)}/month
           {aff.incomeIsVariable && ' (income varies month to month)'}
         </p>
@@ -432,9 +421,9 @@ export function InsightProfileView() {
         {(income.estimatedGrossAnnualSalary !== null || income.personalTransfersMonthly > 0) && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             {income.estimatedGrossAnnualSalary !== null && (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-brand/5 px-3 py-1.5 text-gray-700 ring-1 ring-brand/10">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-3 py-1.5 text-content-secondary">
                 Estimated gross salary ≈{' '}
-                <strong className="tabular-nums">
+                <strong className="tabular-nums text-content">
                   £{income.estimatedGrossAnnualSalary.toLocaleString('en-GB')}
                 </strong>
                 /year
@@ -447,7 +436,7 @@ export function InsightProfileView() {
               </span>
             )}
             {income.personalTransfersMonthly > 0 && (
-              <span className="rounded-lg bg-gray-50 px-3 py-1.5 text-gray-600 ring-1 ring-gray-200">
+              <span className="rounded-lg bg-surface-inset px-3 py-1.5 text-content-secondary">
                 {formatCurrency(income.personalTransfersMonthly)}/mo received as personal transfers —
                 not counted as income
               </span>
@@ -456,24 +445,24 @@ export function InsightProfileView() {
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg bg-gray-50 px-4 py-3">
-            <p className="text-sm text-gray-500">Disposable after essentials</p>
-            <p className="mt-0.5 text-2xl font-semibold tabular-nums text-gray-900">
+          <div className="rounded-panel bg-surface-inset px-4 py-3">
+            <p className="text-sm text-content-muted">Disposable after essentials</p>
+            <p className="mt-0.5 text-2xl font-semibold tabular-nums text-content">
               {formatCurrency(aff.disposableIncome)}
-              <span className="text-sm font-normal text-gray-400">/mo</span>
+              <span className="text-sm font-normal text-content-muted">/mo</span>
             </p>
           </div>
-          <div className="rounded-lg bg-gray-50 px-4 py-3">
-            <p className="text-sm text-gray-500">Surplus after all spending</p>
+          <div className="rounded-panel bg-surface-inset px-4 py-3">
+            <p className="text-sm text-content-muted">Surplus after all spending</p>
             <p
               className={cn(
                 'mt-0.5 text-2xl font-semibold tabular-nums',
-                aff.surplusAfterAll >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                aff.surplusAfterAll >= 0 ? 'text-success-strong' : 'text-danger-strong'
               )}
             >
               {aff.surplusAfterAll >= 0 ? '+' : ''}
               {formatCurrency(aff.surplusAfterAll)}
-              <span className="text-sm font-normal text-gray-400">/mo</span>
+              <span className="text-sm font-normal text-content-muted">/mo</span>
             </p>
           </div>
         </div>
@@ -488,14 +477,14 @@ export function InsightProfileView() {
           )}
         </div>
 
-        <div className="mt-5 rounded-lg bg-brand/5 px-4 py-3 ring-1 ring-brand/10">
-          <p className="text-sm text-gray-600">Estimated maximum sustainable rent</p>
-          <p className="mt-0.5 text-xl font-semibold text-brand">
+        <div className="mt-5 rounded-panel bg-brand-50 px-4 py-3">
+          <p className="text-sm text-content-secondary">Estimated maximum sustainable rent</p>
+          <p className="mt-0.5 text-xl font-semibold text-brand-900">
             {formatCurrency(aff.maxAffordableRent)}
-            <span className="text-sm font-normal text-gray-400">/month</span>
+            <span className="text-sm font-normal text-content-muted">/month</span>
           </p>
           {aff.currentRent !== null && (
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-content-muted">
               {aff.headroomForNewRent > 0
                 ? `About ${formatCurrency(aff.headroomForNewRent)}/month of headroom above the current ${formatCurrency(aff.currentRent)} rent.`
                 : `Currently paying ${formatCurrency(aff.currentRent)}, at or near the sustainable ceiling.`}
@@ -505,10 +494,10 @@ export function InsightProfileView() {
 
         <div
           className={cn(
-            'mt-4 flex items-start gap-2 rounded-lg px-4 py-3 text-sm ring-1',
+            'mt-4 flex items-start gap-2 rounded-panel px-4 py-3 text-sm',
             aff.stressTest.stillPositive
-              ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
-              : 'bg-amber-50 text-amber-900 ring-amber-100'
+              ? 'bg-success-soft text-success-strong'
+              : 'bg-warning-soft text-warning-strong'
           )}
         >
           {aff.stressTest.stillPositive ? (
@@ -524,31 +513,29 @@ export function InsightProfileView() {
 
         <ul className="mt-4 space-y-1.5">
           {aff.notes.map((n) => (
-            <li key={n} className="flex items-start gap-2 text-sm text-gray-600">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+            <li key={n} className="flex items-start gap-2 text-sm text-content-secondary">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-content-muted" />
               {n}
             </li>
           ))}
         </ul>
-      </div>
+      </UICard>
 
       {/* ── Other accounts we spotted ─────────────────────────────────────── */}
       {profile.externalAccounts.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <UICard padding="md">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-lg font-semibold text-gray-900">Other accounts we spotted</h2>
+              <h2 className="text-base font-semibold text-content">Other accounts we spotted</h2>
               <InfoTooltip label="How this is detected">
                 Money moving to and from this account reveals others you hold — a savings pot, a
                 credit card, or another account in your name. Connecting them gives a complete
                 picture and usually strengthens your profile.
               </InfoTooltip>
             </div>
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
-              Partial picture
-            </span>
+            <StatusPill status="warning" label="Partial picture" />
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-content-secondary">
             This profile is built from one account. These look like accounts we can&apos;t see yet.
           </p>
 
@@ -565,80 +552,73 @@ export function InsightProfileView() {
                         ? HelpCircle
                         : Landmark
               return (
-                <div key={i} className="flex items-start gap-3 rounded-lg bg-gray-50 px-4 py-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-gray-100">
-                    <Icon className="h-4 w-4 text-brand" />
+                <div key={i} className="flex items-start gap-3 rounded-panel bg-surface-inset px-4 py-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-card border border-line">
+                    <Icon className="h-4 w-4 text-brand-900" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">{a.label}</p>
+                      <p className="text-sm font-medium text-content">{a.label}</p>
                       {a.type === 'unknown' ? (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                          confirm below
-                        </span>
+                        <StatusPill status="warning" label="confirm below" className="h-5 px-2 text-[10px]" />
                       ) : (
                         a.confidence === 'medium' && (
-                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-                            likely
-                          </span>
+                          <StatusPill status="neutral" label="likely" className="h-5 px-2 text-[10px]" />
                         )
                       )}
                     </div>
-                    <p className="mt-0.5 text-sm text-gray-600">{a.reason}</p>
+                    <p className="mt-0.5 text-sm text-content-secondary">{a.reason}</p>
                   </div>
                 </div>
               )
             })}
           </div>
 
-          <Link
-            href="/dashboard/connections"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
-          >
+          <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
             Add your other accounts
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
+        </UICard>
       )}
 
       {/* ── 3. Follow-up questions ────────────────────────────────────────── */}
       {profile.questions.length > 0 && (
-        <div className="rounded-xl border border-brand/20 bg-brand/5 p-6">
+        <div className="rounded-card border border-brand-100 bg-brand-50 p-6">
           <div className="flex items-center gap-2">
-            <HelpCircle className="h-4 w-4 text-brand" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <HelpCircle className="h-4 w-4 text-brand-900" />
+            <h2 className="text-base font-semibold text-content">
               Help us understand {profile.questions.length}{' '}
               {profile.questions.length === 1 ? 'thing' : 'things'}
             </h2>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-content-secondary">
             These are not problems. Answering them raises your transaction clarity and can lift your
             score.
           </p>
           <div className="mt-4 space-y-3">
             {profile.questions.map((q, i) => (
-              <div key={q.id} className="rounded-lg border border-gray-200 bg-white p-4">
+              <div key={q.id} className="rounded-panel border border-line bg-surface-card p-4">
                 <div className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/10 text-xs font-bold text-brand">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-100 text-xs font-bold text-brand-900">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{q.question}</p>
-                    <p className="mt-1 text-sm text-gray-500">{q.detail}</p>
+                    <p className="text-sm font-medium text-content">{q.question}</p>
+                    <p className="mt-1 text-sm text-content-muted">{q.detail}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {q.options.map((o) => (
                         <button
                           key={o}
                           onClick={() => answerMutation.mutate({ questionId: q.id, answer: o })}
                           disabled={answering !== null}
-                          className="rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-600 transition-colors hover:bg-brand hover:text-cream-surface disabled:opacity-50"
+                          className="rounded-lg bg-surface-inset px-2.5 py-1 text-sm text-content-secondary transition-colors hover:bg-brand hover:text-cream-surface disabled:opacity-50"
                         >
                           {o}
                         </button>
                       ))}
                     </div>
                     {answering === q.id && (
-                      <p className="mt-2 text-xs text-brand">Saving your answer…</p>
+                      <p className="mt-2 text-xs text-brand-900">Saving your answer…</p>
                     )}
                   </div>
                 </div>
@@ -649,62 +629,62 @@ export function InsightProfileView() {
       )}
 
       {/* ── 4. Income ─────────────────────────────────────────────────────── */}
-      <Card title="Income" subtitle={income.narrative}>
+      <Panel title="Income" subtitle={income.narrative}>
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold text-gray-900">
+          <span className="text-2xl font-semibold tabular-nums text-content">
             {formatCurrency(income.averageMonthlyIncome)}
           </span>
-          <span className="text-sm text-gray-400">/ month</span>
+          <span className="text-sm text-content-muted">/ month</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700">
+          <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-900">
             {CHARACTER_LABEL[income.primaryCharacter] ?? income.primaryCharacter}
           </span>
           {income.characterTags.map((t) => (
-            <span key={t} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">
+            <span key={t} className="rounded-full bg-surface-inset px-2.5 py-1 text-xs text-content-secondary">
               {t}
             </span>
           ))}
         </div>
         {income.sources.length > 0 && (
-          <div className="mt-4 space-y-1 border-t border-gray-100 pt-4">
+          <div className="mt-4 space-y-1 border-t border-line-subtle pt-4">
             {income.sources.map((s) => (
               <button
                 key={s.name}
                 onClick={() =>
                   setDrawer({ type: 'income', key: s.key, title: s.name, subtitle: 'Money received' })
                 }
-                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-50"
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-hover"
               >
                 <div className="min-w-0">
-                  <span className="flex items-center gap-1 font-medium text-gray-800">
+                  <span className="flex items-center gap-1 font-medium text-content">
                     {s.name}
-                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                    <ChevronRight className="h-3.5 w-3.5 text-content-muted" />
                   </span>
                   {s.pendingConfirmation && (
-                    <span className="text-sm text-amber-600">needs confirmation</span>
+                    <span className="text-sm text-warning-strong">needs confirmation</span>
                   )}
-                  <span className="block text-sm text-gray-400">{s.monthsPresent} months</span>
+                  <span className="block text-sm text-content-muted">{s.monthsPresent} months</span>
                 </div>
-                <span className="shrink-0 font-medium tabular-nums text-gray-900">
+                <span className="shrink-0 font-medium tabular-nums text-content">
                   {formatCurrency(s.monthlyAverage)}/mo
                 </span>
               </button>
             ))}
           </div>
         )}
-      </Card>
+      </Panel>
 
       {/* ── 5. Commitments ────────────────────────────────────────────────── */}
       {profile.commitments.length > 0 && (
-        <Card
+        <Panel
           title="Bills and commitments"
           subtitle="EquiScore identifies recurring commitments and checks whether they are paid consistently and on time. This is one of its strongest signals."
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[38rem] text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
+                <tr className="text-left text-xs uppercase tracking-wide text-content-muted">
                   <th className="pb-2 font-medium">Commitment</th>
                   <th className="pb-2 text-right font-medium">Typical amount</th>
                   <th className="pb-2 font-medium">Usual day</th>
@@ -720,7 +700,7 @@ export function InsightProfileView() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-line-subtle">
                 {profile.commitments.map((c) => (
                   <tr
                     key={c.name}
@@ -732,32 +712,30 @@ export function InsightProfileView() {
                         subtitle: `${cadenceLabel(c.cadence)} commitment · payment history`,
                       })
                     }
-                    className="cursor-pointer transition-colors hover:bg-gray-50"
+                    className="cursor-pointer transition-colors hover:bg-surface-hover"
                   >
-                    <td className="py-2.5 font-medium text-gray-800">
+                    <td className="py-2.5 font-medium text-content">
                       <span className="flex items-center gap-1">
                         {c.name}
-                        <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                        <ChevronRight className="h-3.5 w-3.5 text-content-muted" />
                       </span>
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-gray-700">
+                    <td className="py-2.5 text-right tabular-nums text-content-secondary">
                       {formatCurrency(c.amount)}
                     </td>
-                    <td className="py-2.5 tabular-nums text-gray-600">
+                    <td className="py-2.5 tabular-nums text-content-secondary">
                       {c.typicalDayOfMonth ? ordinal(c.typicalDayOfMonth) : cadenceLabel(c.cadence)}
                       {c.typicalDayOfMonth != null && (
-                        <span className="ml-1 text-xs text-gray-400">±{c.dayVariance}d</span>
+                        <span className="ml-1 text-xs text-content-muted">±{c.dayVariance}d</span>
                       )}
                     </td>
                     <td className="py-2.5">
-                      <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', CONSISTENCY_STYLE[c.consistency])}>
-                        {CONSISTENCY_LABEL[c.consistency]}
-                      </span>
+                      <StatusPill status={CONSISTENCY_TONE[c.consistency]} label={CONSISTENCY_LABEL[c.consistency]} />
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-gray-700">
+                    <td className="py-2.5 text-right tabular-nums text-content-secondary">
                       {c.occurrences}/{Math.max(c.monthsCovered, c.occurrences)}
                       {c.returnedCount > 0 && (
-                        <span className="ml-1 text-xs text-amber-600">({c.returnedCount} returned)</span>
+                        <span className="ml-1 text-xs text-warning-strong">({c.returnedCount} returned)</span>
                       )}
                     </td>
                   </tr>
@@ -765,17 +743,17 @@ export function InsightProfileView() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-gray-500">{profile.paymentBehaviour.narrative}</p>
-        </Card>
+          <p className="mt-3 text-xs text-content-muted">{profile.paymentBehaviour.narrative}</p>
+        </Panel>
       )}
 
       {/* ── 6. Where it goes ──────────────────────────────────────────────── */}
-      <Card title="Where it goes" subtitle={expenses.narrative}>
+      <Panel title="Where it goes" subtitle={expenses.narrative}>
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold text-gray-900">
+          <span className="text-2xl font-semibold tabular-nums text-content">
             {formatCurrency(expenses.averageMonthlySpend)}
           </span>
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-content-muted">
             / month · {Math.round(expenses.essentialShare * 100)}% essential
           </span>
         </div>
@@ -786,67 +764,67 @@ export function InsightProfileView() {
               onClick={() =>
                 setDrawer({ type: 'category', key: c.key, title: c.label, subtitle: 'Spending category' })
               }
-              className="grid w-full grid-cols-[11rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-gray-50"
+              className="grid w-full grid-cols-[11rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-hover"
             >
-              <span className="flex items-center gap-1 truncate text-sm text-gray-600" title={c.label}>
+              <span className="flex items-center gap-1 truncate text-sm text-content-secondary" title={c.label}>
                 <span className="truncate">{c.label}</span>
-                {c.unconfirmed && <span className="text-amber-500">•</span>}
+                {c.unconfirmed && <span className="text-warning-strong">•</span>}
               </span>
-              <span className="h-2 rounded-full bg-gray-100">
+              <span className="h-2 rounded-full bg-surface-hover">
                 <span
-                  className={cn('block h-full rounded-full', c.essential ? 'bg-brand' : 'bg-gray-300')}
+                  className={cn('block h-full rounded-full', c.essential ? 'bg-brand-600' : 'bg-chart-4')}
                   style={{ width: `${Math.max(2, Math.round(c.share * 100))}%` }}
                 />
               </span>
-              <span className="flex items-center gap-1 text-sm tabular-nums text-gray-500">
+              <span className="flex items-center gap-1 text-sm tabular-nums text-content-muted">
                 {formatCurrency(c.monthlyAverage)}
-                <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                <ChevronRight className="h-3.5 w-3.5 text-content-muted" />
               </span>
             </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
+        <div className="mt-3 flex items-center gap-3 text-xs text-content-muted">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-brand" /> Essential
+            <span className="h-2 w-2 rounded-full bg-brand-600" /> Essential
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-gray-300" /> Discretionary
+            <span className="h-2 w-2 rounded-full bg-chart-4" /> Discretionary
           </span>
         </div>
-      </Card>
+      </Panel>
 
       {/* ── 7. Context review ─────────────────────────────────────────────── */}
-      <Card
+      <Panel
         title={contextClear ? 'Context review' : 'Flagged for context'}
         subtitle="Surfaced for you to explain, not automatically counted against you"
       >
         {profile.unusual.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-emerald-700">
+          <div className="flex items-center gap-2 text-sm text-success-strong">
             <CheckCircle2 className="h-4 w-4" />
             No unusual patterns detected.
           </div>
         ) : (
           <>
-            <p className="mb-3 text-sm text-gray-600">
+            <p className="mb-3 text-sm text-content-secondary">
               We found patterns that may need explanation. These are not treated as negative unless
               they remain unexplained.
             </p>
             <div className="space-y-3">
               {profile.unusual.map((u) => (
-                <div key={u.id} className="rounded-lg border border-gray-200 p-3">
+                <div key={u.id} className="rounded-panel border border-line p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" />
                       <div>
-                        <p className="text-sm font-medium text-gray-800">
+                        <p className="text-sm font-medium text-content">
                           {u.direction === 'debit' ? 'Payment to' : 'Receipt from'} {u.counterparty}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-content-muted">
                           {formatDate(u.date)} · {u.reason}
                         </p>
                       </div>
                     </div>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-content">
                       {formatCurrency(u.amount)}
                     </span>
                   </div>
@@ -862,11 +840,11 @@ export function InsightProfileView() {
           </>
         )}
         {profile.risk.clearedTypologies.length > 0 && (
-          <p className="mt-3 border-t border-gray-100 pt-3 text-xs text-emerald-700">
+          <p className="mt-3 border-t border-line-subtle pt-3 text-xs text-success-strong">
             Checked and absent: {profile.risk.clearedTypologies.join(', ')}.
           </p>
         )}
-      </Card>
+      </Panel>
 
       <BreakdownDrawer spec={drawer} onClose={() => setDrawer(null)} />
     </div>
@@ -885,14 +863,14 @@ function RatioBar({
   warn: number
 }) {
   const pct = Math.min(100, Math.round(value * 100))
-  const color = value <= good ? 'bg-emerald-500' : value <= warn ? 'bg-amber-500' : 'bg-rose-500'
+  const color = value <= good ? 'bg-brand-600' : value <= warn ? 'bg-warning-bar' : 'bg-danger'
   return (
     <div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-700">{label}</span>
-        <span className="font-medium tabular-nums text-gray-900">{pct}%</span>
+        <span className="text-content-secondary">{label}</span>
+        <span className="font-medium tabular-nums text-content">{pct}%</span>
       </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-hover">
         <div className={cn('h-full rounded-full', color)} style={{ width: `${Math.max(2, pct)}%` }} />
       </div>
     </div>
@@ -909,8 +887,8 @@ function stressMessage(s: { surplusUnderStress: number; stillPositive: boolean; 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-sm text-gray-400">{label}</dt>
-      <dd className="mt-0.5 font-medium text-gray-800">{value}</dd>
+      <dt className="text-sm text-content-muted">{label}</dt>
+      <dd className="mt-0.5 font-medium text-content">{value}</dd>
     </div>
   )
 }
@@ -920,7 +898,7 @@ function Chip({ children, good }: { children: React.ReactNode; good?: boolean })
     <span
       className={cn(
         'rounded-full px-2 py-0.5 text-xs',
-        good ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+        good ? 'bg-success-soft text-success-strong' : 'bg-surface-inset text-content-secondary'
       )}
     >
       {children}

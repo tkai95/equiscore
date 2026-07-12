@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Landmark, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
+import { Button } from '@/components/ui'
 
 /**
  * Connect a bank via Enable Banking (an alternative to TrueLayer). The user
@@ -34,7 +35,7 @@ export function EnableBankingConnect() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 text-xs font-medium text-brand hover:text-brand-dark"
+        className="inline-flex items-center gap-2 text-xs font-medium text-brand-900 hover:text-brand-800"
       >
         <Landmark className="h-3.5 w-3.5" />
         Or connect via Enable Banking (beta)
@@ -44,16 +45,16 @@ export function EnableBankingConnect() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <p className="text-sm font-medium text-gray-900">Connect via Enable Banking</p>
-      <p className="mt-0.5 text-xs text-gray-500">Choose your bank, then authorise read-only access.</p>
+    <div className="rounded-panel border border-line bg-surface-card p-4">
+      <p className="text-sm font-medium text-content">Connect via Enable Banking</p>
+      <p className="mt-0.5 text-xs text-content-muted">Choose your bank, then authorise read-only access.</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <div className="relative">
           <select
             value={aspsp}
             onChange={(e) => setAspsp(e.target.value)}
             disabled={isLoading}
-            className="appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-8 text-sm focus:border-brand focus:outline-none disabled:opacity-50"
+            className="appearance-none rounded-lg border border-line bg-surface-card py-2 pl-3 pr-8 text-sm text-content focus:border-brand focus:outline-none disabled:opacity-50"
           >
             <option value="">{isLoading ? 'Loading banks…' : 'Select your bank'}</option>
             {banks.map((b) => (
@@ -62,20 +63,18 @@ export function EnableBankingConnect() {
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
         </div>
-        <button
-          onClick={() => connect.mutate()}
-          disabled={!aspsp || connect.isPending}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-cream-surface hover:bg-brand-dark disabled:opacity-50"
-        >
+        <Button onClick={() => connect.mutate()} disabled={!aspsp} loading={connect.isPending}>
           {connect.isPending ? 'Redirecting…' : 'Connect'}
-        </button>
-        <button onClick={() => setOpen(false)} className="text-sm text-gray-500 hover:text-gray-700">
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
-      {connect.isError && <p className="mt-2 text-xs text-rose-600">Couldn&apos;t start the connection. Try again.</p>}
+      {connect.isError && (
+        <p className="mt-2 text-xs text-danger-strong">Couldn&apos;t start the connection. Try again.</p>
+      )}
     </div>
   )
 }

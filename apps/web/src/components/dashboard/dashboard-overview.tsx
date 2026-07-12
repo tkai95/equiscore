@@ -11,13 +11,20 @@ import {
   CheckCircle2,
   AlertTriangle,
   MinusCircle,
-  Clock,
   ExternalLink,
 } from 'lucide-react'
 import { api, type ScoreImprovements } from '@/lib/api'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { useActionItems } from '@/lib/use-action-items'
+import {
+  buttonClasses,
+  Card,
+  Display,
+  PageLayout,
+  StatusPill as UIStatusPill,
+  type StatusTone,
+} from '@/components/ui'
 import {
   ASSESSMENT_CONFIDENCE,
   PORTFOLIO_STATUS,
@@ -87,14 +94,6 @@ const IDENTITY_DOC_TYPES = [
   'biometric_residence_permit',
 ]
 
-const TIER_HEX: Record<TrustTier, string> = {
-  A: '#123C35',
-  B: '#3D6658',
-  C: '#8FA491',
-  D: '#C7A66A',
-  E: '#A96E52',
-}
-
 const AFFORDABILITY_MAP: Record<string, DimensionStatus> = {
   comfortable: 'strong',
   manageable: 'good',
@@ -102,41 +101,55 @@ const AFFORDABILITY_MAP: Record<string, DimensionStatus> = {
   at_risk: 'at_risk',
 }
 
+// ── Status presentation → design-system tokens ───────────────────────────────
+// The status model (lib/status) owns meaning → label + tone. Here we map its
+// tone onto the shared StatusPill tones and two-tone bar/dot colours so the
+// dashboard reads the same as the Trust Assessment page.
+
+const PILL_TONE: Record<StatusPresentation['tone'], StatusTone> = {
+  success: 'success',
+  brand: 'info',
+  warn: 'warning',
+  danger: 'danger',
+  neutral: 'neutral',
+}
+
+const BAR_TONE: Record<StatusPresentation['tone'], string> = {
+  success: 'bg-brand-600',
+  brand: 'bg-brand-600',
+  warn: 'bg-warning-bar',
+  danger: 'bg-danger-strong',
+  neutral: 'bg-content-muted/40',
+}
+
 // ── Small shared pieces ──────────────────────────────────────────────────────
 
 function StatusPill({ status }: { status: StatusPresentation }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1',
-        status.badge,
-      )}
-    >
-      <span className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
-      {status.label}
-    </span>
-  )
+  return <UIStatusPill status={PILL_TONE[status.tone]} label={status.label} />
 }
 
-function SectionCard({
+/** Report-style panel: heading in a bordered header, content below. */
+function Panel({
   title,
-  aside,
+  action,
   children,
   className,
+  contentClassName = 'p-5',
 }: {
   title: string
-  aside?: React.ReactNode
+  action?: React.ReactNode
   children: React.ReactNode
   className?: string
+  contentClassName?: string
 }) {
   return (
-    <section className={cn('rounded-2xl border border-border bg-white p-6', className)}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-semibold text-charcoal">{title}</h2>
-        {aside}
+    <Card padding="none" className={cn('flex flex-col', className)}>
+      <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-5 py-4">
+        <h2 className="text-base font-semibold text-content">{title}</h2>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      {children}
-    </section>
+      <div className={cn('flex-1', contentClassName)}>{children}</div>
+    </Card>
   )
 }
 
@@ -214,33 +227,28 @@ export function DashboardOverview() {
   const topImprovementGain = improvements?.improvements[0]?.estimatedGain ?? null
 
   return (
-    <div className="mx-auto max-w-[1360px] space-y-6">
+    <PageLayout width="wide">
       {/* ── Section 1: Assessment summary ─────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Trust Portfolio summary */}
-        <div className="rounded-2xl border border-border bg-white p-7 lg:col-span-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-mid">
+        <Card padding="lg" className="lg:col-span-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">
             EquiScore Trust Portfolio
           </p>
-          <h1 className="mt-1 text-[26px] font-semibold leading-tight text-charcoal">
+          <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-content">
             {profile?.fullName ?? 'Your Trust Portfolio'}
           </h1>
 
           {scoreLoading ? (
-            <div className="mt-6 h-24 animate-pulse rounded-xl bg-gray-100" />
+            <div className="mt-6 h-24 animate-pulse rounded-panel bg-surface-hover" />
           ) : hasScore && score ? (
             <>
               <div className="mt-5 flex flex-wrap items-end gap-x-4 gap-y-2">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[44px] font-bold leading-none tabular-nums text-charcoal">
-                    {score.overallScore}
-                  </span>
-                  <span className="text-lg text-charcoal-mid">/ 100</span>
+                  <Display size="lg">{score.overallScore}</Display>
+                  <span className="text-lg text-content-secondary">/ 100</span>
                 </div>
-                <span
-                  className="rounded-full px-3 py-1 text-sm font-semibold"
-                  style={{ color: TIER_HEX[score.overallTier], backgroundColor: `${TIER_HEX[score.overallTier]}18` }}
-                >
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-900">
                   Tier {score.overallTier}
                 </span>
                 <StatusPill status={ASSESSMENT_CONFIDENCE[confidence]} />
@@ -248,7 +256,7 @@ export function DashboardOverview() {
 
               {/* Compact accessible gauge */}
               <div
-                className="mt-4 h-2 w-full max-w-md overflow-hidden rounded-full bg-gray-100"
+                className="mt-4 h-2 w-full max-w-md overflow-hidden rounded-full bg-surface-hover"
                 role="progressbar"
                 aria-valuenow={score.overallScore}
                 aria-valuemin={0}
@@ -256,94 +264,88 @@ export function DashboardOverview() {
                 aria-label={`EquiScore ${score.overallScore} out of 100, Tier ${score.overallTier}`}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${score.overallScore}%`, backgroundColor: TIER_HEX[score.overallTier] }}
+                  className="h-full rounded-full bg-brand-600 transition-all duration-700"
+                  style={{ width: `${score.overallScore}%` }}
                 />
               </div>
 
-              <p className="mt-4 max-w-xl text-sm leading-relaxed text-charcoal-mid">
+              <p className="mt-4 max-w-xl text-sm leading-relaxed text-content-secondary">
                 {identityVerified
                   ? 'Your connected banking data and verified identity support this assessment.'
                   : 'Your connected banking data provides useful financial evidence, but identity and income verification gaps currently limit the assessment.'}
               </p>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-charcoal-mid">
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-content-muted">
                 <span>
                   {accounts.length} account{accounts.length === 1 ? '' : 's'} connected
                 </span>
                 {monthsAnalysed > 0 && (
-                  <span className="border-l border-border pl-4">{monthsAnalysed} months analysed</span>
+                  <span className="border-l border-line-subtle pl-4">{monthsAnalysed} months analysed</span>
                 )}
-                <span className="border-l border-border pl-4">
+                <span className="border-l border-line-subtle pl-4">
                   Last updated {formatDate(score.computedAt)}
                 </span>
               </div>
 
               <Link
                 href="/dashboard/trust-score"
-                className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-900 hover:underline"
               >
                 View full assessment <ArrowRight className="h-4 w-4" />
               </Link>
             </>
           ) : (
             <div className="mt-6">
-              <p className="text-sm leading-relaxed text-charcoal-mid">
+              <p className="text-sm leading-relaxed text-content-secondary">
                 Your Trust Portfolio is a verified, reusable financial profile. Connect a bank or
                 upload a statement to build it from real financial evidence.
               </p>
-              <Link
-                href="/dashboard/connections"
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
-              >
+              <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
                 Connect bank account <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Recommended next action */}
-        <div className="rounded-2xl border border-brand/15 bg-brand-50 p-7 lg:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-mid">
+        <div className="rounded-card border border-brand-100 bg-brand-50 p-6 sm:p-8 lg:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">
             Recommended next action
           </p>
           {primaryAction ? (
             <div className="mt-3 flex h-[calc(100%-1.75rem)] flex-col">
-              <h2 className="text-lg font-semibold leading-snug text-charcoal">
+              <h2 className="text-lg font-semibold leading-snug text-content">
                 {primaryAction.title}
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-charcoal-mid">{primaryAction.detail}</p>
+              <p className="mt-2 text-sm leading-relaxed text-content-secondary">{primaryAction.detail}</p>
 
               {(primaryAction.id === 'verify-identity' || topImprovementGain) && (
-                <dl className="mt-4 space-y-1.5 rounded-xl bg-white/70 p-3 text-[13px] ring-1 ring-brand/10">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-mid">
+                <dl className="mt-4 space-y-1.5 rounded-panel border border-line bg-surface-card p-3 text-[13px]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                     Expected impact
                   </p>
                   {primaryAction.id === 'verify-identity' && (
                     <div className="flex justify-between">
-                      <dt className="text-charcoal-mid">Identity confidence</dt>
-                      <dd className="font-medium text-charcoal">Low → Verified</dd>
+                      <dt className="text-content-secondary">Identity confidence</dt>
+                      <dd className="font-medium text-content">Low → Verified</dd>
                     </div>
                   )}
                   {topImprovementGain != null && (
                     <div className="flex justify-between">
-                      <dt className="text-charcoal-mid">Potential EquiScore improvement</dt>
-                      <dd className="font-medium text-charcoal">Up to {topImprovementGain} points</dd>
+                      <dt className="text-content-secondary">Potential EquiScore improvement</dt>
+                      <dd className="font-medium text-content">Up to {topImprovementGain} points</dd>
                     </div>
                   )}
                 </dl>
               )}
 
               <div className="mt-auto flex flex-col gap-2 pt-5">
-                <Link
-                  href={primaryAction.href}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
-                >
+                <Link href={primaryAction.href} className={buttonClasses('primary', 'md', 'w-full')}>
                   {primaryAction.cta}
                 </Link>
                 <Link
                   href="/dashboard/trust-score"
-                  className="text-center text-xs font-medium text-brand hover:underline"
+                  className="text-center text-xs font-medium text-brand-900 hover:underline"
                 >
                   Why this is required
                 </Link>
@@ -351,17 +353,17 @@ export function DashboardOverview() {
             </div>
           ) : (
             <div className="mt-3">
-              <h2 className="text-lg font-semibold leading-snug text-charcoal">
+              <h2 className="text-lg font-semibold leading-snug text-content">
                 {hasScore ? 'Your portfolio is up to date' : 'Start building your portfolio'}
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-charcoal-mid">
+              <p className="mt-2 text-sm leading-relaxed text-content-secondary">
                 {hasScore
                   ? 'No outstanding actions. You can share your Trust Portfolio whenever you need to.'
                   : 'Connect a bank account to generate your assessment.'}
               </p>
               <Link
                 href={hasScore ? '/dashboard/share' : '/dashboard/connections'}
-                className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
+                className={buttonClasses('primary', 'md', 'mt-5')}
               >
                 {hasScore ? 'Create a share' : 'Connect bank account'}
               </Link>
@@ -410,7 +412,7 @@ export function DashboardOverview() {
 
       {/* ── Sharing activity ──────────────────────────────────────────────── */}
       <SharingActivity shares={shares} sharingStatus={sharingStatus} />
-    </div>
+    </PageLayout>
   )
 }
 
@@ -504,39 +506,39 @@ function PortfolioStatusPanel({
       : PORTFOLIO_STATUS.in_progress
 
   return (
-    <SectionCard title="Portfolio status" aside={<StatusPill status={portfolioStatus} />}>
+    <Panel title="Portfolio status" action={<StatusPill status={portfolioStatus} />}>
       <div className="mb-1 flex items-end justify-between">
-        <span className="text-2xl font-bold tabular-nums text-charcoal">{pct}% complete</span>
-        <span className="text-sm text-charcoal-mid">{completeAreas} of {rows.length} areas complete</span>
+        <span className="text-2xl font-semibold tabular-nums text-content">{pct}% complete</span>
+        <span className="text-sm text-content-secondary">{completeAreas} of {rows.length} areas complete</span>
       </div>
       <div
-        className="h-2 w-full overflow-hidden rounded-full bg-gray-100"
+        className="h-2 w-full overflow-hidden rounded-full bg-surface-hover"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={`Portfolio ${pct} percent complete`}
       >
-        <div className="h-full rounded-full bg-brand transition-all duration-700" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-brand-600 transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
 
-      <div className="mt-5 divide-y divide-border">
+      <div className="mt-5 divide-y divide-line-subtle">
         {rows.map((r) => (
           <div key={r.area} className="flex items-center justify-between gap-3 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="text-sm font-medium text-charcoal">{r.area}</span>
+              <span className="text-sm font-medium text-content">{r.area}</span>
               <StatusPill status={r.presentation} />
             </div>
             <Link
               href={r.href}
-              className="shrink-0 text-sm font-medium text-brand hover:text-brand-dark hover:underline"
+              className="shrink-0 text-sm font-medium text-brand-900 hover:underline"
             >
               {r.action}
             </Link>
           </div>
         ))}
       </div>
-    </SectionCard>
+    </Panel>
   )
 }
 
@@ -613,7 +615,7 @@ function AssessmentBreakdown({
   ]
 
   return (
-    <SectionCard title="Assessment breakdown">
+    <Panel title="Assessment breakdown">
       <div className="space-y-4">
         {dims.map((d) => {
           const st = DIMENSION_STATUS[d.status]
@@ -621,16 +623,16 @@ function AssessmentBreakdown({
           return (
             <div key={d.label}>
               <div className="mb-1 flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-charcoal">{d.label}</span>
+                <span className="text-sm font-medium text-content">{d.label}</span>
                 <div className="flex items-center gap-2">
                   {assessed && (
-                    <span className="text-sm font-semibold tabular-nums text-charcoal">{d.score}</span>
+                    <span className="text-sm font-semibold tabular-nums text-content">{d.score}</span>
                   )}
                   <StatusPill status={st} />
                 </div>
               </div>
               <div
-                className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100"
+                className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
                 role="progressbar"
                 aria-valuenow={assessed ? (d.score as number) : undefined}
                 aria-valuemin={0}
@@ -639,16 +641,16 @@ function AssessmentBreakdown({
               >
                 {assessed && (
                   <div
-                    className={cn('h-full rounded-full transition-all duration-700', st.bar)}
+                    className={cn('h-full rounded-full transition-all duration-700', BAR_TONE[st.tone])}
                     style={{ width: `${Math.max(2, d.score as number)}%` }}
                   />
                 )}
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-charcoal-mid">{d.reason}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-content-secondary">{d.reason}</p>
               {d.action && (
                 <Link
                   href={d.action.href}
-                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-900 hover:underline"
                 >
                   {d.action.label} <ArrowRight className="h-3 w-3" />
                 </Link>
@@ -657,7 +659,7 @@ function AssessmentBreakdown({
           )
         })}
       </div>
-    </SectionCard>
+    </Panel>
   )
 }
 
@@ -668,21 +670,21 @@ function KeySignals({ score }: { score: NonNullable<ScoreData> }) {
   const attention = score.reasonCodes.filter((r) => r.sentiment !== 'positive')
 
   return (
-    <SectionCard title="Key signals">
+    <Panel title="Key signals">
       {score.reasonCodes.length === 0 ? (
-        <p className="text-sm text-charcoal-mid">No signals available yet.</p>
+        <p className="text-sm text-content-secondary">No signals available yet.</p>
       ) : (
         <div className="space-y-5">
           {positive.length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-mid">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-muted">
                 Positive signals
               </h3>
               <ul className="space-y-2.5">
                 {positive.slice(0, 5).map((r, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
-                    <p className="text-sm leading-snug text-charcoal">{r.message}</p>
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success-strong" aria-hidden />
+                    <p className="text-sm leading-snug text-content">{r.message}</p>
                   </li>
                 ))}
               </ul>
@@ -690,19 +692,19 @@ function KeySignals({ score }: { score: NonNullable<ScoreData> }) {
           )}
           {attention.length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-mid">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-muted">
                 Areas requiring attention
               </h3>
               <ul className="space-y-2.5">
                 {attention.slice(0, 5).map((r, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" aria-hidden />
                     <div>
-                      <p className="text-sm leading-snug text-charcoal">{r.message}</p>
+                      <p className="text-sm leading-snug text-content">{r.message}</p>
                       {r.code === 'NAME_MISMATCH' && (
                         <Link
                           href="/dashboard/connections"
-                          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-brand-900 hover:underline"
                         >
                           Review mismatch <ArrowRight className="h-3 w-3" />
                         </Link>
@@ -715,7 +717,7 @@ function KeySignals({ score }: { score: NonNullable<ScoreData> }) {
           )}
         </div>
       )}
-    </SectionCard>
+    </Panel>
   )
 }
 
@@ -730,29 +732,32 @@ function AffordabilityCard({
 }) {
   if (!aff) {
     return (
-      <SectionCard title="Affordability" aside={<StatusPill status={DIMENSION_STATUS.insufficient_evidence} />}>
+      <Panel
+        title="Affordability"
+        action={<StatusPill status={DIMENSION_STATUS.insufficient_evidence} />}
+      >
         <div className="flex items-start gap-2.5">
-          <MinusCircle className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
-          <p className="text-sm leading-relaxed text-charcoal-mid">
+          <MinusCircle className="mt-0.5 h-4 w-4 shrink-0 text-content-muted" aria-hidden />
+          <p className="text-sm leading-relaxed text-content-secondary">
             We could not calculate affordability reliably because verified income information is
             incomplete.
           </p>
         </div>
         <Link
           href="/dashboard/connections"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-900 hover:underline"
         >
           Connect bank account <ArrowRight className="h-3.5 w-3.5" />
         </Link>
-      </SectionCard>
+      </Panel>
     )
   }
 
   const st = DIMENSION_STATUS[AFFORDABILITY_MAP[aff.rating] ?? 'moderate']
   const atRisk = aff.rating === 'at_risk'
   return (
-    <SectionCard title="Affordability" aside={<StatusPill status={st} />}>
-      <p className="mb-4 text-sm leading-relaxed text-charcoal-mid">
+    <Panel title="Affordability" action={<StatusPill status={st} />}>
+      <p className="mb-4 text-sm leading-relaxed text-content-secondary">
         {atRisk
           ? 'Regular commitments consume a high proportion of verified income.'
           : incomeConfirmed
@@ -775,11 +780,11 @@ function AffordabilityCard({
       </div>
       <Link
         href="/dashboard/analytics"
-        className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+        className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-900 hover:underline"
       >
         View full breakdown <ArrowRight className="h-3.5 w-3.5" />
       </Link>
-    </SectionCard>
+    </Panel>
   )
 }
 
@@ -795,17 +800,17 @@ function Metric({
   tone?: 'good' | 'bad'
 }) {
   return (
-    <div className="rounded-xl bg-surface-subtle px-3 py-2.5">
-      <p className="text-xs text-charcoal-mid">{label}</p>
+    <div className="rounded-panel border border-line bg-surface-secondary px-3 py-2.5">
+      <p className="text-xs text-content-muted">{label}</p>
       <p
         className={cn(
           'mt-0.5 text-lg font-semibold tabular-nums',
-          tone === 'good' ? 'text-success' : tone === 'bad' ? 'text-danger' : 'text-charcoal',
+          tone === 'good' ? 'text-success-strong' : tone === 'bad' ? 'text-danger-strong' : 'text-content',
         )}
       >
         {value}
       </p>
-      <p className="text-[11px] text-charcoal-mid/70">{sub}</p>
+      <p className="text-[11px] text-content-muted">{sub}</p>
     </div>
   )
 }
@@ -846,24 +851,24 @@ function ConnectedEvidence({
   const verifiedAreas = categories.filter((c) => c.status.tone === 'success').length
 
   return (
-    <SectionCard title="Connected evidence">
+    <Panel title="Connected evidence">
       <div className="mb-4 grid grid-cols-3 gap-3">
         <CountTile icon={Building2} count={bankCount} label={`bank connection${bankCount === 1 ? '' : 's'}`} />
         <CountTile icon={FileText} count={documentCount} label={`document${documentCount === 1 ? '' : 's'} uploaded`} />
         <CountTile icon={ShieldCheck} count={verifiedAreas} label={`of ${categories.length} areas verified`} />
       </div>
-      <div className="divide-y divide-border rounded-xl bg-surface-subtle px-4">
+      <div className="divide-y divide-line-subtle rounded-panel border border-line bg-surface-secondary px-4">
         {categories.map((c) => (
           <div key={c.label} className="flex items-center justify-between py-2.5">
-            <span className="text-sm text-charcoal">{c.label}</span>
+            <span className="text-sm text-content">{c.label}</span>
             <StatusPill status={c.status} />
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-charcoal-mid">
+      <p className="mt-3 text-xs text-content-muted">
         Connected Open Banking data counts as verified evidence, alongside any uploaded documents.
       </p>
-    </SectionCard>
+    </Panel>
   )
 }
 
@@ -877,12 +882,12 @@ function CountTile({
   label: string
 }) {
   return (
-    <div className="rounded-xl bg-surface-subtle px-3 py-3">
+    <div className="rounded-panel border border-line bg-surface-secondary px-3 py-3">
       <div className="mb-1 flex items-center gap-2">
-        <Icon className="h-4 w-4 text-brand-mid" aria-hidden />
-        <span className="text-xl font-bold tabular-nums text-charcoal">{count}</span>
+        <Icon className="h-4 w-4 text-brand-900" aria-hidden />
+        <span className="text-xl font-semibold tabular-nums text-content">{count}</span>
       </div>
-      <p className="text-xs leading-tight text-charcoal-mid">{label}</p>
+      <p className="text-xs leading-tight text-content-secondary">{label}</p>
     </div>
   )
 }
@@ -911,21 +916,18 @@ function SharingActivity({
   const expired = shares.length - active.length
 
   return (
-    <SectionCard
+    <Panel
       title="Sharing activity"
-      aside={
-        <Link
-          href="/dashboard/share"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-cream-surface hover:bg-brand-dark"
-        >
+      action={
+        <Link href="/dashboard/share" className={buttonClasses('primary', 'sm')}>
           Create a share
         </Link>
       }
     >
       {sharingStatus === 'available_with_warning' && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-warn-bg px-4 py-3 ring-1 ring-warn-border">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden />
-          <p className="text-sm text-warn-fg">
+        <div className="mb-4 flex items-start gap-2.5 rounded-panel bg-warning-soft px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" aria-hidden />
+          <p className="text-sm text-warning-strong">
             You can share the current version of your Trust Portfolio. Recipients will be shown that
             identity verification is incomplete.
           </p>
@@ -933,16 +935,16 @@ function SharingActivity({
       )}
 
       <div className="mb-4 flex flex-wrap gap-6 text-sm">
-        <span className="text-charcoal-mid">
-          Active shares <span className="ml-1 font-semibold text-charcoal">{active.length}</span>
+        <span className="text-content-secondary">
+          Active shares <span className="ml-1 font-semibold text-content">{active.length}</span>
         </span>
-        <span className="text-charcoal-mid">
-          Expired links <span className="ml-1 font-semibold text-charcoal">{expired}</span>
+        <span className="text-content-secondary">
+          Expired links <span className="ml-1 font-semibold text-content">{expired}</span>
         </span>
       </div>
 
       {active.length === 0 ? (
-        <p className="text-sm text-charcoal-mid">
+        <p className="text-sm text-content-secondary">
           No active share links. Create a share to send your Trust Portfolio to a landlord, letting
           agent or lender.
         </p>
@@ -951,13 +953,13 @@ function SharingActivity({
           {active.slice(0, 3).map((s) => (
             <div
               key={s.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-line p-4"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-charcoal">
+                <p className="text-sm font-semibold text-content">
                   {s.targetName ?? TARGET_LABELS[s.targetType ?? 'other'] ?? 'Recipient'}
                 </p>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-charcoal-mid">
+                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-content-muted">
                   <span>Shared {formatDate(s.createdAt)}</span>
                   <span>Expires {formatDate(s.expiresAt)}</span>
                   <span>
@@ -970,13 +972,13 @@ function SharingActivity({
                   href={`/share/${s.shareToken}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-brand-900 hover:underline"
                 >
                   View shared version <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </a>
                 <Link
                   href="/dashboard/share"
-                  className="text-sm font-medium text-charcoal-mid hover:text-charcoal hover:underline"
+                  className="text-sm font-medium text-content-secondary hover:text-content hover:underline"
                 >
                   Manage
                 </Link>
@@ -985,6 +987,6 @@ function SharingActivity({
           ))}
         </div>
       )}
-    </SectionCard>
+    </Panel>
   )
 }

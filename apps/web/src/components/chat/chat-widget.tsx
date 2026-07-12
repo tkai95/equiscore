@@ -96,8 +96,8 @@ export function ChatWidget() {
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[min(44rem,80vh)] w-[calc(100vw-2rem)] max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between bg-brand px-4 py-3 text-cream-surface">
+        <div className="fixed bottom-6 right-6 z-50 flex h-[min(44rem,80vh)] w-[calc(100vw-2rem)] max-w-md flex-col overflow-hidden rounded-card border border-line bg-surface-card shadow-2xl">
+          <div className="flex items-center justify-between bg-brand px-4 py-3 text-white">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="font-semibold">Ask EquiScore</span>
@@ -114,7 +114,7 @@ export function ChatWidget() {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.length === 0 && (
               <div>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-content-secondary">
                   Ask about your payments, affordability, or Trust Portfolio — or how to do anything
                   on EquiScore. Answers use your own data.
                 </p>
@@ -123,7 +123,7 @@ export function ChatWidget() {
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="block w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:border-brand/40 hover:bg-cream/40"
+                      className="block w-full rounded-lg border border-line px-3 py-2 text-left text-sm text-content transition-colors hover:border-brand/40 hover:bg-surface-hover"
                     >
                       {s}
                     </button>
@@ -134,13 +134,13 @@ export function ChatWidget() {
             {messages.map((m, i) =>
               m.role === 'user' ? (
                 <div key={i} className="flex justify-end">
-                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-brand px-3.5 py-2 text-sm leading-relaxed text-cream-surface">
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-brand px-3.5 py-2 text-sm leading-relaxed text-white">
                     {m.content}
                   </div>
                 </div>
               ) : (
                 <div key={i} className="flex justify-start">
-                  <div className="max-w-[92%] rounded-2xl bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-800">
+                  <div className="max-w-[92%] rounded-2xl bg-surface-inset px-3.5 py-2.5 text-sm leading-relaxed text-content">
                     {m.content && <Markdown text={m.content} onNavigate={navigate} />}
                     {i === messages.length - 1 && toolStatus ? (
                       <ToolStatus label={toolStatus} className={m.content ? 'mt-2' : ''} />
@@ -158,24 +158,24 @@ export function ChatWidget() {
               e.preventDefault()
               send(input)
             }}
-            className="flex items-center gap-2 border-t border-gray-100 p-3"
+            className="flex items-center gap-2 border-t border-line-subtle p-3"
           >
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask a question…"
-              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="flex-1 rounded-lg border border-line px-3 py-2 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
               aria-label="Send"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-cream-surface disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
             </button>
           </form>
-          <p className="px-3 pb-2 text-center text-[10px] text-gray-400">
+          <p className="px-3 pb-2 text-center text-[10px] text-content-muted">
             Answers use your own EquiScore data and may not always be perfect.
           </p>
         </div>
@@ -189,7 +189,7 @@ function ToolStatus({ label, className }: { label: string; className?: string })
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-charcoal-mid ring-1 ring-[#D8D6C9]',
+        'inline-flex items-center gap-2 rounded-full bg-surface-card px-2.5 py-1 text-xs font-medium text-content-secondary ring-1 ring-line',
         className
       )}
     >
@@ -201,11 +201,11 @@ function ToolStatus({ label, className }: { label: string; className?: string })
 
 function ThinkingDots() {
   return (
-    <span className="flex items-center gap-1 py-0.5 text-gray-400">
+    <span className="flex items-center gap-1 py-0.5 text-content-muted">
       {[0, 150, 300].map((d) => (
         <span
           key={d}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400"
+          className="h-1.5 w-1.5 animate-bounce rounded-full bg-content-muted"
           style={{ animationDelay: `${d}ms` }}
         />
       ))}
@@ -303,7 +303,7 @@ function Table({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[0.9em]">
         <thead>
-          <tr className="border-b border-gray-300">
+          <tr className="border-b border-line">
             {header.map((cell, i) => (
               <th key={i} className={`px-2 py-1 font-semibold ${alignClass(i)}`}>
                 <Inline text={cell} onNavigate={onNavigate} />
@@ -313,7 +313,7 @@ function Table({
         </thead>
         <tbody>
           {rows.map((row, r) => (
-            <tr key={r} className="border-b border-gray-200 last:border-0">
+            <tr key={r} className="border-b border-line last:border-0">
               {header.map((_, i) => (
                 <td key={i} className={`px-2 py-1 align-top ${alignClass(i)}`}>
                   <Inline text={row[i] ?? ''} onNavigate={onNavigate} />
@@ -344,7 +344,7 @@ function Inline({ text, onNavigate }: { text: string; onNavigate: (href: string)
       nodes.push(<Anchor key={key++} href={href} label={label} onNavigate={onNavigate} />)
     } else if (m[6]) {
       nodes.push(
-        <code key={key++} className="rounded bg-gray-200/70 px-1 py-0.5 text-[0.85em]">
+        <code key={key++} className="rounded bg-surface-inset px-1 py-0.5 text-[0.85em]">
           {m[7]}
         </code>
       )

@@ -9,8 +9,9 @@ import { api } from '@/lib/api'
 import { updateProfileSchema } from '@equiscore/shared'
 import type { UpdateProfileData } from '@equiscore/shared'
 import Link from 'next/link'
-import { User, MapPin, Briefcase, Home, Edit2, Check, X } from 'lucide-react'
-import { cn, formatDate, formatCurrency } from '@/lib/utils'
+import { User, MapPin, Briefcase, Edit2, Check, X, type LucideIcon } from 'lucide-react'
+import { formatDate, formatCurrency } from '@/lib/utils'
+import { Button, buttonClasses, Card, PageLayout, PageTitle } from '@/components/ui'
 
 const RESIDENCY_LABELS: Record<string, string> = {
   british_citizen: 'British Citizen',
@@ -62,39 +63,39 @@ interface Employment {
   isCurrent: boolean
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+/** Report-style panel: icon chip + heading, hairline divider, then content. */
+function Panel({
+  icon: Icon,
+  title,
+  action,
+  children,
+}: {
+  icon: LucideIcon
+  title: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900">{value ?? '—'}</dd>
-    </div>
+    <Card padding="none">
+      <div className="flex items-center justify-between gap-4 border-b border-line-subtle px-5 py-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-900">
+            <Icon className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <h2 className="text-base font-semibold text-content">{title}</h2>
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </Card>
   )
 }
 
-function SectionHeader({
-  icon: Icon,
-  title,
-  onEdit,
-}: {
-  icon: React.ElementType
-  title: string
-  onEdit: () => void
-}) {
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="mb-5 flex items-center justify-between">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
-          <Icon className="h-4 w-4 text-brand" />
-        </div>
-        <h2 className="font-semibold text-gray-900">{title}</h2>
-      </div>
-      <button
-        onClick={onEdit}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-      >
-        <Edit2 className="h-3 w-3" />
-        Edit
-      </button>
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-content-muted">{label}</dt>
+      <dd className="mt-1 text-sm text-content">{value ?? '—'}</dd>
     </div>
   )
 }
@@ -124,8 +125,8 @@ function EditForm({
   })
 
   const inputClass =
-    'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
-  const labelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
+    'w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
+  const labelClass = 'mb-1.5 block text-sm font-medium text-content'
 
   return (
     <form onSubmit={form.handleSubmit(onSave)} className="space-y-5">
@@ -134,7 +135,7 @@ function EditForm({
           <label className={labelClass}>Full name</label>
           <input {...form.register('fullName')} className={inputClass} />
           {form.formState.errors.fullName && (
-            <p className="mt-1 text-xs text-red-600">{form.formState.errors.fullName.message}</p>
+            <p className="mt-1 text-xs text-danger-strong">{form.formState.errors.fullName.message}</p>
           )}
         </div>
         <div>
@@ -185,23 +186,15 @@ function EditForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
+      <div className="flex items-center justify-end gap-3 border-t border-line-subtle pt-4">
+        <Button type="button" variant="secondary" onClick={onCancel}>
           <X className="h-3.5 w-3.5" />
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-cream-surface hover:bg-brand-dark disabled:opacity-50"
-        >
-          <Check className="h-3.5 w-3.5" />
+        </Button>
+        <Button type="submit" variant="primary" loading={isPending}>
+          {!isPending && <Check className="h-3.5 w-3.5" />}
           {isPending ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </div>
     </form>
   )
@@ -252,95 +245,86 @@ export function ProfileView() {
 
   if (profileLoading) {
     return (
-      <div className="space-y-4">
+      <PageLayout>
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-40 animate-pulse rounded-2xl bg-gray-100" />
+          <div key={i} className="h-40 animate-pulse rounded-card bg-surface-hover" />
         ))}
-      </div>
+      </PageLayout>
     )
   }
 
   if (!profile) {
     return (
-      <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-100">
-        <p className="mb-4 text-gray-500">No profile found. Complete onboarding to get started.</p>
-        <Link
-          href="/onboarding"
-          className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-cream-surface hover:bg-brand-dark"
-        >
-          Start onboarding
-        </Link>
-      </div>
+      <PageLayout>
+        <Card className="text-center" padding="lg">
+          <p className="mb-4 text-content-secondary">No profile found. Complete onboarding to get started.</p>
+          <Link href="/onboarding" className={buttonClasses('primary')}>
+            Start onboarding
+          </Link>
+        </Card>
+      </PageLayout>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My profile</h1>
-          <p className="text-sm text-gray-500">Last updated {formatDate(profile.updatedAt)}</p>
-        </div>
+    <PageLayout>
+      <div>
+        <PageTitle>My profile</PageTitle>
+        <p className="mt-1 text-sm text-content-secondary">Last updated {formatDate(profile.updatedAt)}</p>
       </div>
 
       {/* Personal info */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        {!isEditing ? (
-          <>
-            <SectionHeader icon={User} title="Personal information" onEdit={() => setIsEditing(true)} />
-            <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Full name" value={profile.fullName} />
-              <Field label="Date of birth" value={profile.dob ? formatDate(profile.dob) : null} />
-              <Field label="Nationality" value={profile.nationality} />
-              <Field
-                label="Residency status"
-                value={profile.residencyStatus ? RESIDENCY_LABELS[profile.residencyStatus] : null}
-              />
-              <Field
-                label="Employment type"
-                value={profile.employmentType ? EMPLOYMENT_LABELS[profile.employmentType] : null}
-              />
-              <Field
-                label="Monthly income"
-                value={profile.monthlyIncomeDeclared != null ? formatCurrency(profile.monthlyIncomeDeclared) : null}
-              />
-              <Field
-                label="Monthly rent"
-                value={profile.monthlyRentDeclared != null ? formatCurrency(profile.monthlyRentDeclared) : null}
-              />
-            </dl>
-          </>
-        ) : (
-          <>
-            <div className="mb-5 flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
-                <User className="h-4 w-4 text-brand" />
-              </div>
-              <h2 className="font-semibold text-gray-900">Edit personal information</h2>
-            </div>
-            <EditForm
-              profile={profile}
-              onSave={(data) => updateMutation.mutate(data)}
-              onCancel={() => setIsEditing(false)}
-              isPending={updateMutation.isPending}
+      {!isEditing ? (
+        <Panel
+          icon={User}
+          title="Personal information"
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setIsEditing(true)}>
+              <Edit2 className="h-3 w-3" />
+              Edit
+            </Button>
+          }
+        >
+          <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Full name" value={profile.fullName} />
+            <Field label="Date of birth" value={profile.dob ? formatDate(profile.dob) : null} />
+            <Field label="Nationality" value={profile.nationality} />
+            <Field
+              label="Residency status"
+              value={profile.residencyStatus ? RESIDENCY_LABELS[profile.residencyStatus] : null}
             />
-            {updateMutation.isError && (
-              <p className="mt-3 text-sm text-red-600">
-                Failed to save — {(updateMutation.error as Error).message}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+            <Field
+              label="Employment type"
+              value={profile.employmentType ? EMPLOYMENT_LABELS[profile.employmentType] : null}
+            />
+            <Field
+              label="Monthly income"
+              value={profile.monthlyIncomeDeclared != null ? formatCurrency(profile.monthlyIncomeDeclared) : null}
+            />
+            <Field
+              label="Monthly rent"
+              value={profile.monthlyRentDeclared != null ? formatCurrency(profile.monthlyRentDeclared) : null}
+            />
+          </dl>
+        </Panel>
+      ) : (
+        <Panel icon={User} title="Edit personal information">
+          <EditForm
+            profile={profile}
+            onSave={(data) => updateMutation.mutate(data)}
+            onCancel={() => setIsEditing(false)}
+            isPending={updateMutation.isPending}
+          />
+          {updateMutation.isError && (
+            <p className="mt-3 text-sm text-danger-strong">
+              Failed to save — {(updateMutation.error as Error).message}
+            </p>
+          )}
+        </Panel>
+      )}
 
       {/* Address */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <div className="mb-5 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
-            <MapPin className="h-4 w-4 text-brand" />
-          </div>
-          <h2 className="font-semibold text-gray-900">Current address</h2>
-        </div>
+      <Panel icon={MapPin} title="Current address">
         {currentAddress ? (
           <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2">
             <Field label="Address line 1" value={currentAddress.addressLine1} />
@@ -351,19 +335,13 @@ export function ProfileView() {
             <Field label="Postcode" value={currentAddress.postcode} />
           </dl>
         ) : (
-          <p className="text-sm text-gray-500">No address on record. Complete onboarding to add one.</p>
+          <p className="text-sm text-content-secondary">No address on record. Complete onboarding to add one.</p>
         )}
-      </div>
+      </Panel>
 
       {/* Employment detail */}
       {currentEmployment && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <div className="mb-5 flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cream">
-              <Briefcase className="h-4 w-4 text-brand" />
-            </div>
-            <h2 className="font-semibold text-gray-900">Employment detail</h2>
-          </div>
+        <Panel icon={Briefcase} title="Employment detail">
           <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
             <Field
               label="Employment type"
@@ -376,8 +354,8 @@ export function ProfileView() {
               value={currentEmployment.monthlyIncomeDeclared != null ? formatCurrency(currentEmployment.monthlyIncomeDeclared) : null}
             />
           </dl>
-        </div>
+        </Panel>
       )}
-    </div>
+    </PageLayout>
   )
 }

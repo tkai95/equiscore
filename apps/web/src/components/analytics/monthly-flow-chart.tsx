@@ -29,6 +29,14 @@ function formatGBP(value: number) {
   return `£${value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
 }
 
+// Brand-derived chart palette (resolved hex of the design tokens).
+// Income = chart-2 (deep green), expenses = warning-bar (amber). One tonal family.
+const INCOME_COLOUR = '#3d6658'
+const EXPENSE_COLOUR = '#ad781a'
+const GRID_COLOUR = '#e9ece8'
+const AXIS_COLOUR = '#707b76'
+const CURSOR_COLOUR = '#f2f4f1'
+
 interface TooltipPayloadItem {
   name: string
   value: number
@@ -50,26 +58,28 @@ function CustomTooltip({
   const net = income - expenses
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg">
-      <p className="mb-2 text-xs font-semibold text-gray-500">{label}</p>
+    <div className="rounded-panel border border-line bg-surface-card px-4 py-3 shadow-card">
+      <p className="mb-2 text-xs font-semibold text-content-muted">{label}</p>
       <div className="space-y-1 text-sm">
         <div className="flex items-center justify-between gap-6">
-          <span className="flex items-center gap-1.5 text-gray-600">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="flex items-center gap-1.5 text-content-secondary">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: INCOME_COLOUR }} />
             Income
           </span>
-          <span className="font-medium text-gray-900">{formatGBP(income)}</span>
+          <span className="font-medium tabular-nums text-content">{formatGBP(income)}</span>
         </div>
         <div className="flex items-center justify-between gap-6">
-          <span className="flex items-center gap-1.5 text-gray-600">
-            <span className="h-2 w-2 rounded-full bg-rose-500" />
+          <span className="flex items-center gap-1.5 text-content-secondary">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXPENSE_COLOUR }} />
             Expenses
           </span>
-          <span className="font-medium text-gray-900">{formatGBP(expenses)}</span>
+          <span className="font-medium tabular-nums text-content">{formatGBP(expenses)}</span>
         </div>
-        <div className="mt-1 border-t border-gray-100 pt-1 flex items-center justify-between gap-6">
-          <span className="text-gray-500">Net</span>
-          <span className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <div className="mt-1 border-t border-line-subtle pt-1 flex items-center justify-between gap-6">
+          <span className="text-content-muted">Net</span>
+          <span
+            className={`font-semibold tabular-nums ${net >= 0 ? 'text-success-strong' : 'text-danger-strong'}`}
+          >
             {net >= 0 ? '+' : ''}
             {formatGBP(net)}
           </span>
@@ -88,7 +98,7 @@ export function MonthlyFlowChart({
 }) {
   if (data.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-gray-400">
+      <div className="flex h-48 items-center justify-center text-sm text-content-muted">
         No monthly data available
       </div>
     )
@@ -114,28 +124,28 @@ export function MonthlyFlowChart({
         }}
         className={onSelectMonth ? 'cursor-pointer' : undefined}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOUR} vertical={false} />
         <XAxis
           dataKey="month"
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
+          tick={{ fontSize: 11, fill: AXIS_COLOUR }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           tickFormatter={(v: number) => `£${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
+          tick={{ fontSize: 11, fill: AXIS_COLOUR }}
           axisLine={false}
           tickLine={false}
           width={48}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: CURSOR_COLOUR }} />
         <Legend
           iconType="circle"
           iconSize={8}
           wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }}
         />
-        <Bar dataKey="Income" fill="#10b981" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="Expenses" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="Income" fill={INCOME_COLOUR} radius={[3, 3, 0, 0]} />
+        <Bar dataKey="Expenses" fill={EXPENSE_COLOUR} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
