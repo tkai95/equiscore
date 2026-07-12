@@ -194,7 +194,7 @@ export function TrustScoreView() {
 
   if (isLoading) {
     return (
-      <PageLayout className="max-w-[1200px]">
+      <PageLayout>
         <div className="h-8 w-64 animate-pulse rounded bg-surface-hover" />
         <div className="h-52 animate-pulse rounded-card bg-surface-hover" />
         <div className="h-64 animate-pulse rounded-card bg-surface-hover" />
@@ -204,7 +204,7 @@ export function TrustScoreView() {
 
   if (!score) {
     return (
-      <PageLayout className="max-w-[1200px]">
+      <PageLayout>
         <PageTitle>Trust assessment</PageTitle>
         <Card className="text-center" padding="lg">
           <p className="font-semibold text-content">No assessment yet</p>
@@ -253,7 +253,7 @@ export function TrustScoreView() {
       : GENERIC_OPPORTUNITIES
 
   return (
-    <PageLayout className="max-w-[1200px] pb-4">
+    <PageLayout className="pb-4">
       {/* ── Report header ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

@@ -233,7 +233,7 @@ export function DocumentsView() {
   }, {})
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <PageTitle>Documents</PageTitle>
         <p className="mt-1 text-sm text-content-secondary">Upload supporting documents to strengthen your trust profile.</p>

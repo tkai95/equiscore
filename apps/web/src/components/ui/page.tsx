@@ -6,7 +6,9 @@ import { PageTitle } from './typography'
  * placement, so pages stop positioning titles and actions ad hoc.
  */
 
-const WIDTHS = { default: 'max-w-6xl', wide: 'max-w-[1360px]', narrow: 'max-w-3xl' } as const
+// Content width is set ONCE by the dashboard layout so every page matches. The
+// `width` prop is retained for API compatibility but no longer sets a max-width.
+const WIDTHS = { default: '', wide: '', narrow: '' } as const
 
 export function PageLayout({
   width = 'default',
@@ -17,7 +19,7 @@ export function PageLayout({
   className?: string
   children: React.ReactNode
 }) {
-  return <div className={cn('mx-auto space-y-6', WIDTHS[width], className)}>{children}</div>
+  return <div className={cn('w-full space-y-6', WIDTHS[width], className)}>{children}</div>
 }
 
 export function PageHeader({

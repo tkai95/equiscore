@@ -87,7 +87,7 @@ export function CompassView() {
   if (!entitled) return <Upsell />
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       <Header status={data?.status ?? null} asOf={data?.asOf ?? null} months={data?.monthsOfHistory ?? 0} />
 
       {/* Section tabs */}
@@ -240,5 +240,5 @@ function Skeleton({ bare }: { bare?: boolean }) {
     </div>
   )
   if (bare) return <Card>{body}</Card>
-  return <div className="mx-auto max-w-6xl space-y-6">{body}</div>
+  return <div className="space-y-6">{body}</div>
 }
