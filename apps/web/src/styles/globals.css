@@ -32,39 +32,56 @@
        screens keep working while feature screens migrate onto the primitives.
        Colour proportion target: ~70% neutral, ~20% deep green, ~10% accents. */
 
-    /* Brand ramp (forest green) */
-    --brand-900: #123c35;
-    --brand-800: #1c4a41;
-    --brand-600: #466f63;
-    --brand-100: #dfeae5;
-    --brand-50: #f0f5f2;
+    /* Brand ramp — one forest-green family */
+    --brand-900: #073c34; /* deepest — strong text, gauge base */
+    --brand-800: #0a473d; /* primary button hover, gauge active */
+    --brand-600: #286d5a; /* strong/verified text, progress bars */
+    --brand-100: #e6f0eb;
+    --brand-50: #f0f6f3;
 
-    /* Surfaces — soft warm off-white page, crisp white cards, cream for guidance */
-    --surface-page: #f6f5f1;
+    /* Sidebar — dark, calm, institutional shell */
+    --sidebar-bg: #073c34;
+    --sidebar-deep: #05342d;
+    --sidebar-border: rgba(255, 255, 255, 0.09);
+    --sidebar-text: #f5f8f6;
+    --sidebar-text-muted: #b8cbc3;
+    --sidebar-hover: rgba(255, 255, 255, 0.07);
+    --sidebar-active: rgba(205, 226, 215, 0.2);
+
+    /* Surfaces — warm off-white page, white panels, subtle green-grey inset */
+    --surface-page: #f6f6f2;
     --surface-card: #ffffff;
     --surface-raised: #ffffff;
-    --surface-inset: #f7f2e7;
-    --surface-hover: #f1f4f1;
+    --surface-secondary: #fafaf7;
+    --surface-inset: #f3f6f3;
+    --surface-hover: #f2f4f1;
 
-    /* Borders — subtle grey-green; cards read via border + surface contrast (no shadow) */
-    --border-default: #dde2dd;
-    --border-subtle: #e7eae6;
-    --border-strong: #c7cec8;
+    /* Borders — soft */
+    --border-default: #dfe4df;
+    --border-subtle: #e9ece8;
+    --border-strong: #c9d0cb;
 
-    /* Text — three-level scale; dark green-black, with muted lifted for contrast */
-    --text-primary: #16201c;
-    --text-secondary: #4f5751;
-    --text-muted: #6c726d;
+    /* Text — clear hierarchy on the warm canvas */
+    --text-primary: #17231f;
+    --text-secondary: #4f5d57;
+    --text-muted: #707b76;
+    --text-faint: #929a96;
 
-    /* Semantic states (bg + text pairs) — distinct from brand green */
-    --success-bg: #e5f1e9;
-    --success-text: #286044;
-    --warning-bg: #f7edd2;
-    --warning-text: #775719;
+    /* Semantic — green positive, amber moderate (never red for "moderate") */
+    --success-bg: #eaf3ee;
+    --success-text: #286d5a;
+    --warning-bg: #f8edd7;
+    --warning-tile: #fcf6e9;
+    --warning-bar: #ad781a;
+    --warning-text: #966515;
     --danger-bg: #f6e5e1;
     --danger-text: #8c4037;
     --info-bg: #e7eef0;
     --info-text: #3f626a;
+
+    /* Gauge */
+    --gauge-active: #0a473d;
+    --gauge-track: #e1e6e2;
 
     /* Data-visualisation palette — derived from the EquiScore identity */
     --chart-1: #123c35;
@@ -76,7 +93,7 @@
     --chart-7: #d8ccb0;
 
     /* Elevation — near-flat. Cards rely on border + surface contrast, not shadow. */
-    --shadow-card: 0 1px 1px rgba(18, 60, 53, 0.03);
+    --shadow-card: 0 1px 2px rgba(16, 35, 30, 0.025);
   }
 
   .dark {

@@ -32,21 +32,31 @@ export default {
           foreground: 'hsl(var(--accent-foreground))',
         },
         brand: {
-          DEFAULT: '#123C35',
-          dark: '#0B2F29',
-          mid: '#3D6658',
-          // Consolidated ramp (Phase 1). 100/50 remapped to the new tints.
+          DEFAULT: '#073C34', // primary action / deepest green
+          dark: '#0A473D', // primary hover
+          mid: '#286D5A',
           900: 'var(--brand-900)',
           800: 'var(--brand-800)',
           600: 'var(--brand-600)',
           100: 'var(--brand-100)',
           50: 'var(--brand-50)',
         },
-        // ─── Consolidated system (Phase 1) — surfaces, borders, text, states ──
+        // Dark institutional sidebar shell.
+        sidebar: {
+          DEFAULT: 'var(--sidebar-bg)',
+          deep: 'var(--sidebar-deep)',
+          border: 'var(--sidebar-border)',
+          text: 'var(--sidebar-text)',
+          muted: 'var(--sidebar-text-muted)',
+          hover: 'var(--sidebar-hover)',
+          active: 'var(--sidebar-active)',
+        },
+        // ─── Consolidated system — surfaces, borders, text, states ────────────
         surface: {
           page: 'var(--surface-page)',
           card: 'var(--surface-card)',
           raised: 'var(--surface-raised)',
+          secondary: 'var(--surface-secondary)',
           inset: 'var(--surface-inset)',
           hover: 'var(--surface-hover)',
           sidebar: '#FBFAF6',
@@ -66,6 +76,8 @@ export default {
         },
         warning: {
           soft: 'var(--warning-bg)',
+          tile: 'var(--warning-tile)',
+          bar: 'var(--warning-bar)',
           strong: 'var(--warning-text)',
         },
         info: {

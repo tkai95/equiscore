@@ -137,17 +137,17 @@ function SidebarNav({
 
 function SidebarFooter({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <div className={cn('border-t border-[rgba(20,55,48,0.08)] py-3', collapsed ? 'flex justify-center px-2' : 'px-4')}>
+    <div className={cn('border-t border-sidebar-border py-3', collapsed ? 'flex justify-center px-2' : 'px-4')}>
       <UserButton
         afterSignOutUrl="/"
         appearance={{
           elements: {
             rootBox: 'w-full',
             userButtonTrigger: collapsed
-              ? 'flex items-center justify-center rounded-lg p-1.5 hover:bg-brand-50 transition-colors'
-              : 'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-charcoal-mid hover:bg-brand-50 hover:text-charcoal transition-colors',
+              ? 'flex items-center justify-center rounded-lg p-1.5 hover:bg-sidebar-hover transition-colors'
+              : 'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-muted hover:bg-sidebar-hover hover:text-white transition-colors',
             userButtonBox: collapsed ? '' : 'flex-row-reverse gap-3',
-            userButtonOuterIdentifier: 'text-sm text-charcoal',
+            userButtonOuterIdentifier: 'text-sm text-sidebar-text',
           },
         }}
         showName={!collapsed}
@@ -191,19 +191,19 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'hidden shrink-0 flex-col border-r border-[rgba(20,55,48,0.08)] bg-surface-sidebar transition-[width] duration-200 lg:flex',
+        'hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex',
         collapsed ? 'w-[76px]' : 'w-60',
       )}
     >
       {/* Logo + collapse toggle */}
       <div className={cn('flex items-center pb-6 pt-7', collapsed ? 'flex-col gap-4 px-2' : 'justify-between px-6')}>
         <Link href="/" aria-label="EquiScore home">
-          {collapsed ? <EquiScoreMark size={30} /> : <EquiScoreLogo width={140} />}
+          {collapsed ? <EquiScoreMark size={30} className="brightness-0 invert" /> : <EquiScoreLogo width={140} className="brightness-0 invert" />}
         </Link>
         <button
           onClick={toggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="rounded-md p-1.5 text-charcoal-mid transition-colors hover:bg-brand-50 hover:text-charcoal"
+          className="rounded-md p-1.5 text-sidebar-muted transition-colors hover:bg-sidebar-hover hover:text-white"
         >
           {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <PanelLeftClose className="h-[18px] w-[18px]" />}
         </button>
@@ -237,22 +237,22 @@ export function MobileTopBar() {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-[rgba(20,55,48,0.08)] bg-surface-sidebar px-4 lg:hidden">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 lg:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation menu"
-          className="relative -ml-1 rounded-md p-2 text-charcoal transition-colors hover:bg-brand-50"
+          className="relative -ml-1 rounded-md p-2 text-sidebar-text transition-colors hover:bg-sidebar-hover"
         >
           <Menu className="h-5 w-5" />
           {count > 0 && (
             <span
-              className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand"
+              className="absolute right-1 top-1 h-2 w-2 rounded-full bg-white"
               aria-label={`${count} outstanding actions`}
             />
           )}
         </button>
         <Link href="/" aria-label="EquiScore home">
-          <EquiScoreLogo width={124} />
+          <EquiScoreLogo width={124} className="brightness-0 invert" />
         </Link>
         {/* Spacer to keep the logo centred against the menu button */}
         <span className="w-9" aria-hidden />
@@ -266,15 +266,15 @@ export function MobileTopBar() {
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-charcoal/40"
           />
-          <div className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85%] flex-col bg-surface-sidebar shadow-xl">
+          <div className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85%] flex-col bg-sidebar shadow-xl">
             <div className="flex items-center justify-between px-6 pb-5 pt-6">
               <Link href="/" aria-label="EquiScore home" onClick={() => setOpen(false)}>
-                <EquiScoreLogo width={140} />
+                <EquiScoreLogo width={140} className="brightness-0 invert" />
               </Link>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close navigation menu"
-                className="rounded-md p-1.5 text-charcoal-mid transition-colors hover:bg-brand-50 hover:text-charcoal"
+                className="rounded-md p-1.5 text-sidebar-muted transition-colors hover:bg-sidebar-hover hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -322,7 +322,7 @@ function NavGroup({
         onClick={onNavigate}
         className={cn(
           'flex h-11 items-center justify-center rounded-lg transition-colors',
-          isInside ? 'bg-brand-100 text-brand' : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+          isInside ? 'bg-sidebar-active text-white' : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
         )}
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
@@ -337,7 +337,7 @@ function NavGroup({
         aria-expanded={open}
         className={cn(
           'flex h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors',
-          isInside ? 'text-charcoal' : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+          isInside ? 'text-sidebar-text' : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
         )}
       >
         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
@@ -346,7 +346,7 @@ function NavGroup({
       </button>
 
       {open && (
-        <div className="ml-[26px] mt-0.5 space-y-0.5 border-l border-[rgba(20,55,48,0.10)] pl-3">
+        <div className="ml-[26px] mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
           {group.children.map(({ href, label, icon: LeafIcon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
@@ -358,8 +358,8 @@ function NavGroup({
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
                   active
-                    ? 'bg-brand-100 font-medium text-brand'
-                    : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+                    ? 'bg-sidebar-active font-medium text-white'
+                    : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
                 )}
               >
                 <LeafIcon className="h-[15px] w-[15px] shrink-0" />
@@ -407,13 +407,13 @@ function NavLink({
         className={cn(
           'relative flex h-11 items-center justify-center rounded-lg transition-colors',
           active
-            ? 'bg-brand-100 text-brand'
-            : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+            ? 'bg-sidebar-active text-white'
+            : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
         )}
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
         {badge != null && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white" />
         )}
       </Link>
     )
@@ -427,18 +427,17 @@ function NavLink({
       className={cn(
         'relative flex h-11 items-center gap-3 rounded-lg pl-3 pr-2.5 text-sm font-medium transition-colors',
         active
-          ? 'bg-brand-100 text-brand'
+          ? 'bg-sidebar-active text-white'
           : muted
-            ? 'text-charcoal-mid/80 hover:bg-brand-50 hover:text-charcoal'
-            : 'text-charcoal-mid hover:bg-brand-50 hover:text-charcoal',
+            ? 'text-sidebar-muted/80 hover:bg-sidebar-hover hover:text-white'
+            : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
       )}
     >
-      {active && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-brand" />}
       <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
       <span className="flex-1">{label}</span>
       {badge != null && (
         <span
-          className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-cream-surface"
+          className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1.5 text-xs font-semibold text-white"
           aria-label={`${badge} outstanding action${badge === 1 ? '' : 's'}`}
         >
           {badge}

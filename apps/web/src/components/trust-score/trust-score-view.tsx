@@ -54,13 +54,8 @@ type ProfileMeta = {
   source: 'open_banking' | 'statement_upload' | 'test'
 } | null
 
-const TIER_HEX: Record<TrustTier, string> = {
-  A: '#123C35',
-  B: '#3D6658',
-  C: '#8FA491',
-  D: '#C7A66A',
-  E: '#A96E52',
-}
+const GAUGE_ACTIVE = '#0A473D'
+const GAUGE_TRACK = '#E1E6E2'
 
 type DimKey =
   | 'affordabilityScore'
@@ -137,10 +132,10 @@ function ratingClass(score: number): string {
   return isStrong(score) ? 'text-success-strong' : 'text-warning-strong'
 }
 function barClass(score: number): string {
-  return isStrong(score) ? 'bg-brand-600' : 'bg-sand'
+  return isStrong(score) ? 'bg-brand-600' : 'bg-warning-bar'
 }
 function dotClass(score: number): string {
-  return isStrong(score) ? 'bg-success-strong' : 'bg-sand'
+  return isStrong(score) ? 'bg-success-strong' : 'bg-warning-bar'
 }
 
 const DIM_CAMEL: Record<string, string> = {
@@ -310,7 +305,7 @@ export function TrustScoreView() {
       <Card padding="md">
         <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
           <div className="flex flex-col items-center justify-center border-b border-line-subtle pb-6 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
-            <AnimatedGauge score={score.overallScore} tier={score.overallTier} />
+            <AnimatedGauge score={score.overallScore} />
             <p className="mt-3 text-lg font-semibold text-content">Trust Tier {score.overallTier}</p>
             <p className="mt-0.5 text-sm text-content-secondary">{rating(financialAvg)} financial profile</p>
           </div>
@@ -327,13 +322,14 @@ export function TrustScoreView() {
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <HeroStat label="Financial profile" value={rating(financialAvg)} score={financialAvg} />
+              <HeroStat label="Financial profile" value={rating(financialAvg)} score={financialAvg} icon={Wallet} />
               <HeroStat
                 label="Identity"
                 value={identityVerified ? 'Verified' : score.identityConfidenceScore >= 50 ? 'Partial' : 'Unverified'}
                 score={score.identityConfidenceScore}
+                icon={ShieldCheck}
               />
-              <HeroStat label="Evidence quality" value={rating(score.verificationStrengthScore)} score={score.verificationStrengthScore} />
+              <HeroStat label="Evidence quality" value={rating(score.verificationStrengthScore)} score={score.verificationStrengthScore} icon={FileCheck} />
             </div>
           </div>
         </div>
@@ -363,33 +359,34 @@ export function TrustScoreView() {
         </div>
       )}
 
-      {/* ── Financial assessment ───────────────────────────────────────────── */}
-      <ReportSection title="Financial assessment" subtitle="Snapshot of your financial behaviour">
-        <MetricList dims={FINANCIAL_DIMS} score={score} onOpen={setDrawerDim} />
-      </ReportSection>
-
-      {/* ── Evidence quality ───────────────────────────────────────────────── */}
-      <ReportSection title="Evidence quality" subtitle="Confidence in the evidence supporting your profile">
-        {capped && (
-          <div className="flex items-start gap-2 rounded-panel bg-surface-inset px-4 py-3 text-sm text-content-secondary">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
-            Your financial assessment ({rating(financialAvg).toLowerCase()}) supports a stronger profile. Your trust tier
-            is capped at C until verification is completed.
-          </div>
-        )}
-        <MetricList dims={VERIFICATION_DIMS} score={score} onOpen={setDrawerDim} />
-      </ReportSection>
+      {/* ── Financial assessment + Evidence quality (two-column) ───────────── */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(360px,1fr)]">
+        <Panel title="Financial assessment" subtitle="Snapshot of your financial behaviour">
+          <MetricList dims={FINANCIAL_DIMS} score={score} onOpen={setDrawerDim} />
+        </Panel>
+        <Panel title="Evidence quality" subtitle="Confidence in the evidence supporting your profile">
+          {capped && (
+            <div className="flex items-start gap-2 border-b border-line-subtle bg-surface-inset px-5 py-3 text-sm text-content-secondary">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" />
+              Your financial assessment ({rating(financialAvg).toLowerCase()}) supports a stronger profile. Your trust
+              tier is capped at C until verification is completed.
+            </div>
+          )}
+          <MetricList dims={VERIFICATION_DIMS} score={score} onOpen={setDrawerDim} />
+        </Panel>
+      </div>
 
       {/* ── Key findings ───────────────────────────────────────────────────── */}
-      <div>
-        <div className="mb-4 flex items-end justify-between border-b border-line-subtle pb-3">
-          <h2 className="text-lg font-semibold text-content">Key findings</h2>
+      <Panel
+        title="Key findings"
+        action={
           <button onClick={() => setFindingsOpen(true)} className="text-sm font-medium text-brand-900 hover:underline">
             View all findings
           </button>
-        </div>
-        <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-          <div>
+        }
+      >
+        <div className="grid sm:grid-cols-2">
+          <div className="px-5 py-5 sm:border-r sm:border-line-subtle">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-content-muted">What strengthens your profile</h3>
             {strengths.length === 0 ? (
               <p className="text-sm text-content-secondary">Add financial evidence to build positive signals.</p>
@@ -407,7 +404,7 @@ export function TrustScoreView() {
               </ul>
             )}
           </div>
-          <div>
+          <div className="px-5 py-5">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-content-muted">What could strengthen confidence further</h3>
             <ul className="space-y-3.5">
               {opportunities.map((o) => {
@@ -435,17 +432,14 @@ export function TrustScoreView() {
             </ul>
           </div>
         </div>
-      </div>
+      </Panel>
 
       {/* ── How this assessment works ──────────────────────────────────────── */}
-      <div>
-        <div className="mb-4 border-b border-line-subtle pb-3">
-          <h2 className="text-lg font-semibold text-content">How this assessment works</h2>
-          <p className="mt-0.5 text-sm text-content-secondary">
-            See the evidence sources, verification checks and scoring approach used in this assessment.
-          </p>
-        </div>
-        <div className="overflow-hidden rounded-panel border border-line bg-surface-card px-5">
+      <Panel
+        title="How this assessment works"
+        subtitle="See the evidence sources, verification checks and scoring approach used in this assessment."
+      >
+        <div className="px-5">
           <Accordion title="Evidence reviewed" subtitle="Sources and data used in this assessment">
             <ul className="space-y-1.5">
               <Fact label="Primary source" value={profileMeta ? SOURCE_LABEL[profileMeta.source] ?? profileMeta.source : '—'} />
@@ -481,7 +475,7 @@ export function TrustScoreView() {
             </ul>
           </Accordion>
         </div>
-      </div>
+      </Panel>
 
       <DimensionDrawer
         dimKey={drawerDim}
@@ -506,7 +500,7 @@ function Dot() {
 
 // ── Animated semicircular gauge (sweep + count-up, reduced-motion aware) ────────
 
-function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
+function AnimatedGauge({ score }: { score: number }) {
   const [shown, setShown] = useState(0)
 
   useEffect(() => {
@@ -540,11 +534,11 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: w, maxWidth: '100%' }}>
         <svg width="100%" viewBox={`0 0 ${w} ${cy + 1}`} aria-hidden>
-          <path d={path} fill="none" stroke="#DDE2DD" strokeWidth={stroke} strokeLinecap="round" />
+          <path d={path} fill="none" stroke={GAUGE_TRACK} strokeWidth={stroke} strokeLinecap="round" />
           <path
             d={path}
             fill="none"
-            stroke={TIER_HEX[tier]}
+            stroke={GAUGE_ACTIVE}
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={arc}
@@ -561,35 +555,56 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
 
 // ── Hero status tile ────────────────────────────────────────────────────────────
 
-function HeroStat({ label, value, score }: { label: string; value: string; score: number }) {
+function HeroStat({ label, value, score, icon: Icon }: { label: string; value: string; score: number; icon: LucideIcon }) {
+  const strong = isStrong(score)
   return (
-    <div className="rounded-panel border border-line px-4 py-3">
-      <p className="text-xs text-content-muted">{label}</p>
-      <p className={cn('mt-1 flex items-center gap-1.5 text-sm font-semibold', ratingClass(score))}>
-        <span className={cn('h-1.5 w-1.5 rounded-full', dotClass(score))} />
-        {value}
-      </p>
+    <div className="flex items-center gap-3 rounded-panel border border-line bg-surface-secondary px-3.5 py-3">
+      <span
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+          strong ? 'bg-success-soft text-success-strong' : 'bg-warning-tile text-warning-strong',
+        )}
+      >
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs text-content-muted">{label}</p>
+        <p className={cn('text-sm font-semibold', ratingClass(score))}>{value}</p>
+      </div>
     </div>
   )
 }
 
 // ── Report section + metric rows (icon badge + descriptor) ──────────────────────
 
-function ReportSection({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function Panel({
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
-    <section className="space-y-4">
-      <div className="border-b border-line-subtle pb-3">
-        <h2 className="text-lg font-semibold text-content">{title}</h2>
-        <p className="mt-0.5 text-sm text-content-secondary">{subtitle}</p>
+    <Card padding="none">
+      <div className="flex items-start justify-between gap-4 border-b border-line-subtle px-5 py-4">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-content">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-sm text-content-secondary">{subtitle}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {children}
-    </section>
+    </Card>
   )
 }
 
 function MetricList({ dims, score, onOpen }: { dims: DimKey[]; score: TrustScoreData; onOpen: (k: DimKey) => void }) {
   return (
-    <div className="overflow-hidden rounded-panel border border-line bg-surface-card">
+    <div>
       {dims.map((k, i) => (
         <MetricRow key={k} dimKey={k} score={score[k] as number} first={i === 0} onOpen={() => onOpen(k)} />
       ))}
