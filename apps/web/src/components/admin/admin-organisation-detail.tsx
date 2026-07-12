@@ -21,12 +21,28 @@ import { AdminTable, Cell, EmptyAdminState, formatMaybeDate, label } from './adm
 
 const ROLES = ['owner', 'admin', 'policy_admin', 'reviewer', 'manager', 'billing_admin', 'auditor']
 
+function deliveryMessage(invitation: {
+  email: string
+  emailDelivery?: { sent: boolean; reason?: string }
+}) {
+  if (invitation.emailDelivery?.sent) {
+    return `Invite email sent to ${invitation.email}.`
+  }
+
+  if (invitation.emailDelivery?.reason) {
+    return `Invite created for ${invitation.email}, but email was not sent: ${invitation.emailDelivery.reason}. Use Copy to send the link manually.`
+  }
+
+  return `Invite created for ${invitation.email}. It will be claimed when that user signs in.`
+}
+
 export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug: string }) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('admin')
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin-organisation', organisationSlug],
@@ -51,7 +67,8 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
       const token = await getToken()
       return adminApi.organisations.resendInvitation(token!, organisationSlug, invitationId)
     },
-    onSuccess: () => {
+    onSuccess: (invitation) => {
+      setActionNotice(deliveryMessage(invitation))
       void queryClient.invalidateQueries({ queryKey: ['admin-organisation', organisationSlug] })
       void queryClient.invalidateQueries({ queryKey: ['admin-activity'] })
       void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
@@ -63,7 +80,8 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
       const token = await getToken()
       return adminApi.organisations.revokeInvitation(token!, organisationSlug, invitationId)
     },
-    onSuccess: () => {
+    onSuccess: (invitation) => {
+      setActionNotice(`Invite revoked for ${invitation.email}.`)
       void queryClient.invalidateQueries({ queryKey: ['admin-organisation', organisationSlug] })
       void queryClient.invalidateQueries({ queryKey: ['admin-activity'] })
       void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
@@ -208,8 +226,7 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
                   )}
                   {invite.data && (
                     <div className="bg-surface-inset text-content-secondary rounded-lg p-3 text-sm">
-                      Invite created for {invite.data.email}. It will be claimed when that user
-                      signs in.
+                      {deliveryMessage(invite.data)}
                     </div>
                   )}
                   <Button type="submit" loading={invite.isPending} disabled={!email.trim()}>
@@ -225,6 +242,11 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
             <Section title="Pending and recent invitations">
               {actionError && (
                 <p className="text-danger-strong mb-4 text-sm">{actionError.message}</p>
+              )}
+              {actionNotice && (
+                <p className="bg-surface-inset text-content-secondary mb-4 rounded-lg p-3 text-sm">
+                  {actionNotice}
+                </p>
               )}
               {data.invitations.length === 0 ? (
                 <EmptyAdminState

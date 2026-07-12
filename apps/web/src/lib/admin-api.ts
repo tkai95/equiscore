@@ -55,6 +55,7 @@ export interface AdminInvitation {
   revokedAt: string | null
   createdAt: string
   updatedAt: string
+  emailDelivery?: InvitationEmailDelivery
 }
 
 export interface AdminOrganisationDetail extends Omit<AdminOrganisation, 'owner' | 'metrics'> {
@@ -163,6 +164,15 @@ export interface InternalAdminInvitation {
   updatedAt: string
   invitedBy: AdminPerson | null
   acceptedBy: AdminPerson | null
+  emailDelivery?: InvitationEmailDelivery
+}
+
+export interface InvitationEmailDelivery {
+  attempted: boolean
+  sent: boolean
+  provider: string
+  reason?: string
+  messageId?: string
 }
 
 export interface InternalAdmins {

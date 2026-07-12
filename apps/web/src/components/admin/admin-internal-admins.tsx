@@ -35,12 +35,28 @@ function invitationStatusTone(status: string) {
   return 'neutral' as const
 }
 
+function deliveryMessage(invitation: {
+  email: string
+  emailDelivery?: { sent: boolean; reason?: string }
+}) {
+  if (invitation.emailDelivery?.sent) {
+    return `Invite email sent to ${invitation.email}.`
+  }
+
+  if (invitation.emailDelivery?.reason) {
+    return `Invite created for ${invitation.email}, but email was not sent: ${invitation.emailDelivery.reason}. Use Copy to send the link manually.`
+  }
+
+  return `Invite created for ${invitation.email}. Access is claimed when they sign in with that email.`
+}
+
 export function AdminInternalAdmins() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('support')
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin-internal-admins'],
@@ -77,7 +93,8 @@ export function AdminInternalAdmins() {
       const token = await getToken()
       return adminApi.internalAdmins.resend(token!, invitationId)
     },
-    onSuccess: () => {
+    onSuccess: (invitation) => {
+      setActionNotice(deliveryMessage(invitation))
       void queryClient.invalidateQueries({ queryKey: ['admin-internal-admins'] })
       void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
     },
@@ -88,7 +105,8 @@ export function AdminInternalAdmins() {
       const token = await getToken()
       return adminApi.internalAdmins.revoke(token!, invitationId)
     },
-    onSuccess: () => {
+    onSuccess: (invitation) => {
+      setActionNotice(`Invite revoked for ${invitation.email}.`)
       void queryClient.invalidateQueries({ queryKey: ['admin-internal-admins'] })
       void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
     },
@@ -228,8 +246,7 @@ export function AdminInternalAdmins() {
                   )}
                   {invite.data && (
                     <div className="bg-surface-inset text-content-secondary rounded-lg p-3 text-sm">
-                      Invite created for {invite.data.email}. Access is claimed when they sign in
-                      with that email.
+                      {deliveryMessage(invite.data)}
                     </div>
                   )}
                   <Button type="submit" loading={invite.isPending} disabled={!email.trim()}>
@@ -245,6 +262,11 @@ export function AdminInternalAdmins() {
             <Section title="Invitations">
               {actionError && (
                 <p className="text-danger-strong mb-4 text-sm">{actionError.message}</p>
+              )}
+              {actionNotice && (
+                <p className="bg-surface-inset text-content-secondary mb-4 rounded-lg p-3 text-sm">
+                  {actionNotice}
+                </p>
               )}
               {data.invitations.length === 0 ? (
                 <EmptyAdminState

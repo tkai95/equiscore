@@ -8,6 +8,10 @@ import {
 import { db } from '@equiscore/database'
 import type { Prisma } from '@equiscore/database'
 import { randomBytes } from 'crypto'
+import {
+  InvitationEmailService,
+  type InvitationEmailDelivery,
+} from '../common/invitation-email.service'
 import type { OrganisationRole } from '../organisations/permissions'
 import {
   permissionsForInternalAdminRole,
@@ -59,6 +63,8 @@ const INTERNAL_ADMIN_ROLES: InternalAdminRole[] = [
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name)
+
+  constructor(private readonly invitationEmail: InvitationEmailService) {}
 
   async resolveAdminContext(userId: string, email: string): Promise<InternalAdminContext> {
     const normalisedEmail = this.normaliseEmail(email)
@@ -362,7 +368,9 @@ export class AdminService {
         return saved
       })
 
-      return this.mapInternalAdminInvitation(invitation)
+      const mappedInvitation = this.mapInternalAdminInvitation(invitation)
+      const emailDelivery = await this.sendInternalAdminInvitationEmail(mappedInvitation)
+      return { ...mappedInvitation, emailDelivery }
     } catch (error) {
       this.logger.error(
         `Failed to invite internal admin ${email} as ${role}`,
@@ -434,7 +442,9 @@ export class AdminService {
       return saved
     })
 
-    return this.mapInternalAdminInvitation(invitation)
+    const mappedInvitation = this.mapInternalAdminInvitation(invitation)
+    const emailDelivery = await this.sendInternalAdminInvitationEmail(mappedInvitation)
+    return { ...mappedInvitation, emailDelivery }
   }
 
   async revokeInternalAdminInvitation(admin: InternalAdminContext, invitationId: string) {
@@ -782,9 +792,14 @@ export class AdminService {
       return { organisation, invitation }
     })
 
+    const invitation = result.invitation ? this.mapInvitation(result.invitation) : null
+    const emailDelivery = invitation
+      ? await this.sendPartnerInvitationEmail(invitation, result.organisation)
+      : null
+
     return {
       organisation: result.organisation,
-      invitation: result.invitation ? this.mapInvitation(result.invitation) : null,
+      invitation: invitation ? { ...invitation, emailDelivery } : null,
     }
   }
 
@@ -879,7 +894,9 @@ export class AdminService {
       return saved
     })
 
-    return this.mapInvitation(invitation)
+    const mappedInvitation = this.mapInvitation(invitation)
+    const emailDelivery = await this.sendPartnerInvitationEmail(mappedInvitation, organisation)
+    return { ...mappedInvitation, emailDelivery }
   }
 
   async resendMemberInvitation(
@@ -972,7 +989,9 @@ export class AdminService {
       return saved
     })
 
-    return this.mapInvitation(invitation)
+    const mappedInvitation = this.mapInvitation(invitation)
+    const emailDelivery = await this.sendPartnerInvitationEmail(mappedInvitation, organisation)
+    return { ...mappedInvitation, emailDelivery }
   }
 
   async revokeMemberInvitation(
@@ -1226,6 +1245,85 @@ export class AdminService {
 
       return access
     })
+  }
+
+  private async sendInternalAdminInvitationEmail(invitation: {
+    email: string
+    role: string
+    expiresAt: Date
+  }): Promise<InvitationEmailDelivery> {
+    return this.invitationEmail.sendInvitation({
+      to: invitation.email,
+      subject: 'You are invited to EquiScore admin',
+      heading: 'You are invited to EquiScore admin',
+      preview: 'Sign in with your invited email to access the EquiScore admin portal.',
+      intro:
+        'An EquiScore administrator has invited you to the internal admin portal. Sign in with the email address this invitation was sent to.',
+      ctaLabel: 'Open admin portal',
+      ctaUrl: this.absoluteAdminUrl('/admin'),
+      details: [
+        { label: 'Role', value: this.label(invitation.role) },
+        { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
+      ],
+    })
+  }
+
+  private async sendPartnerInvitationEmail(
+    invitation: { email: string; role: string; expiresAt: Date },
+    organisation: { name: string; slug: string }
+  ): Promise<InvitationEmailDelivery> {
+    return this.invitationEmail.sendInvitation({
+      to: invitation.email,
+      subject: `You are invited to ${organisation.name} on EquiScore`,
+      heading: `Join ${organisation.name} on EquiScore`,
+      preview: 'Sign in with your invited email to access the partner workspace.',
+      intro:
+        'An EquiScore administrator has invited you to a partner workspace. Sign in with the email address this invitation was sent to.',
+      ctaLabel: 'Open partner workspace',
+      ctaUrl: this.absolutePartnerUrl(`/o/${organisation.slug}`),
+      details: [
+        { label: 'Organisation', value: organisation.name },
+        { label: 'Role', value: this.label(invitation.role) },
+        { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
+      ],
+    })
+  }
+
+  private absoluteAdminUrl(path: string): string {
+    return this.absoluteSurfaceUrl(
+      process.env.ADMIN_APP_URL ?? process.env.NEXT_PUBLIC_ADMIN_APP_URL,
+      'https://admin.equiscore.app',
+      path
+    )
+  }
+
+  private absolutePartnerUrl(path: string): string {
+    return this.absoluteSurfaceUrl(
+      process.env.PARTNER_APP_URL ?? process.env.NEXT_PUBLIC_PARTNER_APP_URL,
+      'https://partners.equiscore.app',
+      path
+    )
+  }
+
+  private absoluteSurfaceUrl(
+    configured: string | undefined,
+    fallback: string,
+    path: string
+  ): string {
+    const base = (configured?.trim() || fallback).replace(/\/+$/, '')
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`
+  }
+
+  private formatInviteDate(value: Date): string {
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(value)
+  }
+
+  private label(value: string): string {
+    return value.replace(/_/g, ' ')
   }
 
   private mapMemberPerson(user: {
