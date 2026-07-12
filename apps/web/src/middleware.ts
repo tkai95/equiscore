@@ -23,9 +23,18 @@ const PUBLIC_MARKETING_BLOCKED = [
   '/onboarding',
   '/trust-score',
 ]
+const AUTH_PAGE_ROUTES = ['/sign-in', '/sign-up']
 
 function matchesPrefix(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'))
+}
+
+function isAuthPage(pathname: string): boolean {
+  return matchesPrefix(pathname, AUTH_PAGE_ROUTES)
+}
+
+function isAppRouteHandler(pathname: string): boolean {
+  return matchesPrefix(pathname, ['/api', '/trpc'])
 }
 
 function requestHost(req: NextRequest): string {
@@ -69,6 +78,8 @@ function adminRewrite(req: NextRequest): URL | null {
   if (!isAdminHost(req)) return null
 
   const { pathname } = req.nextUrl
+  if (isAuthPage(pathname) || isAppRouteHandler(pathname)) return null
+
   if (pathname === '/') {
     const url = req.nextUrl.clone()
     url.pathname = '/admin'
@@ -89,7 +100,8 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const rewriteUrl = partnerWorkspaceRewrite(req) ?? adminRewrite(req)
   const isPartnerWorkspacePath =
     isPartnersHost(req) && (p === '/' || p.startsWith('/o/') || p.startsWith('/workspace'))
-  const isAdminPath = isAdminHost(req) || p.startsWith('/admin')
+  const isAdminPath =
+    (isAdminHost(req) && !isAuthPage(p) && !isAppRouteHandler(p)) || p.startsWith('/admin')
 
   if (!HAS_CLERK) {
     if (matchesPrefix(p, AUTH_ROUTES) || isPartnerWorkspacePath || isAdminPath) {
