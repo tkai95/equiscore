@@ -1,15 +1,27 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, ClipboardList, FileClock, Gauge, WalletCards } from 'lucide-react'
+import { ArrowRight, ClipboardList, FileClock, Gauge, Lock, WalletCards } from 'lucide-react'
 import { workspaceApi } from '@/lib/workspace-api'
-import { Card, Metric, MetricGroup, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
+import {
+  Button,
+  Card,
+  Metric,
+  MetricGroup,
+  PageHeader,
+  PageLayout,
+  Section,
+  StatusPill,
+} from '@/components/ui'
+import { EmptyWorkspaceState } from './workspace-table'
 
 export function WorkspaceOverview({ organisationSlug }: { organisationSlug: string }) {
   const { getToken } = useAuth()
-  const { data, isLoading } = useQuery({
+  const { signOut } = useClerk()
+  const { user } = useUser()
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['workspace-overview', organisationSlug],
     queryFn: async () => workspaceApi.organisations.overview((await getToken())!, organisationSlug),
   })
@@ -17,8 +29,39 @@ export function WorkspaceOverview({ organisationSlug }: { organisationSlug: stri
   if (isLoading) {
     return (
       <PageLayout width="wide">
-        <div className="h-8 w-64 animate-pulse rounded bg-surface-hover" />
-        <div className="h-48 animate-pulse rounded-card bg-surface-hover" />
+        <div className="bg-surface-hover h-8 w-64 animate-pulse rounded" />
+        <div className="rounded-card bg-surface-hover h-48 animate-pulse" />
+      </PageLayout>
+    )
+  }
+
+  if (isError) {
+    return (
+      <PageLayout width="wide">
+        <PageHeader
+          title="Partner workspace access required"
+          description={`partners.equiscore.app/o/${organisationSlug}`}
+        />
+        <Card padding="lg">
+          <div className="bg-surface-inset text-brand mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full">
+            <Lock className="h-5 w-5" />
+          </div>
+          <EmptyWorkspaceState
+            title="This account is not authorised for this organisation"
+            body={`You are signed in as ${
+              user?.primaryEmailAddress?.emailAddress ?? 'this account'
+            }. Ask an EquiScore admin or your organisation owner to invite the correct email address.`}
+          />
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void signOut({ redirectUrl: '/sign-in' })}
+            >
+              Switch account
+            </Button>
+          </div>
+        </Card>
       </PageLayout>
     )
   }
@@ -40,7 +83,7 @@ export function WorkspaceOverview({ organisationSlug }: { organisationSlug: stri
         actions={
           <Link
             href={`/workspace/o/${organisation.slug}/assessments`}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white"
+            className="bg-brand inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white"
           >
             Open cases
             <ArrowRight className="h-4 w-4" />
@@ -50,8 +93,8 @@ export function WorkspaceOverview({ organisationSlug }: { organisationSlug: stri
 
       <Card>
         <div className="mb-4 flex items-center gap-2">
-          <Gauge className="h-4 w-4 text-brand" />
-          <h2 className="text-lg font-semibold text-content">Workspace overview</h2>
+          <Gauge className="text-brand h-4 w-4" />
+          <h2 className="text-content text-lg font-semibold">Workspace overview</h2>
         </div>
         <MetricGroup>
           <Metric label="Open cases" value={metrics.openCases} />
@@ -81,16 +124,16 @@ export function WorkspaceOverview({ organisationSlug }: { organisationSlug: stri
 
         <Card>
           <div className="mb-3 flex items-center gap-2">
-            <WalletCards className="h-4 w-4 text-brand" />
-            <h2 className="font-semibold text-content">Usage</h2>
+            <WalletCards className="text-brand h-4 w-4" />
+            <h2 className="text-content font-semibold">Usage</h2>
           </div>
-          <p className="text-sm text-content-secondary">
+          <p className="text-content-secondary text-sm">
             {metrics.usedCredits} assessment credits used against an allowance of{' '}
             {organisation.monthlyAssessmentAllowance}.
           </p>
           <Link
             href={`/workspace/o/${organisation.slug}/usage`}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-brand"
+            className="text-brand mt-4 inline-flex items-center gap-2 text-sm font-medium"
           >
             View usage ledger
             <ArrowRight className="h-4 w-4" />
@@ -113,10 +156,13 @@ function WorkflowLink({
   body: string
 }) {
   return (
-    <Link href={href} className="rounded-xl border border-line bg-surface-card p-4 transition-colors hover:bg-surface-hover">
-      <Icon className="h-5 w-5 text-brand" />
-      <p className="mt-3 font-medium text-content">{title}</p>
-      <p className="mt-1 text-sm text-content-secondary">{body}</p>
+    <Link
+      href={href}
+      className="border-line bg-surface-card hover:bg-surface-hover rounded-xl border p-4 transition-colors"
+    >
+      <Icon className="text-brand h-5 w-5" />
+      <p className="text-content mt-3 font-medium">{title}</p>
+      <p className="text-content-secondary mt-1 text-sm">{body}</p>
     </Link>
   )
 }

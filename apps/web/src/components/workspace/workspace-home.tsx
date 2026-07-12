@@ -1,14 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Building2, Lock } from 'lucide-react'
 import { workspaceApi, type WorkspaceOrganisation } from '@/lib/workspace-api'
-import { Card, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
+import { Button, Card, PageHeader, PageLayout, Section, StatusPill } from '@/components/ui'
 
 export function WorkspaceHome() {
   const { getToken } = useAuth()
+  const { signOut } = useClerk()
+  const { user } = useUser()
 
   const { data: organisations = [], isLoading } = useQuery({
     queryKey: ['workspace-organisations'],
@@ -40,9 +42,21 @@ export function WorkspaceHome() {
               </div>
               <p className="text-content font-medium">No partner workspace access yet</p>
               <p className="text-content-secondary mx-auto mt-1 max-w-xl text-sm">
-                Ask an EquiScore admin or your organisation owner to invite you. Invites are claimed
-                automatically when you sign in with the invited email address.
+                You are signed in as{' '}
+                <span className="font-medium">
+                  {user?.primaryEmailAddress?.emailAddress ?? 'this account'}
+                </span>
+                , but this account is not authorised for a partner organisation. Ask an EquiScore
+                admin or your organisation owner to invite the correct email address.
               </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4"
+                onClick={() => void signOut({ redirectUrl: '/sign-in' })}
+              >
+                Switch account
+              </Button>
             </div>
           ) : (
             <div className="divide-line-subtle divide-y">

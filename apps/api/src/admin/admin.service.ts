@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { db } from '@equiscore/database'
@@ -57,15 +58,30 @@ const INTERNAL_ADMIN_ROLES: InternalAdminRole[] = [
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
+
   async resolveAdminContext(userId: string, email: string): Promise<InternalAdminContext> {
     const normalisedEmail = this.normaliseEmail(email)
     const bootstrap = this.bootstrapAdminEmails().has(normalisedEmail)
 
     if (bootstrap) {
-      const activeAccess = await db.internalAdminAccess.upsert({
-        where: { userId },
-        update: { role: 'owner', status: 'active', revokedAt: null },
-        create: { userId, role: 'owner', status: 'active' },
+      const activeAccess = await db.$transaction(async (tx) => {
+        const access = await tx.internalAdminAccess.upsert({
+          where: { userId },
+          update: { role: 'owner', status: 'active', revokedAt: null },
+          create: { userId, role: 'owner', status: 'active' },
+        })
+
+        await tx.internalAdminInvitation.updateMany({
+          where: { email: normalisedEmail, status: 'pending' },
+          data: {
+            status: 'accepted',
+            acceptedById: userId,
+            acceptedAt: new Date(),
+          },
+        })
+
+        return access
       })
 
       return {
@@ -234,6 +250,7 @@ export class AdminService {
         },
       }),
       db.internalAdminInvitation.findMany({
+        where: { status: 'pending' },
         orderBy: { createdAt: 'desc' },
         take: 100,
         include: {
@@ -292,51 +309,68 @@ export class AdminService {
       data: { status: 'expired' },
     })
 
-    const invitation = await db.$transaction(async (tx) => {
-      const existingPending = await tx.internalAdminInvitation.findFirst({
-        where: { email, status: 'pending' },
+    try {
+      const invitation = await db.$transaction(async (tx) => {
+        const existingPending = await tx.internalAdminInvitation.findFirst({
+          where: { email, status: 'pending' },
+        })
+
+        const include = {
+          invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          acceptedBy: {
+            select: { id: true, email: true, profile: { select: { fullName: true } } },
+          },
+        } satisfies Prisma.InternalAdminInvitationInclude
+
+        const saved = existingPending
+          ? await tx.internalAdminInvitation.update({
+              where: { id: existingPending.id },
+              data: {
+                role,
+                token,
+                invitedById: admin.userId,
+                expiresAt,
+                metadata: { source: 'internal_admin_reinvite' },
+              },
+              include,
+            })
+          : await tx.internalAdminInvitation.create({
+              data: {
+                email,
+                role,
+                token,
+                invitedById: admin.userId,
+                expiresAt,
+                metadata: { source: 'internal_admin_invite' },
+              },
+              include,
+            })
+
+        await tx.internalAdminAuditEvent.create({
+          data: {
+            actorUserId: admin.userId,
+            actorEmail: admin.email,
+            actorRole: admin.role,
+            action: existingPending
+              ? 'internal_admin_invitation_resent'
+              : 'internal_admin_invitation_created',
+            targetType: 'internal_admin_invitation',
+            targetId: saved.id,
+            metadata: { email, role },
+          },
+        })
+
+        return saved
       })
 
-      const saved = existingPending
-        ? await tx.internalAdminInvitation.update({
-            where: { id: existingPending.id },
-            data: {
-              role,
-              token,
-              invitedById: admin.userId,
-              expiresAt,
-              metadata: { source: 'internal_admin_reinvite' },
-            },
-          })
-        : await tx.internalAdminInvitation.create({
-            data: {
-              email,
-              role,
-              token,
-              invitedById: admin.userId,
-              expiresAt,
-              metadata: { source: 'internal_admin_invite' },
-            },
-          })
-
-      await tx.internalAdminAuditEvent.create({
-        data: {
-          actorUserId: admin.userId,
-          actorEmail: admin.email,
-          actorRole: admin.role,
-          action: existingPending
-            ? 'internal_admin_invitation_resent'
-            : 'internal_admin_invitation_created',
-          targetType: 'internal_admin_invitation',
-          targetId: saved.id,
-          metadata: { email, role },
-        },
-      })
-
-      return saved
-    })
-
-    return this.mapInternalAdminInvitation(invitation)
+      return this.mapInternalAdminInvitation(invitation)
+    } catch (error) {
+      this.logger.error(
+        `Failed to invite internal admin ${email} as ${role}`,
+        error instanceof Error ? error.stack : String(error)
+      )
+      throw error
+    }
   }
 
   async getOverview() {
