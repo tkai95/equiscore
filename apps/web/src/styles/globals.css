@@ -39,8 +39,8 @@
     --brand-100: #dfeae5;
     --brand-50: #f0f5f2;
 
-    /* Surfaces — near-white page, crisp white cards, cream ONLY for guidance */
-    --surface-page: #f6f7f5;
+    /* Surfaces — soft warm off-white page, crisp white cards, cream for guidance */
+    --surface-page: #f6f5f1;
     --surface-card: #ffffff;
     --surface-raised: #ffffff;
     --surface-inset: #f7f2e7;
