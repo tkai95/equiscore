@@ -308,10 +308,9 @@ export function TrustScoreView() {
 
       {/* ── Assessment summary (the one hero card) ─────────────────────────── */}
       <Card padding="md">
-        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
           <div className="flex flex-col items-center justify-center border-b border-line-subtle pb-6 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
             <AnimatedGauge score={score.overallScore} tier={score.overallTier} />
-            <p className="mt-1 text-lg font-semibold text-content">Trust Tier {score.overallTier}</p>
           </div>
 
           <div className="flex flex-col justify-center">
@@ -451,33 +450,37 @@ function AnimatedGauge({ score, tier }: { score: number; tier: TrustTier }) {
     return () => cancelAnimationFrame(raf)
   }, [score])
 
-  const r = 80
-  const stroke = 11
+  const r = 74
+  const stroke = 10
   const w = r * 2 + stroke
-  const h = r + stroke
   const cy = r + stroke / 2
   const path = `M ${stroke / 2} ${cy} A ${r} ${r} 0 0 1 ${w - stroke / 2} ${cy}`
   const arc = Math.PI * r
   const offset = arc * (1 - Math.min(1, Math.max(0, shown / 100)))
 
   return (
-    <div className="relative" style={{ width: w, maxWidth: '100%' }}>
-      <svg width="100%" viewBox={`0 0 ${w} ${h + 6}`} aria-hidden>
-        <path d={path} fill="none" stroke="#DDE2DD" strokeWidth={stroke} strokeLinecap="round" />
-        <path
-          d={path}
-          fill="none"
-          stroke={TIER_HEX[tier]}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={arc}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: r * 0.36 }}>
-        <Display size="score">{shown}</Display>
-        <span className="mt-0.5 text-xs text-content-muted">out of 100</span>
+    <div className="flex flex-col items-center">
+      <div className="relative" style={{ width: w, maxWidth: '100%' }}>
+        {/* Crop the viewBox at the diameter so the arc fills the box exactly. */}
+        <svg width="100%" viewBox={`0 0 ${w} ${cy + 1}`} aria-hidden>
+          <path d={path} fill="none" stroke="#DDE2DD" strokeWidth={stroke} strokeLinecap="round" />
+          <path
+            d={path}
+            fill="none"
+            stroke={TIER_HEX[tier]}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={arc}
+            strokeDashoffset={offset}
+          />
+        </svg>
+        {/* Score rests on the diameter, centred in the arc — no overlap below. */}
+        <div className="absolute inset-0 flex items-end justify-center pb-1">
+          <Display size="score">{shown}</Display>
+        </div>
       </div>
+      <p className="mt-3 text-lg font-semibold text-content">Trust Tier {tier}</p>
+      <p className="mt-0.5 text-xs text-content-muted">Score {shown} out of 100</p>
     </div>
   )
 }
@@ -521,12 +524,12 @@ function DimensionRow({
         !first && 'border-t border-line-subtle',
       )}
     >
-      <span className="w-40 shrink-0 text-sm font-medium text-content">{DIM_LABELS[dimKey]}</span>
-      <span className="hidden w-24 shrink-0 text-sm text-content-secondary sm:block">{rating(score)}</span>
-      <div className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-surface-hover sm:block">
-        <div className={cn('h-full rounded-full', barColor(score))} style={{ width: `${Math.max(2, score)}%` }} />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-content">{DIM_LABELS[dimKey]}</span>
+      <span className="hidden w-20 text-right text-sm text-content-secondary sm:block">{rating(score)}</span>
+      <div className="hidden h-1 w-24 overflow-hidden rounded-full bg-surface-hover sm:block lg:w-36">
+        <div className={cn('h-full rounded-full', barColor(score))} style={{ width: `${Math.max(3, score)}%` }} />
       </div>
-      <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums text-content">{score}</span>
+      <span className="w-8 text-right text-sm font-semibold tabular-nums text-content">{score}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-content-muted/60" />
     </button>
   )

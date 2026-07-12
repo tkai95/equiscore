@@ -20,7 +20,7 @@ export function Display({
     sm: 'text-2xl',
     md: 'text-3xl',
     lg: 'text-4xl',
-    score: 'text-[56px] leading-none sm:text-[68px]',
+    score: 'text-5xl leading-none',
   } as const
   return (
     <span className={cn('font-display font-semibold tabular-nums text-content', sizes[size], className)}>
