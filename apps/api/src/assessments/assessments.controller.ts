@@ -1,8 +1,13 @@
-import { Controller, Get, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
-import { CurrentOrganisation, type OrganisationContext } from '../organisations/organisation-context'
+import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
+import {
+  CurrentOrganisation,
+  type OrganisationContext,
+} from '../organisations/organisation-context'
 import { OrganisationAccessGuard } from '../organisations/organisation-access.guard'
+import { CreateAssessmentRequestDto } from './assessment-requests.dto'
 import { AssessmentsService } from './assessments.service'
 
 @ApiTags('company workspace')
@@ -22,6 +27,16 @@ export class AssessmentsController {
   @ApiOperation({ summary: 'List organisation assessment requests' })
   async requests(@CurrentOrganisation() organisation: OrganisationContext) {
     return this.assessments.listRequests(organisation)
+  }
+
+  @Post('assessment-requests')
+  @ApiOperation({ summary: 'Create a company-initiated assessment request' })
+  async createRequest(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: CreateAssessmentRequestDto
+  ) {
+    return this.assessments.createRequest(organisation, user.dbUserId!, body)
   }
 
   @Get('policies')

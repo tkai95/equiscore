@@ -1,6 +1,10 @@
 import { API_URL } from './api-base'
 
-async function workspaceFetch<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
+async function workspaceFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  token?: string
+): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -77,6 +81,8 @@ export interface WorkspaceAssessmentRequest {
   status: string
   proposedCommitment: number | null
   reference: string | null
+  requestToken: string | null
+  requestUrl: string | null
   deadline: string | null
   createdAt: string
   sentAt: string | null
@@ -87,6 +93,45 @@ export interface WorkspaceAssessmentRequest {
   counts: { cases: number; consents: number }
 }
 
+export interface CreateWorkspaceAssessmentRequestInput {
+  applicantEmail: string
+  applicantName?: string
+  assessmentType: 'rental' | 'telecom' | 'utilities' | 'lending' | 'other'
+  proposedCommitment?: number
+  reference?: string
+  deadline?: string
+}
+
+export interface PublicAssessmentRequest {
+  id: string
+  organisation: { id: string; name: string; slug: string }
+  applicant: { name: string | null; email: string }
+  assessmentType: string
+  status: string
+  proposedCommitment: number | null
+  reference: string | null
+  deadline: string | null
+  createdAt: string
+  sentAt: string | null
+  completedAt: string | null
+  policy: { id: string; name: string; versionNumber: number } | null
+  isCompletable: boolean
+}
+
+export interface CompletedAssessmentRequest {
+  requestId: string
+  status: string
+  case: {
+    id: string
+    status: string
+    assessmentOutcome: string | null
+    assessmentConfidence: string | null
+    reference: string | null
+    assessedAt: string | null
+    expiresAt: string | null
+  }
+}
+
 export interface WorkspacePolicy {
   id: string
   name: string
@@ -95,7 +140,13 @@ export interface WorkspacePolicy {
   createdAt: string
   updatedAt: string
   createdBy: PersonRef | null
-  latestVersion: { id: string; versionNumber: number; status: string; effectiveFrom: string | null; approvedAt: string | null } | null
+  latestVersion: {
+    id: string
+    versionNumber: number
+    status: string
+    effectiveFrom: string | null
+    approvedAt: string | null
+  } | null
   versionCount: number
 }
 
@@ -132,9 +183,17 @@ export const workspaceApi = {
   organisations: {
     list: (token: string) => workspaceFetch<WorkspaceOrganisation[]>('/organisations', {}, token),
     create: (token: string, data: { name: string; slug?: string }) =>
-      workspaceFetch<WorkspaceOrganisation>('/organisations', { method: 'POST', body: JSON.stringify(data) }, token),
+      workspaceFetch<WorkspaceOrganisation>(
+        '/organisations',
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
     overview: (token: string, organisationSlug: string) =>
-      workspaceFetch<WorkspaceOverview>(`/organisations/${encodeURIComponent(organisationSlug)}/overview`, {}, token),
+      workspaceFetch<WorkspaceOverview>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/overview`,
+        {},
+        token
+      ),
     cases: (token: string, organisationSlug: string) =>
       workspaceFetch<WorkspaceAssessmentCase[]>(
         `/organisations/${encodeURIComponent(organisationSlug)}/assessment-cases`,
@@ -147,8 +206,22 @@ export const workspaceApi = {
         {},
         token
       ),
+    createRequest: (
+      token: string,
+      organisationSlug: string,
+      data: CreateWorkspaceAssessmentRequestInput
+    ) =>
+      workspaceFetch<WorkspaceAssessmentRequest>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/assessment-requests`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
     policies: (token: string, organisationSlug: string) =>
-      workspaceFetch<WorkspacePolicy[]>(`/organisations/${encodeURIComponent(organisationSlug)}/policies`, {}, token),
+      workspaceFetch<WorkspacePolicy[]>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies`,
+        {},
+        token
+      ),
     usage: (token: string, organisationSlug: string) =>
       workspaceFetch<WorkspaceUsageEvent[]>(
         `/organisations/${encodeURIComponent(organisationSlug)}/usage-events`,
@@ -159,6 +232,18 @@ export const workspaceApi = {
       workspaceFetch<WorkspaceAuditEvent[]>(
         `/organisations/${encodeURIComponent(organisationSlug)}/audit-events`,
         {},
+        token
+      ),
+  },
+  assessmentRequests: {
+    get: (requestToken: string) =>
+      workspaceFetch<PublicAssessmentRequest>(
+        `/assessment-requests/${encodeURIComponent(requestToken)}`
+      ),
+    complete: (token: string, requestToken: string) =>
+      workspaceFetch<CompletedAssessmentRequest>(
+        `/assessment-requests/${encodeURIComponent(requestToken)}/complete`,
+        { method: 'POST' },
         token
       ),
   },
