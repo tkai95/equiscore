@@ -93,6 +93,15 @@ const STATUS_BADGE: Record<ScoreDisplayStatus, { label: string; tone: StatusTone
   insufficient_evidence: { label: 'Not financially verified', tone: 'neutral' },
 }
 
+/** Deep tier colours for the medallion arc + letter (green family → clay). */
+const TIER_STROKE: Record<TrustTier, string> = {
+  A: '#0A473D',
+  B: '#286D5A',
+  C: '#6E8F81',
+  D: '#C7A66A',
+  E: '#A96E52',
+}
+
 const SCORE_DIMENSIONS = [
   { key: 'verificationStrength', label: 'Verification Strength' },
   { key: 'identityConfidence', label: 'Identity Confidence' },
@@ -109,6 +118,42 @@ function recipientPhrasing(message: string): string {
 
 /** Whole pounds — a shared report reads cleaner without pennies. */
 const poundsWhole = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`
+
+/** Tier medallion: the tier letter (serif) inside a score-filled arc. Static
+ *  (server-rendered) — the ring length encodes the score, coloured by tier. */
+function TierMedallion({ tier, score }: { tier: TrustTier; score: number }) {
+  const hex = TIER_STROKE[tier]
+  const r = 52
+  const stroke = 9
+  const circumference = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(100, score)) / 100
+  return (
+    <div className="relative h-28 w-28 shrink-0">
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#E1E6E2" strokeWidth={stroke} />
+        <circle
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke={hex}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct)}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-4xl font-semibold leading-none" style={{ color: hex }}>
+          {tier}
+        </span>
+        <span className="mt-1 text-[11px] font-medium tabular-nums text-content-muted">
+          {Math.round(score)}/100
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value)
@@ -208,16 +253,11 @@ export default async function PublicProfilePage({ params }: { params: { token: s
           <p className="mb-1 text-sm font-medium text-content-muted">Trust Portfolio for</p>
           <h1 className="mb-4 text-2xl font-bold text-content">{profile.applicantName ?? 'Applicant'}</h1>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-current bg-surface-card">
-              <div className="text-3xl font-bold">{profile.trustTier}</div>
-            </div>
+          <div className="flex flex-wrap items-center gap-5">
+            <TierMedallion tier={profile.trustTier} score={profile.overallScore} />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-content-muted">EquiScore Trust Portfolio</p>
-              <p className="text-lg font-semibold text-content">{TIER_LABELS[profile.trustTier]}</p>
-              <p className="mt-0.5 text-sm font-medium tabular-nums text-content-secondary">
-                Score {Math.round(profile.overallScore)} / 100
-              </p>
+              <p className="text-xl font-semibold text-content">{TIER_LABELS[profile.trustTier]}</p>
               <p className="mt-1 max-w-md text-sm text-content-secondary">
                 Assessed across identity, income, and financial behaviour signals.
               </p>
