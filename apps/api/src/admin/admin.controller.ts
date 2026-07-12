@@ -51,6 +51,24 @@ export class AdminController {
     return this.admin.inviteInternalAdmin(admin, body)
   }
 
+  @Post('internal-admins/invitations/:invitationId/resend')
+  @ApiOperation({ summary: 'Refresh an EquiScore internal admin invitation' })
+  resendInternalAdminInvitation(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.resendInternalAdminInvitation(admin, invitationId)
+  }
+
+  @Post('internal-admins/invitations/:invitationId/revoke')
+  @ApiOperation({ summary: 'Revoke an EquiScore internal admin invitation' })
+  revokeInternalAdminInvitation(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.revokeInternalAdminInvitation(admin, invitationId)
+  }
+
   @Post('organisations')
   @ApiOperation({ summary: 'Create a partner organisation' })
   createOrganisation(
@@ -84,6 +102,26 @@ export class AdminController {
     @Body() body: { email: string; role?: string }
   ) {
     return this.admin.inviteMember(admin, organisationSlug, body)
+  }
+
+  @Post('organisations/:organisationSlug/invitations/:invitationId/resend')
+  @ApiOperation({ summary: 'Refresh a partner organisation invitation' })
+  resendInvitation(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('organisationSlug') organisationSlug: string,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.resendMemberInvitation(admin, organisationSlug, invitationId)
+  }
+
+  @Post('organisations/:organisationSlug/invitations/:invitationId/revoke')
+  @ApiOperation({ summary: 'Revoke a partner organisation invitation' })
+  revokeInvitation(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('organisationSlug') organisationSlug: string,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.revokeMemberInvitation(admin, organisationSlug, invitationId)
   }
 
   @Get('usage-events')

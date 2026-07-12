@@ -250,7 +250,6 @@ export class AdminService {
         },
       }),
       db.internalAdminInvitation.findMany({
-        where: { status: 'pending' },
         orderBy: { createdAt: 'desc' },
         take: 100,
         include: {
@@ -371,6 +370,121 @@ export class AdminService {
       )
       throw error
     }
+  }
+
+  async resendInternalAdminInvitation(admin: InternalAdminContext, invitationId: string) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const existing = await db.internalAdminInvitation.findUnique({ where: { id: invitationId } })
+    if (!existing) throw new NotFoundException('Internal admin invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+    if (existing.role === 'owner' && admin.role !== 'owner') {
+      throw new ForbiddenException('Only an owner can resend an owner invitation')
+    }
+
+    const existingUser = await db.user.findUnique({
+      where: { email: this.normaliseEmail(existing.email) },
+      include: { internalAdminAccesses: true },
+    })
+    const activeAccess = existingUser?.internalAdminAccesses.find(
+      (access) => access.status === 'active'
+    )
+    if (activeAccess) throw new ConflictException('That user is already an active internal admin')
+
+    const token = this.makeToken()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const include = {
+      invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      acceptedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+    } satisfies Prisma.InternalAdminInvitationInclude
+
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.internalAdminInvitation.update({
+        where: { id: existing.id },
+        data: {
+          status: 'pending',
+          token,
+          invitedById: admin.userId,
+          acceptedById: null,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt,
+          metadata: { source: 'internal_admin_resend', resentFromStatus: existing.status },
+        },
+        include,
+      })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'internal_admin_invitation_resent',
+          targetType: 'internal_admin_invitation',
+          targetId: saved.id,
+          metadata: { email: saved.email, role: saved.role, previousStatus: existing.status },
+        },
+      })
+
+      return saved
+    })
+
+    return this.mapInternalAdminInvitation(invitation)
+  }
+
+  async revokeInternalAdminInvitation(admin: InternalAdminContext, invitationId: string) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const existing = await db.internalAdminInvitation.findUnique({ where: { id: invitationId } })
+    if (!existing) throw new NotFoundException('Internal admin invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+    if (existing.role === 'owner' && admin.role !== 'owner') {
+      throw new ForbiddenException('Only an owner can revoke an owner invitation')
+    }
+
+    const now = new Date()
+    const include = {
+      invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      acceptedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+    } satisfies Prisma.InternalAdminInvitationInclude
+
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.internalAdminInvitation.update({
+        where: { id: existing.id },
+        data: {
+          status: 'revoked',
+          revokedAt: now,
+          metadata: { source: 'internal_admin_revoke', revokedFromStatus: existing.status },
+        },
+        include,
+      })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'internal_admin_invitation_revoked',
+          targetType: 'internal_admin_invitation',
+          targetId: saved.id,
+          metadata: { email: saved.email, role: saved.role, previousStatus: existing.status },
+        },
+      })
+
+      return saved
+    })
+
+    return this.mapInternalAdminInvitation(invitation)
   }
 
   async getOverview() {
@@ -759,6 +873,170 @@ export class AdminService {
           targetType: 'organisation_invitation',
           targetId: saved.id,
           metadata: { email, role },
+        },
+      })
+
+      return saved
+    })
+
+    return this.mapInvitation(invitation)
+  }
+
+  async resendMemberInvitation(
+    admin: InternalAdminContext,
+    organisationSlugOrId: string,
+    invitationId: string
+  ) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const organisation = await db.organisation.findFirst({
+      where: { OR: [{ id: organisationSlugOrId }, { slug: organisationSlugOrId }] },
+      select: { id: true, name: true, slug: true },
+    })
+    if (!organisation) throw new NotFoundException('Organisation not found')
+
+    const existing = await db.organisationInvitation.findFirst({
+      where: { id: invitationId, organisationId: organisation.id },
+    })
+    if (!existing) throw new NotFoundException('Organisation invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+
+    const existingUser = await db.user.findUnique({ where: { email: existing.email } })
+    if (existingUser) {
+      const existingMember = await db.organisationMember.findUnique({
+        where: {
+          organisationId_userId: {
+            organisationId: organisation.id,
+            userId: existingUser.id,
+          },
+        },
+      })
+      if (existingMember?.status === 'active') {
+        throw new ConflictException('That user is already an active member of this organisation')
+      }
+    }
+
+    const token = this.makeToken()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.organisationInvitation.update({
+        where: { id: existing.id },
+        data: {
+          status: 'pending',
+          token,
+          invitedById: admin.userId,
+          acceptedById: null,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt,
+          metadata: { source: 'internal_admin_resend', resentFromStatus: existing.status },
+        },
+      })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'partner_invitation_resent',
+          targetType: 'organisation_invitation',
+          targetId: saved.id,
+          organisationId: organisation.id,
+          metadata: {
+            email: saved.email,
+            role: saved.role,
+            organisationSlug: organisation.slug,
+            previousStatus: existing.status,
+          },
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: organisation.id,
+          actorType: 'equiscore_admin',
+          actorId: admin.userId,
+          action: 'partner_invitation_resent',
+          targetType: 'organisation_invitation',
+          targetId: saved.id,
+          metadata: { email: saved.email, role: saved.role, previousStatus: existing.status },
+        },
+      })
+
+      return saved
+    })
+
+    return this.mapInvitation(invitation)
+  }
+
+  async revokeMemberInvitation(
+    admin: InternalAdminContext,
+    organisationSlugOrId: string,
+    invitationId: string
+  ) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const organisation = await db.organisation.findFirst({
+      where: { OR: [{ id: organisationSlugOrId }, { slug: organisationSlugOrId }] },
+      select: { id: true, name: true, slug: true },
+    })
+    if (!organisation) throw new NotFoundException('Organisation not found')
+
+    const existing = await db.organisationInvitation.findFirst({
+      where: { id: invitationId, organisationId: organisation.id },
+    })
+    if (!existing) throw new NotFoundException('Organisation invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+
+    const now = new Date()
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.organisationInvitation.update({
+        where: { id: existing.id },
+        data: {
+          status: 'revoked',
+          revokedAt: now,
+          metadata: { source: 'internal_admin_revoke', revokedFromStatus: existing.status },
+        },
+      })
+
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'partner_invitation_revoked',
+          targetType: 'organisation_invitation',
+          targetId: saved.id,
+          organisationId: organisation.id,
+          metadata: {
+            email: saved.email,
+            role: saved.role,
+            organisationSlug: organisation.slug,
+            previousStatus: existing.status,
+          },
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: organisation.id,
+          actorType: 'equiscore_admin',
+          actorId: admin.userId,
+          action: 'partner_invitation_revoked',
+          targetType: 'organisation_invitation',
+          targetId: saved.id,
+          metadata: { email: saved.email, role: saved.role, previousStatus: existing.status },
         },
       })
 

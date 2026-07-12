@@ -3,8 +3,9 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MailPlus, UserCog } from 'lucide-react'
+import { Check, Copy, MailPlus, RefreshCw, UserCog, XCircle } from 'lucide-react'
 import { adminApi } from '@/lib/admin-api'
+import { absoluteAdminUrl } from '@/lib/app-urls'
 import {
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   PageLayout,
   Section,
   StatusPill,
+  buttonClasses,
 } from '@/components/ui'
 import { AdminTable, Cell, EmptyAdminState, formatMaybeDate, label } from './admin-table'
 
@@ -38,6 +40,7 @@ export function AdminInternalAdmins() {
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('support')
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin-internal-admins'],
@@ -69,10 +72,40 @@ export function AdminInternalAdmins() {
     },
   })
 
+  const resend = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const token = await getToken()
+      return adminApi.internalAdmins.resend(token!, invitationId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-internal-admins'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
+    },
+  })
+
+  const revoke = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const token = await getToken()
+      return adminApi.internalAdmins.revoke(token!, invitationId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-internal-admins'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
+    },
+  })
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (email.trim()) invite.mutate()
   }
+
+  const copyInviteLink = async (invitationId: string) => {
+    await navigator.clipboard.writeText(absoluteAdminUrl('/admin'))
+    setCopiedInvitationId(invitationId)
+    setTimeout(() => setCopiedInvitationId(null), 1800)
+  }
+
+  const actionError = (resend.error ?? revoke.error) as Error | null
 
   return (
     <PageLayout width="wide">
@@ -210,6 +243,9 @@ export function AdminInternalAdmins() {
 
           <Card padding="lg">
             <Section title="Invitations">
+              {actionError && (
+                <p className="text-danger-strong mb-4 text-sm">{actionError.message}</p>
+              )}
               {data.invitations.length === 0 ? (
                 <EmptyAdminState
                   title="No internal admin invitations"
@@ -217,23 +253,74 @@ export function AdminInternalAdmins() {
                 />
               ) : (
                 <AdminTable
-                  columns={['Email', 'Role', 'Status', 'Invited by', 'Accepted by', 'Expires']}
+                  columns={[
+                    'Email',
+                    'Role',
+                    'Status',
+                    'Invited by',
+                    'Accepted by',
+                    'Expires',
+                    'Actions',
+                  ]}
                 >
-                  {data.invitations.map((invitation) => (
-                    <tr key={invitation.id}>
-                      <Cell>{invitation.email}</Cell>
-                      <Cell muted>{label(invitation.role)}</Cell>
-                      <Cell>
-                        <StatusPill
-                          status={invitationStatusTone(invitation.status)}
-                          label={label(invitation.status)}
-                        />
-                      </Cell>
-                      <Cell muted>{invitation.invitedBy?.email ?? 'System'}</Cell>
-                      <Cell muted>{invitation.acceptedBy?.email ?? 'Not accepted'}</Cell>
-                      <Cell muted>{formatMaybeDate(invitation.expiresAt)}</Cell>
-                    </tr>
-                  ))}
+                  {data.invitations.map((invitation) => {
+                    const canCopy = invitation.status === 'pending'
+                    const canManage =
+                      invitation.status === 'pending' || invitation.status === 'expired'
+                    return (
+                      <tr key={invitation.id}>
+                        <Cell>{invitation.email}</Cell>
+                        <Cell muted>{label(invitation.role)}</Cell>
+                        <Cell>
+                          <StatusPill
+                            status={invitationStatusTone(invitation.status)}
+                            label={label(invitation.status)}
+                          />
+                        </Cell>
+                        <Cell muted>{invitation.invitedBy?.email ?? 'System'}</Cell>
+                        <Cell muted>{invitation.acceptedBy?.email ?? 'Not accepted'}</Cell>
+                        <Cell muted>{formatMaybeDate(invitation.expiresAt)}</Cell>
+                        <Cell className="min-w-[260px]">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              className={buttonClasses('secondary', 'sm')}
+                              onClick={() => copyInviteLink(invitation.id)}
+                              disabled={!canCopy}
+                              title="Copy admin portal invite link"
+                            >
+                              {copiedInvitationId === invitation.id ? (
+                                <Check className="text-success-strong h-3.5 w-3.5" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                              {copiedInvitationId === invitation.id ? 'Copied' : 'Copy'}
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClasses('secondary', 'sm')}
+                              onClick={() => resend.mutate(invitation.id)}
+                              disabled={!canManage || resend.isPending || revoke.isPending}
+                              title="Refresh this invitation"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Resend
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClasses('destructive', 'sm')}
+                              onClick={() => revoke.mutate(invitation.id)}
+                              disabled={!canManage || resend.isPending || revoke.isPending}
+                              title="Revoke this invitation"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Revoke
+                            </button>
+                          </div>
+                        </Cell>
+                      </tr>
+                    )
+                  })}
                 </AdminTable>
               )}
             </Section>

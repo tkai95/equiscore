@@ -57,6 +57,7 @@ Built:
 - Public share links now render correctly from server-side backend fetches.
 - Browser API calls use same-origin `/api/backend` proxying so `admin.equiscore.app`, `partners.equiscore.app`, and `dev.equiscore.app` do not depend on fragile browser CORS behaviour.
 - Admin access clarity added: an authenticated but unauthorised email sees an "Admin access required" screen before any admin sidebar or admin data renders.
+- Internal admin and partner organisation invitations now have database-backed copy-link, resend, revoke, accepted, pending, expired, and revoked management states in the admin UI.
 - The product URL decision is reflected in UI copy and middleware as `partners.equiscore.app/o/{organisationSlug}/...` while the app route group remains `/workspace` for the monorepo implementation.
 - The workspace shell has been aligned with the existing consumer dashboard styling so the partner layer feels like part of EquiScore while remaining a distinct product surface.
 
@@ -74,7 +75,7 @@ Verified:
 Known remaining setup:
 
 - Environment variables must remain deployment/local-only and must not be committed. Clerk, database, API, and domain values should be managed per environment.
-- Real invite email delivery is not yet wired. Admin and partner invitations are database-backed, but email sending, resend, revoke, and invite-link delivery need to be added next.
+- Real invite email delivery is not yet wired. Admin and partner invitations are database-backed and manageable, but outbound email sending still needs a provider integration.
 - Partner team management is still mostly admin-operated. Partner owners/admins should later be able to invite, suspend, and remove members within their own organisation.
 - Case detail, reviewer workflow depth, policy builder, missing-information workflows, billing exports, and tenant-isolation tests remain to be built.
 - Tests/CI still need to be introduced; current verification is schema validation, TypeScript, and production build.
@@ -1160,9 +1161,8 @@ Build:
 Immediate next slices, in order:
 
 1. **Invite delivery and management**
-   - Send real emails for internal admin and partner invitations.
-   - Add resend/revoke actions.
-   - Show accepted, pending, expired, and revoked states consistently.
+   - Done: admin UI can copy invite links, resend invitations, revoke invitations, and show accepted, pending, expired, and revoked states consistently.
+   - Remaining: send real emails for internal admin and partner invitations once the outbound provider is selected/configured.
 
 2. **Partner team management**
    - Let partner owners/admins invite and remove their own organisation members.

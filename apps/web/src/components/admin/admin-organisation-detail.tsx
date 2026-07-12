@@ -3,8 +3,9 @@
 import { FormEvent, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MailPlus, Users } from 'lucide-react'
+import { Check, Copy, MailPlus, RefreshCw, Users, XCircle } from 'lucide-react'
 import { adminApi } from '@/lib/admin-api'
+import { absolutePartnerUrl } from '@/lib/app-urls'
 import {
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   PageLayout,
   Section,
   StatusPill,
+  buttonClasses,
 } from '@/components/ui'
 import { AdminTable, Cell, EmptyAdminState, formatMaybeDate, label } from './admin-table'
 
@@ -24,6 +26,7 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('admin')
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin-organisation', organisationSlug],
@@ -43,10 +46,42 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
     },
   })
 
+  const resendInvitation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const token = await getToken()
+      return adminApi.organisations.resendInvitation(token!, organisationSlug, invitationId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-organisation', organisationSlug] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-activity'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
+    },
+  })
+
+  const revokeInvitation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const token = await getToken()
+      return adminApi.organisations.revokeInvitation(token!, organisationSlug, invitationId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-organisation', organisationSlug] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-activity'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-audit'] })
+    },
+  })
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (email.trim()) invite.mutate()
   }
+
+  const copyInviteLink = async (invitationId: string, slug: string) => {
+    await navigator.clipboard.writeText(absolutePartnerUrl(`/o/${slug}`))
+    setCopiedInvitationId(invitationId)
+    setTimeout(() => setCopiedInvitationId(null), 1800)
+  }
+
+  const actionError = (resendInvitation.error ?? revokeInvitation.error) as Error | null
 
   return (
     <PageLayout width="wide">
@@ -188,33 +223,89 @@ export function AdminOrganisationDetail({ organisationSlug }: { organisationSlug
 
           <Card padding="lg">
             <Section title="Pending and recent invitations">
+              {actionError && (
+                <p className="text-danger-strong mb-4 text-sm">{actionError.message}</p>
+              )}
               {data.invitations.length === 0 ? (
                 <EmptyAdminState
                   title="No invitations"
                   body="Invites created from admin will appear here."
                 />
               ) : (
-                <AdminTable columns={['Email', 'Role', 'Status', 'Expires', 'Created']}>
-                  {data.invitations.map((invitation) => (
-                    <tr key={invitation.id}>
-                      <Cell>{invitation.email}</Cell>
-                      <Cell muted>{label(invitation.role)}</Cell>
-                      <Cell>
-                        <StatusPill
-                          status={
-                            invitation.status === 'pending'
-                              ? 'info'
-                              : invitation.status === 'accepted'
-                                ? 'success'
-                                : 'neutral'
-                          }
-                          label={label(invitation.status)}
-                        />
-                      </Cell>
-                      <Cell muted>{formatMaybeDate(invitation.expiresAt)}</Cell>
-                      <Cell muted>{formatMaybeDate(invitation.createdAt)}</Cell>
-                    </tr>
-                  ))}
+                <AdminTable columns={['Email', 'Role', 'Status', 'Expires', 'Created', 'Actions']}>
+                  {data.invitations.map((invitation) => {
+                    const canCopy = invitation.status === 'pending'
+                    const canManage =
+                      invitation.status === 'pending' || invitation.status === 'expired'
+                    return (
+                      <tr key={invitation.id}>
+                        <Cell>{invitation.email}</Cell>
+                        <Cell muted>{label(invitation.role)}</Cell>
+                        <Cell>
+                          <StatusPill
+                            status={
+                              invitation.status === 'pending'
+                                ? 'info'
+                                : invitation.status === 'accepted'
+                                  ? 'success'
+                                  : invitation.status === 'revoked'
+                                    ? 'danger'
+                                    : 'neutral'
+                            }
+                            label={label(invitation.status)}
+                          />
+                        </Cell>
+                        <Cell muted>{formatMaybeDate(invitation.expiresAt)}</Cell>
+                        <Cell muted>{formatMaybeDate(invitation.createdAt)}</Cell>
+                        <Cell className="min-w-[260px]">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              className={buttonClasses('secondary', 'sm')}
+                              onClick={() => copyInviteLink(invitation.id, data.slug)}
+                              disabled={!canCopy}
+                              title="Copy partner workspace invite link"
+                            >
+                              {copiedInvitationId === invitation.id ? (
+                                <Check className="text-success-strong h-3.5 w-3.5" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                              {copiedInvitationId === invitation.id ? 'Copied' : 'Copy'}
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClasses('secondary', 'sm')}
+                              onClick={() => resendInvitation.mutate(invitation.id)}
+                              disabled={
+                                !canManage ||
+                                resendInvitation.isPending ||
+                                revokeInvitation.isPending
+                              }
+                              title="Refresh this invitation"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Resend
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClasses('destructive', 'sm')}
+                              onClick={() => revokeInvitation.mutate(invitation.id)}
+                              disabled={
+                                !canManage ||
+                                resendInvitation.isPending ||
+                                revokeInvitation.isPending
+                              }
+                              title="Revoke this invitation"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Revoke
+                            </button>
+                          </div>
+                        </Cell>
+                      </tr>
+                    )
+                  })}
                 </AdminTable>
               )}
             </Section>

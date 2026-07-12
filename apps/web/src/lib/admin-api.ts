@@ -250,6 +250,18 @@ export const adminApi = {
         { method: 'POST', body: JSON.stringify(data) },
         token
       ),
+    resend: (token: string, invitationId: string) =>
+      adminFetch<InternalAdminInvitation>(
+        `/admin/internal-admins/invitations/${encodeURIComponent(invitationId)}/resend`,
+        { method: 'POST' },
+        token
+      ),
+    revoke: (token: string, invitationId: string) =>
+      adminFetch<InternalAdminInvitation>(
+        `/admin/internal-admins/invitations/${encodeURIComponent(invitationId)}/revoke`,
+        { method: 'POST' },
+        token
+      ),
   },
   organisations: {
     list: (token: string) => adminFetch<AdminOrganisation[]>('/admin/organisations', {}, token),
@@ -281,6 +293,22 @@ export const adminApi = {
       adminFetch<AdminInvitation>(
         `/admin/organisations/${encodeURIComponent(organisationSlug)}/invitations`,
         { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    resendInvitation: (token: string, organisationSlug: string, invitationId: string) =>
+      adminFetch<AdminInvitation>(
+        `/admin/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/invitations/${encodeURIComponent(invitationId)}/resend`,
+        { method: 'POST' },
+        token
+      ),
+    revokeInvitation: (token: string, organisationSlug: string, invitationId: string) =>
+      adminFetch<AdminInvitation>(
+        `/admin/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/invitations/${encodeURIComponent(invitationId)}/revoke`,
+        { method: 'POST' },
         token
       ),
   },
