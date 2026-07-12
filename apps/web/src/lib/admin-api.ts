@@ -225,8 +225,16 @@ export interface AdminOrganisationAuditEvent {
   createdAt: string
 }
 
+export interface AdminMe {
+  userId: string
+  email: string
+  role: string
+  permissions: string[]
+  source: string
+}
+
 export const adminApi = {
-  me: (token: string) => adminFetch('/admin/me', {}, token),
+  me: (token: string) => adminFetch<AdminMe>('/admin/me', {}, token),
   overview: (token: string) => adminFetch<AdminOverview>('/admin/overview', {}, token),
   consumers: (token: string, query?: string) =>
     adminFetch<AdminConsumers>(

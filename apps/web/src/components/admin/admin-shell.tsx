@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { UserButton, useAuth, useClerk, useUser } from '@clerk/nextjs'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import {
   Activity,
@@ -20,9 +21,11 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
+import { adminApi } from '@/lib/admin-api'
 import { cn } from '@/lib/utils'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { ChatWidget } from '@/components/chat/chat-widget'
+import { Button } from '@/components/ui'
 
 const ADMIN_NAV = [
   { href: '/admin', label: 'Overview', icon: ShieldCheck, exact: true },
@@ -231,6 +234,34 @@ function AdminMobileTopBar() {
 }
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  const { getToken, isLoaded } = useAuth()
+  const { signOut } = useClerk()
+  const { user } = useUser()
+
+  const {
+    data: admin,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['admin-me'],
+    enabled: isLoaded,
+    retry: false,
+    queryFn: async () => adminApi.me((await getToken())!),
+  })
+
+  if (!isLoaded || isLoading) return <AdminAccessLoading />
+
+  if (isError || !admin) {
+    return (
+      <AdminAccessRequired
+        email={user?.primaryEmailAddress?.emailAddress ?? null}
+        error={(error as Error | undefined)?.message}
+        onSwitchAccount={() => void signOut({ redirectUrl: '/sign-in' })}
+      />
+    )
+  }
+
   return (
     <div className="bg-surface-page flex h-screen overflow-hidden">
       <AdminSidebar />
@@ -241,6 +272,76 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <ChatWidget />
+    </div>
+  )
+}
+
+function AdminAccessLoading() {
+  return (
+    <div className="bg-surface-page flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex justify-center">
+          <EquiScoreLogo width={150} />
+        </div>
+        <div className="border-line bg-surface-card rounded-card p-6">
+          <div className="bg-surface-hover mb-4 h-5 w-40 animate-pulse rounded" />
+          <div className="bg-surface-hover h-4 w-full animate-pulse rounded" />
+          <div className="bg-surface-hover mt-2 h-4 w-2/3 animate-pulse rounded" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AdminAccessRequired({
+  email,
+  error,
+  onSwitchAccount,
+}: {
+  email: string | null
+  error?: string
+  onSwitchAccount: () => void
+}) {
+  return (
+    <div className="bg-surface-page flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-xl">
+        <div className="mb-8 flex justify-center">
+          <EquiScoreLogo width={150} />
+        </div>
+
+        <div className="border-line bg-surface-card rounded-card border p-6 text-center sm:p-8">
+          <div className="bg-surface-inset text-brand mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+            <Lock className="h-6 w-6" />
+          </div>
+          <h1 className="text-content text-2xl font-semibold tracking-tight">
+            Admin access required
+          </h1>
+          <p className="text-content-secondary mx-auto mt-2 max-w-md text-sm">
+            You are signed in{email ? ` as ${email}` : ''}, but this email has not been granted
+            EquiScore internal admin access.
+          </p>
+          <p className="text-content-muted mx-auto mt-3 max-w-md text-sm">
+            Ask an existing internal admin to invite this email, or switch to an authorised account.
+            Signing in here does not grant partner or admin permissions.
+          </p>
+          {error && (
+            <p className="text-content-muted bg-surface-inset mt-5 rounded-lg px-3 py-2 text-xs">
+              {error}
+            </p>
+          )}
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button type="button" onClick={onSwitchAccount}>
+              Switch account
+            </Button>
+            <Link
+              href="/"
+              className="text-brand inline-flex items-center justify-center text-sm font-medium"
+            >
+              Go to consumer site
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
