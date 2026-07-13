@@ -386,6 +386,8 @@ Existing `SharedProfile` should stay as the one-off share-link mechanism. Do not
 - For user-initiated company sharing, create or reuse a `SharedProfile` as the applicant-facing grant/intent.
 - Add a company intake model, such as `OrganisationSharedProfile`, that references `SharedProfile` and tracks organisation acceptance state.
 - When accepted, create a formal `AssessmentCase`, `ConsentRecord`, `ProfileSnapshot`, `CriterionResult` rows, and a `UsageEvent`.
+- Add a partner workspace intake action where an authorised partner pastes a share link/code. The API resolves the share token, verifies it is active and unrevoked, creates the organisation intake row, and keeps the item visible under "Shared with us" until accepted, declined, or assessed.
+- Do not rely on a generic public share view as the system of record for partner workflows. Public share links remain viewer links; partner intake turns the share into a logged, organisation-scoped workflow item.
 
 This preserves the public share product while giving company customers proper case management.
 
@@ -898,20 +900,23 @@ This should list organisations with active or historic access, consent expiry, a
 
 Recommended implementation:
 
-1. User selects organisation or enters invitation code.
-2. Create `ConsentRecord` in pending/granted state depending on UX.
-3. Create `OrganisationSharedProfile` intake row.
-4. Company sees row in "Shared with us".
-5. Company chooses "Accept and assess".
-6. API validates consent and data sufficiency.
-7. Create `ProfileSnapshot`.
-8. Evaluate active `PolicyVersion`.
-9. Create `AssessmentCase`.
-10. Create `CriterionResult` rows.
-11. Append `UsageEvent`.
-12. Audit all material actions.
+1. Applicant creates a normal EquiScore share link/code from the consumer dashboard.
+2. Applicant sends the link/code to a partner outside EquiScore, or chooses a partner destination inside EquiScore once partner discovery exists.
+3. Authorised partner opens `Shared with us` and pastes the share link/code into an intake form.
+4. API resolves the `SharedProfile`, verifies expiry/revocation/freshness, and creates an `OrganisationSharedProfile` intake row scoped to that organisation.
+5. If the share has not already granted explicit company consent for this organisation and purpose, the applicant is prompted to authorise the partner before an assessment case can be delivered.
+6. Applicant sees company name, purpose, requested data categories, proposed commitment where relevant, consent expiry, and can approve or decline.
+7. Company sees the row in "Shared with us" with status such as awaiting applicant authorisation, ready to assess, declined, duplicate, expired, or assessed.
+8. Company chooses "Accept and assess".
+9. API validates active consent and data sufficiency.
+10. Create `ProfileSnapshot`.
+11. Evaluate active `PolicyVersion`.
+12. Create `AssessmentCase`.
+13. Create `CriterionResult` rows.
+14. Append `UsageEvent`.
+15. Audit all material actions.
 
-Credit is consumed only at step 11.
+Credit is consumed only at step 14.
 
 ### Company-Initiated Request
 
@@ -919,11 +924,17 @@ Recommended implementation:
 
 1. Company creates `AssessmentRequest`.
 2. Generate secure request token.
-3. Send invitation later; for MVP, show/copy link is enough if email service is not ready.
-4. Applicant completes request and grants consent.
-5. Backend creates/delivers assessment exactly as above.
-6. Request status changes to `ASSESSMENT_DELIVERED`.
-7. Company receives case in repository.
+3. Send request invitation email/link to the applicant.
+4. Applicant opens request on the consumer surface, not the partner surface.
+5. If the applicant already has an EquiScore account, they sign in with the requested email and see an explicit authorisation step: approve or decline this partner's access for the stated purpose.
+6. If the applicant does not have an account, they sign up, complete the required onboarding/profile/evidence steps, then land on the same explicit authorisation step.
+7. Applicant sees company name, purpose, requested data categories, proposed commitment, deadline, consent expiry, and can approve or decline.
+8. If approved, backend creates/delivers the assessment exactly as above.
+9. If declined, the request is closed as applicant declined and no assessment case or usage event is created.
+10. Request status changes to `ASSESSMENT_DELIVERED` only after consent, snapshot, case, criteria, and usage event are created.
+11. Company receives case in repository.
+
+Both flows must converge on the same consent, snapshot, policy evaluation, case, usage, and audit services so that user-initiated shares and company-initiated requests produce the same kind of partner case.
 
 ## Recalculation vs Refresh
 
@@ -1172,16 +1183,23 @@ Immediate next slices, in order:
    - Done: membership and invitation actions are organisation-audited.
    - Remaining: add suspend/reactivate flows, owner transfer polish, and notification analytics.
 
-3. **Assessment case detail and reviewer workflow**
+3. **Partner intake and applicant consent pairing**
+   - Add "Shared with us" intake where partners paste a consumer share link/code and convert it into an organisation-scoped intake row.
+   - Add applicant authorisation states for both flows: partner-requested assessment and user-initiated share intake.
+   - Ensure existing users sign in and approve/decline the partner access request; new users complete signup/onboarding and then approve/decline.
+   - Keep generic public share links separate from partner workspace case intake.
+   - Deliver a case only after explicit active consent for the organisation, purpose, and data scope.
+
+4. **Assessment case detail and reviewer workflow**
    - Build case detail view with snapshot, criteria, evidence summary, notes, status, and decision controls.
    - Add missing-information/request-more-evidence flow.
    - Keep company decisions separate from EquiScore outcome.
 
-4. **Policy builder foundation**
+5. **Policy builder foundation**
    - Draft, approve, activate, and retire policy versions.
    - Add criteria editor and policy preview against existing snapshots.
 
-5. **Tests and CI hardening**
+6. **Tests and CI hardening**
    - Add tenant-isolation tests.
    - Add duplicate-billing/idempotency tests.
    - Add invite-claiming and access-denial tests for admin and partner flows.
