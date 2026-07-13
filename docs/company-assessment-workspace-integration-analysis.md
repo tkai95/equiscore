@@ -1237,7 +1237,7 @@ Immediate next slices, in order:
 9. Add usage ledger with unique idempotency key.
 10. Implement user-share accept-and-assess backend flow.
 11. Implement company-requested assessment backend flow.
-12. Build assessments table and case detail UI.
+12. Build assessments pipeline queue and case detail UI.
 13. Add audit-event expansion for organisation/case actions.
 14. Add tenant-isolation integration tests.
 15. Add duplicate-billing tests.
