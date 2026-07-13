@@ -97,3 +97,10 @@ export class RequestCaseInformationDto {
   @IsISO8601()
   dueAt?: string
 }
+
+export class RespondToInformationRequestDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  response!: string
+}

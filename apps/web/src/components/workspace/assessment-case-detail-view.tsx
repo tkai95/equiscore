@@ -44,6 +44,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   review_required: 'warning',
   information_required: 'warning',
   information_requested: 'warning',
+  applicant_responded: 'info',
   under_review: 'info',
   review_complete: 'success',
   company_decision_recorded: 'success',
@@ -666,6 +667,19 @@ export function AssessmentCaseDetailView({
                       <p className="text-content-muted mt-1 text-xs">
                         Due {formatMaybeDate(request.dueAt)}
                       </p>
+                    )}
+                    {request.applicantResponse && (
+                      <div className="bg-surface-inset mt-2 rounded-lg p-2">
+                        <p className="text-content-muted text-[11px] font-medium uppercase tracking-wide">
+                          Applicant response
+                        </p>
+                        <p className="text-content mt-1 whitespace-pre-wrap text-xs">
+                          {request.applicantResponse}
+                        </p>
+                        <p className="text-content-muted mt-1 text-[11px]">
+                          Sent {formatMaybeDate(request.respondedAt)}
+                        </p>
+                      </div>
                     )}
                   </Cell>
                   <Cell muted>{formatMaybeDate(request.createdAt)}</Cell>

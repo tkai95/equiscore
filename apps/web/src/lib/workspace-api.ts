@@ -360,6 +360,31 @@ export interface PublicAssessmentRequest {
   completedAt: string | null
   policy: { id: string; name: string; versionNumber: number } | null
   isCompletable: boolean
+  case: {
+    id: string
+    status: string
+    assessmentOutcome: string | null
+    assessmentConfidence: string | null
+    companyDecision: string | null
+    decisionRationale: string | null
+    reference: string | null
+    assessedAt: string | null
+    expiresAt: string | null
+    createdAt: string
+  } | null
+  informationRequests: Array<{
+    id: string
+    requestType: string
+    message: string
+    requestedFields: unknown
+    status: string
+    dueAt: string | null
+    applicantResponse: string | null
+    createdAt: string
+    respondedAt: string | null
+    resolvedAt: string | null
+  }>
+  canRespondToInformationRequests: boolean
 }
 
 export interface CompletedAssessmentRequest {
@@ -582,6 +607,19 @@ export const workspaceApi = {
       workspaceFetch<CompletedAssessmentRequest>(
         `/assessment-requests/${encodeURIComponent(requestToken)}/complete`,
         { method: 'POST' },
+        token
+      ),
+    respondToInformationRequest: (
+      token: string,
+      requestToken: string,
+      informationRequestId: string,
+      data: { response: string }
+    ) =>
+      workspaceFetch<PublicAssessmentRequest>(
+        `/assessment-requests/${encodeURIComponent(
+          requestToken
+        )}/information-requests/${encodeURIComponent(informationRequestId)}/respond`,
+        { method: 'POST', body: JSON.stringify(data) },
         token
       ),
   },

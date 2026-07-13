@@ -11,6 +11,7 @@ import type { OrganisationContext } from '../organisations/organisation-context'
 import type {
   CreateAssessmentRequestDto,
   RecordCaseDecisionDto,
+  RespondToInformationRequestDto,
   RequestCaseInformationDto,
 } from './assessment-requests.dto'
 
@@ -532,6 +533,37 @@ export class AssessmentsService {
         policyVersion: {
           select: { id: true, versionNumber: true, policy: { select: { name: true } } },
         },
+        cases: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            assessmentOutcome: true,
+            assessmentConfidence: true,
+            companyDecision: true,
+            decisionRationale: true,
+            reference: true,
+            assessedAt: true,
+            expiresAt: true,
+            createdAt: true,
+            informationRequests: {
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                requestType: true,
+                message: true,
+                requestedFields: true,
+                status: true,
+                dueAt: true,
+                applicantResponse: true,
+                createdAt: true,
+                respondedAt: true,
+                resolvedAt: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -574,6 +606,8 @@ export class AssessmentsService {
       status = 'applicant_opened'
     }
 
+    const latestCase = request.cases[0] ?? null
+
     return {
       id: request.id,
       organisation: request.organisation,
@@ -597,7 +631,133 @@ export class AssessmentsService {
           }
         : null,
       isCompletable: this.isPendingRequestStatus(status),
+      case: latestCase
+        ? {
+            id: latestCase.id,
+            status: latestCase.status,
+            assessmentOutcome: latestCase.assessmentOutcome,
+            assessmentConfidence: latestCase.assessmentConfidence,
+            companyDecision: latestCase.companyDecision,
+            decisionRationale: latestCase.decisionRationale,
+            reference: latestCase.reference,
+            assessedAt: latestCase.assessedAt,
+            expiresAt: latestCase.expiresAt,
+            createdAt: latestCase.createdAt,
+          }
+        : null,
+      informationRequests: latestCase?.informationRequests ?? [],
+      canRespondToInformationRequests:
+        latestCase?.informationRequests.some((item) => item.status === 'open') ?? false,
     }
+  }
+
+  async respondToInformationRequest(
+    token: string,
+    informationRequestId: string,
+    applicantUserId: string,
+    input: RespondToInformationRequestDto,
+    ipAddress?: string
+  ) {
+    const response = this.cleanString(input.response)
+    if (!response) throw new BadRequestException('Response is required')
+
+    const request = await db.assessmentRequest.findUnique({
+      where: { requestToken: token },
+      select: {
+        id: true,
+        organisationId: true,
+        applicantEmail: true,
+        cancelledAt: true,
+        status: true,
+        cases: {
+          where: { informationRequests: { some: { id: informationRequestId } } },
+          take: 1,
+          select: {
+            id: true,
+            applicantId: true,
+            status: true,
+            informationRequests: {
+              where: { id: informationRequestId },
+              select: { id: true, status: true, requestType: true },
+            },
+          },
+        },
+      },
+    })
+
+    if (!request) throw new NotFoundException('Assessment request not found')
+    if (request.cancelledAt || request.status === 'cancelled') {
+      throw new ForbiddenException('This assessment request has been cancelled')
+    }
+
+    const applicant = await db.user.findUnique({
+      where: { id: applicantUserId },
+      select: { id: true, email: true },
+    })
+    if (!applicant) throw new NotFoundException('Applicant not found')
+
+    const requestedEmail = this.normaliseEmail(request.applicantEmail)
+    const signedInEmail = this.normaliseEmail(applicant.email)
+    if (requestedEmail !== signedInEmail) {
+      throw new ForbiddenException(
+        `This request was sent to ${requestedEmail}. Please sign in with that email.`
+      )
+    }
+
+    const assessmentCase = request.cases[0] ?? null
+    const informationRequest = assessmentCase?.informationRequests[0] ?? null
+    if (!assessmentCase || !informationRequest) {
+      throw new NotFoundException('Information request not found for this assessment')
+    }
+    if (assessmentCase.applicantId !== applicantUserId) {
+      throw new ForbiddenException('This assessment belongs to a different applicant')
+    }
+    if (informationRequest.status !== 'open') {
+      throw new BadRequestException('This information request is no longer open')
+    }
+
+    const now = new Date()
+    await db.$transaction(async (tx) => {
+      await tx.informationRequest.update({
+        where: { id: informationRequest.id },
+        data: {
+          applicantResponse: response,
+          status: 'applicant_responded',
+          respondedAt: now,
+        },
+      })
+
+      await tx.assessmentCase.update({
+        where: { id: assessmentCase.id },
+        data: { status: 'applicant_responded' },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: request.organisationId,
+          assessmentCaseId: assessmentCase.id,
+          actorType: 'applicant',
+          actorId: applicantUserId,
+          action: 'assessment_case_information_responded',
+          targetType: 'information_request',
+          targetId: informationRequest.id,
+          beforeStateReference: this.hashPayload({
+            caseStatus: assessmentCase.status,
+            informationRequestStatus: informationRequest.status,
+          }),
+          afterStateReference: this.hashPayload({
+            caseStatus: 'applicant_responded',
+            informationRequestStatus: 'applicant_responded',
+          }),
+          ipAddress,
+          metadata: this.asJson({
+            requestType: informationRequest.requestType,
+          }),
+        },
+      })
+    })
+
+    return this.getPublicRequest(token, ipAddress)
   }
 
   async completeRequest(token: string, applicantUserId: string, ipAddress?: string) {
