@@ -172,8 +172,8 @@ export function ShareProfileView() {
   return (
     <PageLayout>
       <PageHeader
-        title="Share profile"
-        description="Create a secure, time-limited link to share your trust profile with landlords or lenders."
+        title="Sharing"
+        description="Create, control and track secure access to your Trust Profile."
       />
 
       {/* How it works */}
@@ -200,8 +200,8 @@ export function ShareProfileView() {
           <p className="mx-auto mt-1 max-w-md text-sm text-content-secondary">
             You need an active trust score before you can create shareable links.
           </p>
-          <a href="/dashboard/trust-score" className={buttonClasses('primary', 'md', 'mt-4')}>
-            Go to Trust Score
+          <a href="/dashboard/trust-profile/assessment" className={buttonClasses('primary', 'md', 'mt-4')}>
+            Go to Assessment
           </a>
         </Card>
       )}

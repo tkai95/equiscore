@@ -1,7 +1,7 @@
-import { AnalyticsOverview } from '@/components/analytics/analytics-overview'
+import { redirect } from 'next/navigation'
 
-export const metadata = { title: 'Financial insights' }
+export const metadata = { title: 'Financial Profile' }
 
 export default function AnalyticsPage() {
-  return <AnalyticsOverview />
+  redirect('/dashboard/trust-profile/financial-profile')
 }

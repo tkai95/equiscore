@@ -278,7 +278,7 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
       <div className="flex items-center justify-between gap-4">
         <div>
           <PageTitle>Bank connections</PageTitle>
-          <p className="mt-1 text-sm text-content-secondary">Connect your bank account to strengthen your Trust Portfolio.</p>
+          <p className="mt-1 text-sm text-content-secondary">Connect your bank account to strengthen your Trust Profile.</p>
         </div>
         {hasAccounts && (
           <Button variant="secondary" onClick={() => syncMutation.mutate()} loading={syncMutation.isPending}>
@@ -713,10 +713,10 @@ function ImportSummary({ data }: { data: StatementImportResult }) {
       </strong>
       .{' '}
       <Link
-        href="/dashboard/analytics"
+        href="/dashboard/trust-profile/financial-profile"
         className="font-semibold underline underline-offset-2 hover:opacity-80"
       >
-        View insights
+        View profile
       </Link>
       {data.ledgerVerified && (
         <span className="mt-1 flex items-center gap-1.5 text-xs text-success-strong">

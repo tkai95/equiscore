@@ -230,13 +230,13 @@ export function DashboardOverview() {
     <PageLayout width="wide">
       {/* ── Section 1: Assessment summary ─────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Trust Portfolio summary */}
+        {/* Trust Profile summary */}
         <Card padding="lg" className="lg:col-span-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">
-            EquiScore Trust Portfolio
+            EquiScore Trust Profile
           </p>
           <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-content">
-            {profile?.fullName ?? 'Your Trust Portfolio'}
+            {profile?.fullName ?? 'Your Trust Profile'}
           </h1>
 
           {scoreLoading ? (
@@ -288,7 +288,7 @@ export function DashboardOverview() {
               </div>
 
               <Link
-                href="/dashboard/trust-score"
+                href="/dashboard/trust-profile/assessment"
                 className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-900 hover:underline"
               >
                 View full assessment <ArrowRight className="h-4 w-4" />
@@ -297,7 +297,7 @@ export function DashboardOverview() {
           ) : (
             <div className="mt-6">
               <p className="text-sm leading-relaxed text-content-secondary">
-                Your Trust Portfolio is a verified, reusable financial profile. Connect a bank or
+                Your Trust Profile is a verified, reusable financial profile. Connect a bank or
                 upload a statement to build it from real financial evidence.
               </p>
               <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
@@ -344,7 +344,7 @@ export function DashboardOverview() {
                   {primaryAction.cta}
                 </Link>
                 <Link
-                  href="/dashboard/trust-score"
+                  href="/dashboard/trust-profile/assessment"
                   className="text-center text-xs font-medium text-brand-900 hover:underline"
                 >
                   Why this is required
@@ -358,7 +358,7 @@ export function DashboardOverview() {
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-content-secondary">
                 {hasScore
-                  ? 'No outstanding actions. You can share your Trust Portfolio whenever you need to.'
+                  ? 'No outstanding actions. You can share your Trust Profile whenever you need to.'
                   : 'Connect a bank account to generate your assessment.'}
               </p>
               <Link
@@ -475,7 +475,7 @@ function PortfolioStatusPanel({
           ? { ...DIMENSION_STATUS.action_required, label: 'Review required' }
           : DIMENSION_STATUS.not_assessed,
       weight: incomeConfirmed ? 1 : hasBankData ? 0.5 : 0,
-      href: '/dashboard/analytics',
+      href: '/dashboard/trust-profile/financial-profile',
       action: incomeConfirmed ? 'View' : 'Review income',
     },
     {
@@ -590,7 +590,7 @@ function AssessmentBreakdown({
       reason: incomeVariable
         ? 'Income varies significantly and the primary income source has not been confirmed.'
         : 'A recurring income pattern was detected across the period.',
-      action: incomeVariable ? { label: 'Review income', href: '/dashboard/analytics' } : undefined,
+      action: incomeVariable ? { label: 'Review income', href: '/dashboard/trust-profile/financial-profile' } : undefined,
     },
     {
       label: 'Affordability',
@@ -599,7 +599,7 @@ function AssessmentBreakdown({
       reason: aff
         ? 'Affordability was assessed from your verified income and spending.'
         : 'There is not enough verified information to calculate affordability reliably.',
-      action: aff ? undefined : { label: 'Complete income review', href: '/dashboard/analytics' },
+      action: aff ? undefined : { label: 'Complete income review', href: '/dashboard/trust-profile/financial-profile' },
     },
     {
       label: 'Rental reliability',
@@ -779,7 +779,7 @@ function AffordabilityCard({
         />
       </div>
       <Link
-        href="/dashboard/analytics"
+        href="/dashboard/trust-profile/financial-profile"
         className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-900 hover:underline"
       >
         View full breakdown <ArrowRight className="h-3.5 w-3.5" />
@@ -928,7 +928,7 @@ function SharingActivity({
         <div className="mb-4 flex items-start gap-2.5 rounded-panel bg-warning-soft px-4 py-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-strong" aria-hidden />
           <p className="text-sm text-warning-strong">
-            You can share the current version of your Trust Portfolio. Recipients will be shown that
+            You can share the current version of your Trust Profile. Recipients will be shown that
             identity verification is incomplete.
           </p>
         </div>
@@ -945,7 +945,7 @@ function SharingActivity({
 
       {active.length === 0 ? (
         <p className="text-sm text-content-secondary">
-          No active share links. Create a share to send your Trust Portfolio to a landlord, letting
+          No active share links. Create a share to send your Trust Profile to a landlord, letting
           agent or lender.
         </p>
       ) : (

@@ -11,8 +11,8 @@ export function ActionCentreView() {
   return (
     <PageLayout width="narrow">
       <PageHeader
-        title="Action Centre"
-        description="The outstanding steps that will strengthen your Trust Portfolio, in priority order. Each improves the confidence and evidence behind your assessment."
+        title="To do"
+        description="The steps to complete, fix or respond to so your Trust Profile stays current and useful."
       />
 
       {isLoading ? (
@@ -26,7 +26,7 @@ export function ActionCentreView() {
           <CheckCircle2 className="h-10 w-10 text-success-strong" aria-hidden />
           <p className="mt-3 text-lg font-semibold text-content">You&apos;re all caught up</p>
           <p className="mt-1 max-w-sm text-sm text-content-secondary">
-            There are no outstanding actions. Your Trust Portfolio is ready to share whenever you
+            There are no outstanding actions. Your Trust Profile is ready to share whenever you
             need it.
           </p>
           <Link href="/dashboard/share" className={buttonClasses('primary', 'md', 'mt-5')}>

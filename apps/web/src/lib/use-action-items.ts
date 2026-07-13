@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 /**
  * Single source of truth for the user's outstanding actions.
  *
- * The sidebar badge, the Action Centre page and the dashboard's recommended
+ * The sidebar badge, the To do page and the dashboard's recommended
  * action all read from here so the count and the list can never disagree.
  * Actions are ordered by priority (identity/verification first, then evidence,
  * then freshness), which matches how the assessment is capped.
@@ -120,7 +120,7 @@ export function useActionItems() {
       title: 'Review your income source',
       detail:
         'Your income varies month to month or the primary source is unconfirmed. Reviewing it strengthens the assessment.',
-      href: '/dashboard/analytics',
+      href: '/dashboard/trust-profile/financial-profile',
       cta: 'Review income',
       priority: 4,
     })

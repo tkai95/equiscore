@@ -9,13 +9,12 @@ import {
   ListChecks,
   ShieldCheck,
   BarChart3,
-  Landmark,
-  FileText,
   Share2,
   User,
   Settings,
   ChevronDown,
-  Compass,
+  Target,
+  Wallet,
   LifeBuoy,
   Lock,
   PanelLeftClose,
@@ -27,40 +26,21 @@ import {
 import { cn } from '@/lib/utils'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { useActionItems } from '@/lib/use-action-items'
-import { useMe } from '@/lib/use-me'
 
 type Leaf = { href: string; label: string; icon: LucideIcon }
 type Group = { id: string; label: string; icon: LucideIcon; children: Leaf[] }
 
-// IA organised around user jobs, not internal system structure. Sharing is a
-// top-level capability (never buried under a profile menu); "Analytics" is
-// "Financial insights"; "My Trust Score" is "Assessment".
+// IA organised around user jobs, not internal system structure. Trust Profile
+// is the formal assessment/report, Goals applies it to a real-world outcome,
+// and My Money carries the ongoing financial-coaching surface.
 const GROUPS: Group[] = [
   {
-    id: 'portfolio',
-    label: 'Trust Portfolio',
+    id: 'trust-profile',
+    label: 'Trust Profile',
     icon: ShieldCheck,
     children: [
-      { href: '/dashboard/trust-score', label: 'Assessment', icon: ShieldCheck },
-      { href: '/dashboard/analytics', label: 'Financial insights', icon: BarChart3 },
-    ],
-  },
-  {
-    id: 'evidence',
-    label: 'Evidence',
-    icon: Landmark,
-    children: [
-      { href: '/dashboard/connections', label: 'Bank connections', icon: Landmark },
-      { href: '/dashboard/documents', label: 'Documents & evidence', icon: FileText },
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings,
-    children: [
-      { href: '/dashboard/profile', label: 'Personal details', icon: User },
-      { href: '/dashboard/settings', label: 'Account & security', icon: Lock },
+      { href: '/dashboard/trust-profile/assessment', label: 'Assessment', icon: ShieldCheck },
+      { href: '/dashboard/trust-profile/financial-profile', label: 'Financial Profile', icon: BarChart3 },
     ],
   },
 ]
@@ -76,7 +56,6 @@ function SidebarNav({
 }) {
   const pathname = usePathname()
   const { count } = useActionItems()
-  const { data: me } = useMe()
 
   return (
     <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
@@ -89,27 +68,6 @@ function SidebarNav({
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
-      <NavLink
-        href="/dashboard/actions"
-        label="Action Centre"
-        icon={ListChecks}
-        pathname={pathname}
-        badge={count > 0 ? count : undefined}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-      {/* Compass — the coaching layer, shown only to entitled subscribers.
-          The API guard is the real boundary; hiding the link is UX. */}
-      {me?.compassEnabled && (
-        <NavLink
-          href="/dashboard/compass"
-          label="Compass"
-          icon={Compass}
-          pathname={pathname}
-          collapsed={collapsed}
-          onNavigate={onNavigate}
-        />
-      )}
 
       <div className="pt-2" />
       {GROUPS.map((group) => (
@@ -123,6 +81,31 @@ function SidebarNav({
       ))}
 
       <div className="pt-2" />
+      <NavLink
+        href="/dashboard/goals"
+        label="Goals"
+        icon={Target}
+        pathname={pathname}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavLink
+        href="/dashboard/my-money"
+        label="My Money"
+        icon={Wallet}
+        pathname={pathname}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavLink
+        href="/dashboard/to-do"
+        label="To do"
+        icon={ListChecks}
+        pathname={pathname}
+        badge={count > 0 ? count : undefined}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
       <NavLink
         href="/dashboard/share"
         label="Sharing"
@@ -155,12 +138,22 @@ function SidebarFooter({ collapsed = false }: { collapsed?: boolean }) {
         {/* Help & support and Privacy & security live in the account menu. */}
         <UserButton.MenuItems>
           <UserButton.Link
+            label="Personal details"
+            labelIcon={<User className="h-4 w-4" />}
+            href="/dashboard/profile"
+          />
+          <UserButton.Link
+            label="Account & security"
+            labelIcon={<Settings className="h-4 w-4" />}
+            href="/dashboard/settings"
+          />
+          <UserButton.Link
             label="Help & support"
             labelIcon={<LifeBuoy className="h-4 w-4" />}
             href="/faq"
           />
           <UserButton.Link
-            label="Privacy & security"
+            label="Privacy & permissions"
             labelIcon={<Lock className="h-4 w-4" />}
             href="/security"
           />

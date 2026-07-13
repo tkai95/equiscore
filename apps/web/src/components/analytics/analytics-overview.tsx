@@ -97,10 +97,9 @@ export function AnalyticsOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <PageTitle>Financial insights</PageTitle>
+        <PageTitle>Financial Profile</PageTitle>
         <p className="mt-1 max-w-2xl text-sm text-content-secondary">
-          What your bank data says about your income, spending, and reliability, from Open Banking or
-          an uploaded statement.
+          The financial facts and behaviours EquiScore found in your evidence, and how they support your assessment.
         </p>
       </div>
 

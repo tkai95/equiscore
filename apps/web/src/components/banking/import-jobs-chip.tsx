@@ -93,11 +93,11 @@ export function ImportJobsChip() {
           {done.result ? ` — ${done.result.overallTier} / ${done.result.overallScore}` : ''}
         </span>
         <Link
-          href="/dashboard/analytics"
+          href="/dashboard/trust-profile/financial-profile"
           onClick={() => dismiss(done.id)}
           className="font-semibold underline underline-offset-2 hover:text-success-strong"
         >
-          View insights
+          View profile
         </Link>
         <button
           onClick={() => dismiss(done.id)}

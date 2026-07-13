@@ -327,7 +327,7 @@ export function InsightProfileView() {
             <p className="text-2xl font-semibold text-content-muted">Not yet generated</p>
             <p className="mt-2 text-sm text-content-secondary">
               Generate your assessment on the{' '}
-              <a href="/dashboard/trust-score" className="font-medium text-brand-900 hover:underline">
+              <a href="/dashboard/trust-profile/assessment" className="font-medium text-brand-900 hover:underline">
                 Assessment
               </a>{' '}
               page to see it here.

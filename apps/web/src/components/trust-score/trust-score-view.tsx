@@ -94,7 +94,7 @@ const DIM_META: Record<DimKey, { assessed: string[]; improve: string[] }> = {
   },
   rentalReliabilityScore: {
     assessed: ['Whether rent is detected and paid consistently', 'Returned or missed payments', 'Reliability of essential bill payments'],
-    improve: ['Ensure rent is paid from the connected account', 'Explain any flagged rent-like transfers on Financial insights'],
+    improve: ['Ensure rent is paid from the connected account', 'Explain any flagged rent-like transfers on Financial Profile'],
   },
   identityConfidenceScore: {
     assessed: ['Match between your name and the bank account holder', 'Address confidence from evidence'],
@@ -209,7 +209,7 @@ export function TrustScoreView() {
         <Card className="text-center" padding="lg">
           <p className="font-semibold text-content">No assessment yet</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-content-secondary">
-            Your Trust Portfolio is built from real financial evidence. Connect a bank or upload a statement, then
+            Your Trust Profile is built from real financial evidence. Connect a bank or upload a statement, then
             generate your assessment.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">

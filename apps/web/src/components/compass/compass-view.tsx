@@ -5,17 +5,13 @@ import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
-  Compass as CompassIcon,
   LayoutGrid,
-  Waypoints,
   CircleDollarSign,
-  ShoppingBag,
-  CalendarClock,
   CalendarDays,
-  ShieldCheck,
   Sparkles,
   Gauge,
   Lock,
+  Wallet,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { CompassPayload } from '@/lib/compass-types'
@@ -26,7 +22,6 @@ import { BreakdownDrawer, type DrawerSpec } from '@/components/analytics/breakdo
 import { Card, EmptyState } from './compass-ui'
 import {
   BillsSection,
-  ImpactSection,
   IncomeSection,
   MoneyMapSection,
   OverviewSection,
@@ -38,25 +33,15 @@ import { CalendarSection } from './compass-calendar'
 
 type TabId =
   | 'overview'
-  | 'calendar'
-  | 'money-map'
-  | 'income'
-  | 'spending'
-  | 'bills'
-  | 'resilience'
-  | 'savings'
-  | 'impact'
+  | 'income-spending'
+  | 'bills-calendar'
+  | 'savings-resilience'
 
 const TABS: { id: TabId; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid },
-  { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { id: 'money-map', label: 'Money Map', icon: Waypoints },
-  { id: 'income', label: 'Income', icon: CircleDollarSign },
-  { id: 'spending', label: 'Spending', icon: ShoppingBag },
-  { id: 'bills', label: 'Bills', icon: CalendarClock },
-  { id: 'resilience', label: 'Resilience', icon: Gauge },
-  { id: 'savings', label: 'Savings', icon: Sparkles },
-  { id: 'impact', label: 'Score impact', icon: ShieldCheck },
+  { id: 'income-spending', label: 'Income & spending', icon: CircleDollarSign },
+  { id: 'bills-calendar', label: 'Bills & calendar', icon: CalendarDays },
+  { id: 'savings-resilience', label: 'Savings & resilience', icon: Gauge },
 ]
 
 const FRESHNESS_LABEL: Record<string, string> = {
@@ -117,23 +102,38 @@ export function CompassView() {
         <Skeleton bare />
       ) : isError || !data ? (
         <EmptyState
-          icon={<CompassIcon className="h-8 w-8" />}
-          title="We couldn't load Compass"
+          icon={<Wallet className="h-8 w-8" />}
+          title="We couldn't load My Money"
           body="Please refresh the page. If this keeps happening, your evidence may still be processing."
         />
       ) : !data.hasData ? (
         <NoData />
       ) : (
         <div>
-          {tab === 'overview' && <OverviewSection data={data} onDrill={setDrawer} actions={actions} />}
-          {tab === 'calendar' && <CalendarSection data={data} />}
-          {tab === 'money-map' && <MoneyMapSection data={data} />}
-          {tab === 'income' && <IncomeSection data={data} onDrill={setDrawer} />}
-          {tab === 'spending' && <SpendingSection data={data} onDrill={setDrawer} />}
-          {tab === 'bills' && <BillsSection data={data} onDrill={setDrawer} actions={actions} />}
-          {tab === 'resilience' && <ResilienceSection data={data} />}
-          {tab === 'savings' && <SavingsSection data={data} actions={actions} />}
-          {tab === 'impact' && <ImpactSection data={data} />}
+          {tab === 'overview' && (
+            <div className="space-y-6">
+              <OverviewSection data={data} onDrill={setDrawer} actions={actions} />
+              <MoneyMapSection data={data} />
+            </div>
+          )}
+          {tab === 'income-spending' && (
+            <div className="space-y-6">
+              <IncomeSection data={data} onDrill={setDrawer} />
+              <SpendingSection data={data} onDrill={setDrawer} />
+            </div>
+          )}
+          {tab === 'bills-calendar' && (
+            <div className="space-y-6">
+              <CalendarSection data={data} />
+              <BillsSection data={data} onDrill={setDrawer} actions={actions} />
+            </div>
+          )}
+          {tab === 'savings-resilience' && (
+            <div className="space-y-6">
+              <ResilienceSection data={data} />
+              <SavingsSection data={data} actions={actions} />
+            </div>
+          )}
         </div>
       )}
 
@@ -147,11 +147,11 @@ function Header({ status, asOf, months }: { status: string | null; asOf: string 
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 className="flex items-center gap-2.5 text-[28px] font-semibold text-content">
-          <CompassIcon className="h-7 w-7 text-brand-900" />
-          Compass
+          <Wallet className="h-7 w-7 text-brand-900" />
+          My Money
         </h1>
         <p className="mt-1 text-sm text-content-secondary">
-          Your money, explained. What you earn, where it goes, and how to strengthen your position.
+          Understand what comes in, where it goes, what is coming up, and how resilient your position looks.
         </p>
       </div>
       {status && (
@@ -175,11 +175,11 @@ function Upsell() {
     <div className="mx-auto max-w-3xl">
       <div className="overflow-hidden rounded-card border border-line bg-surface-card">
         <div className="bg-brand-900 px-8 py-10 text-cream-surface">
-          <CompassIcon className="mb-3 h-8 w-8" />
-          <h1 className="text-2xl font-semibold">EquiScore Compass</h1>
+          <Wallet className="mb-3 h-8 w-8" />
+          <h1 className="text-2xl font-semibold">My Money</h1>
           <p className="mt-2 max-w-lg text-sm text-cream-surface/80">
-            The financial clarity layer of EquiScore. Understand your income, control your spending, review your
-            recurring bills, and see exactly how your money strengthens your Trust Portfolio.
+            The financial clarity layer of EquiScore. Understand your income, spending, bills, resilience, and the
+            money patterns that support your Trust Profile.
           </p>
         </div>
         <div className="px-8 py-6">
@@ -202,7 +202,7 @@ function Upsell() {
           <div className="mt-6 flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-lg bg-surface-inset px-3 py-2 text-sm text-content-secondary">
               <Lock className="h-4 w-4" />
-              Compass is part of a subscription plan
+              My Money is part of a subscription plan
             </div>
             <Link
               href="/dashboard"
@@ -220,9 +220,9 @@ function Upsell() {
 function NoData() {
   return (
     <EmptyState
-      icon={<CompassIcon className="h-8 w-8" />}
-      title="Compass needs some financial evidence first"
-      body="Connect a bank account or upload a statement, and Compass will map your income, spending, bills and savings."
+      icon={<Wallet className="h-8 w-8" />}
+      title="My Money needs some financial evidence first"
+      body="Connect a bank account or upload a statement to map your income, spending, bills and savings."
     />
   )
 }

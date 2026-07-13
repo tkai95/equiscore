@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
-export const metadata = { title: 'Assessment' }
+export const metadata = { title: 'Trust Profile' }
 
-export default function TrustScorePage() {
+export default function TrustProfilePage() {
   redirect('/dashboard/trust-profile/assessment')
 }
