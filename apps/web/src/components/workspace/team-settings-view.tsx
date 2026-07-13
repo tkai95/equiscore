@@ -151,7 +151,7 @@ export function TeamSettingsView({ organisationSlug }: { organisationSlug: strin
   return (
     <PageLayout width="wide">
       <PageHeader
-        title="Team & settings"
+        title="Team"
         description={
           data
             ? `${data.organisation.name} · partners.equiscore.app/o/${data.organisation.slug}`

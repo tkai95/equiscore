@@ -796,27 +796,38 @@ The admin navigation should be visibly distinct in information architecture, but
    - activity
    - decision
 
-4. Requests
-   - create request
-   - list statuses
+4. Applicant intake
+   - expandable navigation group containing Requests and Shared links
+   - request assessment drawer/form
+   - list request statuses
    - resend/cancel
+   - import consumer share links
+   - template setup for partner-branded invite/request messages
 
-5. Shared with us
-   - pending company shares
-   - accept and assess
-   - decline/request changes/duplicate
+5. Policies
+   - policy list
+   - draft/approve/activate/retire policies
+   - criteria preview
 
-6. Usage
-   - allowance
-   - used/remaining/overage
-   - usage ledger table
+6. Settings
+   - Team
+   - Usage
+   - Audit log
 
-7. Team/settings
-   - invite members
-   - role assignment
+Settings: Usage
 
-8. Audit log
-   - initially read-only list
+- allowance
+- used/remaining/overage
+- usage ledger table
+
+Settings: Team
+
+- invite members
+- role assignment
+
+Settings: Audit log
+
+- initially read-only list
 
 ### MVP Internal Admin Pages
 
@@ -1190,6 +1201,8 @@ Immediate next slices, in order:
 
 3. **Partner intake and applicant consent pairing**
    - Done (`58f62ae`): added "Shared with us" intake where partners paste a consumer share link/code and convert it into an organisation-scoped, audited intake row without consuming usage credits.
+   - Done: simplified partner navigation so Applicant intake expands into Requests and Shared links, while Usage, Audit log, and Team live under Settings.
+   - Add partner-branded request templates: logo/name fields, editable message content, preview, approval/sign-off state, active/inactive versions, and audit trail for who approved a template.
    - Add applicant authorisation states for both flows: partner-requested assessment and user-initiated share intake.
    - Ensure existing users sign in and approve/decline the partner access request; new users complete signup/onboarding and then approve/decline.
    - Keep generic public share links separate from partner workspace case intake.

@@ -8,9 +8,11 @@ import {
   Activity,
   BarChart3,
   Building2,
+  ChevronDown,
   ClipboardList,
   FileClock,
   Gauge,
+  Inbox,
   Landmark,
   LifeBuoy,
   ListChecks,
@@ -28,15 +30,40 @@ import { cn } from '@/lib/utils'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { ChatWidget } from '@/components/chat/chat-widget'
 
-const ORG_NAV = [
-  { href: '', label: 'Overview', icon: Gauge },
-  { href: '/assessments', label: 'Assessments', icon: ClipboardList },
-  { href: '/requests', label: 'Requests', icon: FileClock },
-  { href: '/shared', label: 'Shared with us', icon: ShieldCheck },
-  { href: '/policies', label: 'Policies', icon: ListChecks },
-  { href: '/usage', label: 'Usage', icon: BarChart3 },
-  { href: '/audit', label: 'Audit log', icon: Activity },
-  { href: '/settings', label: 'Team & settings', icon: Settings },
+type OrgNavItem =
+  | { type: 'link'; href: string; label: string; icon: LucideIcon; exact?: boolean }
+  | { type: 'group'; label: string; icon: LucideIcon; children: OrgNavChild[] }
+
+type OrgNavChild = {
+  href: string
+  label: string
+  icon: LucideIcon
+  exact?: boolean
+}
+
+const ORG_NAV: OrgNavItem[] = [
+  { type: 'link', href: '', label: 'Overview', icon: Gauge, exact: true },
+  { type: 'link', href: '/assessments', label: 'Assessments', icon: ClipboardList },
+  {
+    type: 'group',
+    label: 'Applicant intake',
+    icon: Inbox,
+    children: [
+      { href: '/requests', label: 'Requests', icon: FileClock },
+      { href: '/shared', label: 'Shared links', icon: ShieldCheck },
+    ],
+  },
+  { type: 'link', href: '/policies', label: 'Policies', icon: ListChecks },
+  {
+    type: 'group',
+    label: 'Settings',
+    icon: Settings,
+    children: [
+      { href: '/settings', label: 'Team', icon: Users },
+      { href: '/usage', label: 'Usage', icon: BarChart3 },
+      { href: '/audit', label: 'Audit log', icon: Activity },
+    ],
+  },
 ]
 
 function organisationBase(pathname: string): string | null {
@@ -75,18 +102,29 @@ function WorkspaceNav({
               Current organisation
             </div>
           )}
-          {ORG_NAV.map((item) => (
-            <NavLink
-              key={item.label}
-              href={`${base}${item.href}`}
-              label={item.label}
-              icon={item.icon}
-              pathname={pathname}
-              exact={item.href === ''}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-            />
-          ))}
+          {ORG_NAV.map((item) =>
+            item.type === 'group' ? (
+              <NavGroup
+                key={item.label}
+                base={base}
+                item={item}
+                pathname={pathname}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+              />
+            ) : (
+              <NavLink
+                key={item.label}
+                href={`${base}${item.href}`}
+                label={item.label}
+                icon={item.icon}
+                pathname={pathname}
+                exact={item.exact}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+              />
+            )
+          )}
         </>
       )}
     </nav>
@@ -284,6 +322,7 @@ function NavLink({
   pathname,
   exact,
   collapsed = false,
+  nested = false,
   onNavigate,
 }: {
   href: string
@@ -292,6 +331,7 @@ function NavLink({
   pathname: string
   exact?: boolean
   collapsed?: boolean
+  nested?: boolean
   onNavigate?: () => void
 }) {
   const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/')
@@ -322,7 +362,8 @@ function NavLink({
       aria-current={active ? 'page' : undefined}
       onClick={onNavigate}
       className={cn(
-        'relative flex h-11 items-center gap-3 rounded-lg pl-3 pr-2.5 text-sm font-medium transition-colors',
+        'relative flex items-center gap-3 rounded-lg pr-2.5 text-sm font-medium transition-colors',
+        nested ? 'h-9 pl-3 text-[13px]' : 'h-11 pl-3',
         active
           ? 'bg-sidebar-active text-sidebar-text'
           : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white'
@@ -334,5 +375,92 @@ function NavLink({
       <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </Link>
+  )
+}
+
+function NavGroup({
+  base,
+  item,
+  pathname,
+  collapsed = false,
+  onNavigate,
+}: {
+  base: string
+  item: Extract<OrgNavItem, { type: 'group' }>
+  pathname: string
+  collapsed?: boolean
+  onNavigate?: () => void
+}) {
+  const childHrefs = item.children.map((child) => `${base}${child.href}`)
+  const active = childHrefs.some((href) => pathname === href || pathname.startsWith(href + '/'))
+  const [open, setOpen] = useState(active)
+  const Icon = item.icon
+
+  useEffect(() => {
+    if (active) setOpen(true)
+  }, [active])
+
+  const firstChildHref = childHrefs[0] ?? base
+  if (collapsed) {
+    return (
+      <Link
+        href={firstChildHref}
+        title={item.label}
+        aria-label={item.label}
+        aria-current={active ? 'page' : undefined}
+        onClick={onNavigate}
+        className={cn(
+          'relative flex h-11 items-center justify-center rounded-lg transition-colors',
+          active
+            ? 'bg-sidebar-active text-sidebar-text'
+            : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white'
+        )}
+      >
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          'relative flex h-11 w-full items-center gap-3 rounded-lg pl-3 pr-2.5 text-left text-sm font-medium transition-colors',
+          active
+            ? 'bg-sidebar-active text-sidebar-text'
+            : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white'
+        )}
+      >
+        {active && (
+          <span className="bg-sidebar-text absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full" />
+        )}
+        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        <ChevronDown
+          className={cn('h-4 w-4 shrink-0 transition-transform', open ? 'rotate-0' : '-rotate-90')}
+          strokeWidth={2}
+        />
+      </button>
+
+      {open && (
+        <div className="border-sidebar-border/70 ml-5 space-y-1 border-l pl-3">
+          {item.children.map((child) => (
+            <NavLink
+              key={child.label}
+              href={`${base}${child.href}`}
+              label={child.label}
+              icon={child.icon}
+              pathname={pathname}
+              exact={child.exact}
+              nested
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

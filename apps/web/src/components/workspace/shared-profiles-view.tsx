@@ -82,8 +82,8 @@ export function SharedProfilesView({ organisationSlug }: { organisationSlug: str
   return (
     <PageLayout width="wide">
       <PageHeader
-        title="Shared with us"
-        description="Consumer share links imported into this organisation before any assessed case or billable usage is created."
+        title="Shared links"
+        description="Import consumer share links into this organisation before any assessed case or billable usage is created."
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -92,7 +92,7 @@ export function SharedProfilesView({ organisationSlug }: { organisationSlug: str
             title={
               <span className="flex items-center gap-2">
                 <ShieldCheck className="text-brand h-4 w-4" />
-                Imported shares
+                Imported links
               </span>
             }
           >

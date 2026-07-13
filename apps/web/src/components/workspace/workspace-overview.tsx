@@ -116,8 +116,8 @@ export function WorkspaceOverview({ organisationSlug }: { organisationSlug: stri
             <WorkflowLink
               href={`/workspace/o/${organisation.slug}/requests`}
               icon={FileClock}
-              title="Assessment requests"
-              body="Create invitations and track applicant completion before delivery."
+              title="Applicant intake"
+              body="Request applicant assessments or import existing consumer share links."
             />
           </div>
         </Section>
