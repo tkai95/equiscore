@@ -6,11 +6,14 @@ import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
+  CheckCircle2,
   ClipboardCheck,
   FileText,
   MessageSquarePlus,
+  RotateCcw,
   Send,
   ShieldCheck,
+  XCircle,
 } from 'lucide-react'
 import {
   workspaceApi,
@@ -53,6 +56,8 @@ const STATUS_TONES: Record<string, StatusTone> = {
   additional_information_required: 'warning',
   guarantor_or_alternative_route_required: 'warning',
   referred_for_manual_review: 'info',
+  open: 'warning',
+  resolved: 'success',
   declined: 'danger',
   withdrawn: 'neutral',
   expired_without_decision: 'danger',
@@ -197,6 +202,28 @@ export function AssessmentCaseDetailView({
         requestedFields: '',
         dueAt: '',
       })
+    },
+  })
+
+  const updateInformationRequestStatus = useMutation({
+    mutationFn: async ({
+      id,
+      status,
+    }: {
+      id: string
+      status: 'open' | 'resolved' | 'cancelled'
+    }) => {
+      const token = await getToken()
+      return workspaceApi.organisations.updateInformationRequestStatus(
+        token!,
+        organisationSlug,
+        caseId,
+        id,
+        { status }
+      )
+    },
+    onSuccess: (updated) => {
+      refreshCase(updated)
     },
   })
 
@@ -681,6 +708,77 @@ export function AssessmentCaseDetailView({
                         </p>
                       </div>
                     )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {request.status === 'applicant_responded' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() =>
+                            updateInformationRequestStatus.mutate({
+                              id: request.id,
+                              status: 'resolved',
+                            })
+                          }
+                          loading={
+                            updateInformationRequestStatus.isPending &&
+                            updateInformationRequestStatus.variables?.id === request.id &&
+                            updateInformationRequestStatus.variables?.status === 'resolved'
+                          }
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Resolve
+                        </Button>
+                      )}
+                      {(request.status === 'applicant_responded' ||
+                        request.status === 'resolved') && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            updateInformationRequestStatus.mutate({
+                              id: request.id,
+                              status: 'open',
+                            })
+                          }
+                          loading={
+                            updateInformationRequestStatus.isPending &&
+                            updateInformationRequestStatus.variables?.id === request.id &&
+                            updateInformationRequestStatus.variables?.status === 'open'
+                          }
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Reopen
+                        </Button>
+                      )}
+                      {request.status === 'open' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() =>
+                            updateInformationRequestStatus.mutate({
+                              id: request.id,
+                              status: 'cancelled',
+                            })
+                          }
+                          loading={
+                            updateInformationRequestStatus.isPending &&
+                            updateInformationRequestStatus.variables?.id === request.id &&
+                            updateInformationRequestStatus.variables?.status === 'cancelled'
+                          }
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                    {updateInformationRequestStatus.isError &&
+                      updateInformationRequestStatus.variables?.id === request.id && (
+                        <p className="text-danger-strong mt-2 text-xs">
+                          {(updateInformationRequestStatus.error as Error).message}
+                        </p>
+                      )}
                   </Cell>
                   <Cell muted>{formatMaybeDate(request.createdAt)}</Cell>
                 </tr>

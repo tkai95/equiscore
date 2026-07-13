@@ -6,13 +6,19 @@ import {
 } from '@nestjs/common'
 import { createHash, randomBytes } from 'crypto'
 import { db } from '@equiscore/database'
-import type { CompanyAssessmentType, CompanyDecision, Prisma } from '@equiscore/database'
+import type {
+  CompanyAssessmentType,
+  CompanyDecision,
+  InformationRequestStatus,
+  Prisma,
+} from '@equiscore/database'
 import type { OrganisationContext } from '../organisations/organisation-context'
 import type {
   CreateAssessmentRequestDto,
   RecordCaseDecisionDto,
   RespondToInformationRequestDto,
   RequestCaseInformationDto,
+  UpdateInformationRequestStatusDto,
 } from './assessment-requests.dto'
 
 const COMPANY_REQUEST_CONSENT_VERSION = 'company-request-mvp-2026-07-12'
@@ -506,6 +512,83 @@ export class AssessmentsService {
             requestType,
             requestedFields,
             dueAt: dueAt?.toISOString() ?? null,
+          }),
+        },
+      })
+    })
+
+    return this.getCase(context, caseId)
+  }
+
+  async updateInformationRequestStatus(
+    context: OrganisationContext,
+    caseId: string,
+    informationRequestId: string,
+    actorId: string,
+    input: UpdateInformationRequestStatusDto
+  ) {
+    const assessmentCase = await db.assessmentCase.findFirst({
+      where: { id: caseId, organisationId: context.organisationId },
+      select: {
+        id: true,
+        status: true,
+        informationRequests: {
+          where: { id: informationRequestId },
+          select: { id: true, status: true, requestType: true },
+        },
+      },
+    })
+
+    if (!assessmentCase) throw new NotFoundException('Assessment case not found')
+
+    const informationRequest = assessmentCase.informationRequests[0] ?? null
+    if (!informationRequest) throw new NotFoundException('Information request not found')
+
+    this.assertInformationRequestTransition(informationRequest.status, input.status)
+
+    await db.$transaction(async (tx) => {
+      await tx.informationRequest.update({
+        where: { id: informationRequest.id },
+        data: {
+          status: input.status,
+          resolvedAt: input.status === 'resolved' ? new Date() : null,
+        },
+      })
+
+      const nextCaseStatus = await this.caseStatusAfterInformationRequestUpdate(
+        tx,
+        assessmentCase.id
+      )
+
+      await tx.assessmentCase.update({
+        where: { id: assessmentCase.id },
+        data: {
+          status: nextCaseStatus,
+          reviewerId: actorId,
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          assessmentCaseId: assessmentCase.id,
+          actorType: 'partner_user',
+          actorId,
+          action: `assessment_case_information_${input.status}`,
+          targetType: 'information_request',
+          targetId: informationRequest.id,
+          beforeStateReference: this.hashPayload({
+            caseStatus: assessmentCase.status,
+            informationRequestStatus: informationRequest.status,
+          }),
+          afterStateReference: this.hashPayload({
+            caseStatus: nextCaseStatus,
+            informationRequestStatus: input.status,
+          }),
+          metadata: this.asJson({
+            requestType: informationRequest.requestType,
+            previousStatus: informationRequest.status,
+            nextStatus: input.status,
           }),
         },
       })
@@ -1372,6 +1455,47 @@ export class AssessmentsService {
       .map((field) => field.trim())
       .filter(Boolean)
       .slice(0, 20)
+  }
+
+  private assertInformationRequestTransition(
+    currentStatus: InformationRequestStatus,
+    nextStatus: 'open' | 'resolved' | 'cancelled'
+  ) {
+    if (currentStatus === nextStatus) return
+    if (currentStatus === 'cancelled') {
+      throw new BadRequestException('Cancelled information requests cannot be changed')
+    }
+    if (nextStatus === 'resolved' && currentStatus !== 'applicant_responded') {
+      throw new BadRequestException('Only applicant responses can be resolved')
+    }
+    if (
+      nextStatus === 'open' &&
+      currentStatus !== 'applicant_responded' &&
+      currentStatus !== 'resolved'
+    ) {
+      throw new BadRequestException('Only responded or resolved requests can be reopened')
+    }
+    if (nextStatus === 'cancelled' && currentStatus === 'resolved') {
+      throw new BadRequestException('Resolved information requests cannot be cancelled')
+    }
+  }
+
+  private async caseStatusAfterInformationRequestUpdate(
+    tx: Prisma.TransactionClient,
+    assessmentCaseId: string
+  ) {
+    const [openCount, respondedCount] = await Promise.all([
+      tx.informationRequest.count({
+        where: { assessmentCaseId, status: 'open' },
+      }),
+      tx.informationRequest.count({
+        where: { assessmentCaseId, status: 'applicant_responded' },
+      }),
+    ])
+
+    if (openCount > 0) return 'information_requested'
+    if (respondedCount > 0) return 'applicant_responded'
+    return 'under_review'
   }
 
   private caseStatusForDecision(decision: CompanyDecision) {

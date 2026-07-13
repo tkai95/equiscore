@@ -1212,7 +1212,7 @@ Immediate next slices, in order:
    - Done: added an organisation-scoped assessment case detail API and first partner-facing case detail page with snapshot, consent/request context, financial summaries, criteria results, review activity, and audit trail.
    - Done: added case detail reviewer actions for recording company decisions and requesting more information, with organisation audit events.
    - Done: added applicant response handling on the secure request link for open information requests, including partner-visible responses and audit events.
-   - Add partner-side resolve/reopen controls for information requests.
+   - Done: added partner-side resolve, reopen, and cancel controls for information requests.
    - Keep company decisions separate from EquiScore outcome.
 
 5. **Policy builder foundation**

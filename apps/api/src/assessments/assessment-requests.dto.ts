@@ -104,3 +104,8 @@ export class RespondToInformationRequestDto {
   @MaxLength(4000)
   response!: string
 }
+
+export class UpdateInformationRequestStatusDto {
+  @IsIn(['open', 'resolved', 'cancelled'])
+  status!: 'open' | 'resolved' | 'cancelled'
+}

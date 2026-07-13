@@ -312,6 +312,10 @@ export interface RequestWorkspaceCaseInformationInput {
   dueAt?: string
 }
 
+export interface UpdateWorkspaceInformationRequestStatusInput {
+  status: 'open' | 'resolved' | 'cancelled'
+}
+
 export interface WorkspaceSharedProfile {
   id: string
   status: string
@@ -560,6 +564,22 @@ export const workspaceApi = {
         `/organisations/${encodeURIComponent(
           organisationSlug
         )}/assessment-cases/${encodeURIComponent(caseId)}/information-requests`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    updateInformationRequestStatus: (
+      token: string,
+      organisationSlug: string,
+      caseId: string,
+      informationRequestId: string,
+      data: UpdateWorkspaceInformationRequestStatusInput
+    ) =>
+      workspaceFetch<WorkspaceAssessmentCaseDetail>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/assessment-cases/${encodeURIComponent(
+          caseId
+        )}/information-requests/${encodeURIComponent(informationRequestId)}/status`,
         { method: 'POST', body: JSON.stringify(data) },
         token
       ),

@@ -11,6 +11,7 @@ import {
   CreateAssessmentRequestDto,
   RecordCaseDecisionDto,
   RequestCaseInformationDto,
+  UpdateInformationRequestStatusDto,
 } from './assessment-requests.dto'
 import { AssessmentsService } from './assessments.service'
 
@@ -56,6 +57,24 @@ export class AssessmentsController {
     @Body() body: RequestCaseInformationDto
   ) {
     return this.assessments.requestCaseInformation(organisation, caseId, user.dbUserId!, body)
+  }
+
+  @Post('assessment-cases/:caseId/information-requests/:informationRequestId/status')
+  @ApiOperation({ summary: 'Update an assessment information request status' })
+  async updateInformationRequestStatus(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('caseId') caseId: string,
+    @Param('informationRequestId') informationRequestId: string,
+    @Body() body: UpdateInformationRequestStatusDto
+  ) {
+    return this.assessments.updateInformationRequestStatus(
+      organisation,
+      caseId,
+      informationRequestId,
+      user.dbUserId!,
+      body
+    )
   }
 
   @Get('assessment-requests')
