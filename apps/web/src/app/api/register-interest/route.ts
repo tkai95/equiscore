@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { Pool } from 'pg'
 
 let pool: Pool | null = null
+const DEFAULT_EMAIL_LOGO_URL = 'https://www.equiscore.app/EquiScore_Full_Logo.svg'
 
 type WaitlistPayload = {
   email?: string
@@ -201,6 +202,7 @@ function waitlistEmailInput(to: string, profileType: 'individual' | 'business') 
 }
 
 function renderWaitlistHtml(input: ReturnType<typeof waitlistEmailInput>): string {
+  const logoUrl = configValue('EMAIL_LOGO_URL') ?? DEFAULT_EMAIL_LOGO_URL
   const details = input.details
     .map(
       (detail) => `
@@ -233,10 +235,13 @@ function renderWaitlistHtml(input: ReturnType<typeof waitlistEmailInput>): strin
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
                     <td>
-                      <table role="presentation" cellspacing="0" cellpadding="0">
+                      <table role="presentation" cellspacing="0" cellpadding="0" style="background: #fffdf5; border-radius: 14px;">
                         <tr>
-                          <td style="width: 38px; height: 38px; border-radius: 12px; background: #fffdf5; color: #064638; font-size: 24px; font-weight: 800; text-align: center; line-height: 38px;">E</td>
-                          <td style="padding-left: 12px; color: #fffdf5; font-size: 22px; font-weight: 700; letter-spacing: 0;">EquiScore</td>
+                          <td style="padding: 9px 12px;">
+                            <img src="${escapeAttribute(
+                              logoUrl
+                            )}" width="160" alt="EquiScore" style="display: block; width: 160px; max-width: 160px; height: auto; border: 0; outline: none; text-decoration: none;" />
+                          </td>
                         </tr>
                       </table>
                     </td>

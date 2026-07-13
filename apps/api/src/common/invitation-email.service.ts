@@ -34,6 +34,7 @@ interface InvitationEmailInput extends Omit<BrandedEmailInput, 'ctaLabel' | 'cta
 @Injectable()
 export class InvitationEmailService {
   private readonly logger = new Logger(InvitationEmailService.name)
+  private readonly defaultLogoUrl = 'https://www.equiscore.app/EquiScore_Full_Logo.svg'
 
   constructor(private readonly config: ConfigService) {}
 
@@ -122,6 +123,7 @@ export class InvitationEmailService {
   }
 
   private renderHtml(input: BrandedEmailInput): string {
+    const logoUrl = this.configValue('EMAIL_LOGO_URL') ?? this.defaultLogoUrl
     const details = (input.details ?? [])
       .map(
         (detail) => `
@@ -186,10 +188,13 @@ export class InvitationEmailService {
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
                     <td>
-                      <table role="presentation" cellspacing="0" cellpadding="0">
+                      <table role="presentation" cellspacing="0" cellpadding="0" style="background: #fffdf5; border-radius: 14px;">
                         <tr>
-                          <td style="width: 38px; height: 38px; border-radius: 12px; background: #fffdf5; color: #064638; font-size: 24px; font-weight: 800; text-align: center; line-height: 38px;">E</td>
-                          <td style="padding-left: 12px; color: #fffdf5; font-size: 22px; font-weight: 700; letter-spacing: 0;">EquiScore</td>
+                          <td style="padding: 9px 12px;">
+                            <img src="${this.escapeAttribute(
+                              logoUrl
+                            )}" width="160" alt="EquiScore" style="display: block; width: 160px; max-width: 160px; height: auto; border: 0; outline: none; text-decoration: none;" />
+                          </td>
                         </tr>
                       </table>
                     </td>
