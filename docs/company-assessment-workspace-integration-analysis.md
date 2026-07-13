@@ -388,6 +388,8 @@ Existing `SharedProfile` should stay as the one-off share-link mechanism. Do not
 - When accepted, create a formal `AssessmentCase`, `ConsentRecord`, `ProfileSnapshot`, `CriterionResult` rows, and a `UsageEvent`.
 - Add a partner workspace intake action where an authorised partner pastes a share link/code. The API resolves the share token, verifies it is active and unrevoked, creates the organisation intake row, and keeps the item visible under "Shared with us" until accepted, declined, or assessed.
 - Do not rely on a generic public share view as the system of record for partner workflows. Public share links remain viewer links; partner intake turns the share into a logged, organisation-scoped workflow item.
+- At share creation, the applicant should choose between a generic share and a partner share. A generic share creates a public recipient link only. A partner share creates a link/code explicitly intended for partner workspace intake, with copy that tells the applicant to give it to the partner so they can import it inside their EquiScore workspace.
+- Naming or selecting a partner at share creation must not by itself consume partner allowance or create a billable event. Partner usage starts only when an authorised partner imports/accepts the share inside their workspace and an assessment is delivered through the organisation-scoped case flow.
 
 This preserves the public share product while giving company customers proper case management.
 
@@ -900,23 +902,26 @@ This should list organisations with active or historic access, consent expiry, a
 
 Recommended implementation:
 
-1. Applicant creates a normal EquiScore share link/code from the consumer dashboard.
-2. Applicant sends the link/code to a partner outside EquiScore, or chooses a partner destination inside EquiScore once partner discovery exists.
-3. Authorised partner opens `Shared with us` and pastes the share link/code into an intake form.
-4. API resolves the `SharedProfile`, verifies expiry/revocation/freshness, and creates an `OrganisationSharedProfile` intake row scoped to that organisation.
-5. If the share has not already granted explicit company consent for this organisation and purpose, the applicant is prompted to authorise the partner before an assessment case can be delivered.
-6. Applicant sees company name, purpose, requested data categories, proposed commitment where relevant, consent expiry, and can approve or decline.
-7. Company sees the row in "Shared with us" with status such as awaiting applicant authorisation, ready to assess, declined, duplicate, expired, or assessed.
-8. Company chooses "Accept and assess".
-9. API validates active consent and data sufficiency.
-10. Create `ProfileSnapshot`.
-11. Evaluate active `PolicyVersion`.
-12. Create `AssessmentCase`.
-13. Create `CriterionResult` rows.
-14. Append `UsageEvent`.
-15. Audit all material actions.
+1. Applicant starts from the consumer share screen and chooses share type: generic recipient share or partner workspace share.
+2. Generic recipient share creates the current one-off public link for landlords, agents, banks, or individuals who are not using the partner workspace.
+3. Partner workspace share creates a share code/link with instructions: give this to the partner so they can import it inside their EquiScore workspace.
+4. Optional later enhancement: applicant can search/select a known partner. That may create a non-billable pending intake or notification, but it must not consume partner allowance until the partner accepts/imports and an assessment is delivered.
+5. Applicant sends the link/code to a partner outside EquiScore, or chooses a partner destination inside EquiScore once partner discovery exists.
+6. Authorised partner opens `Shared with us` and pastes the share link/code into an intake form.
+7. API resolves the `SharedProfile`, verifies expiry/revocation/freshness, and creates an `OrganisationSharedProfile` intake row scoped to that organisation.
+8. If the share has not already granted explicit company consent for this organisation and purpose, the applicant is prompted to authorise the partner before an assessment case can be delivered.
+9. Applicant sees company name, purpose, requested data categories, proposed commitment where relevant, consent expiry, and can approve or decline.
+10. Company sees the row in "Shared with us" with status such as awaiting applicant authorisation, ready to assess, declined, duplicate, expired, or assessed.
+11. Company chooses "Accept and assess".
+12. API validates active consent and data sufficiency.
+13. Create `ProfileSnapshot`.
+14. Evaluate active `PolicyVersion`.
+15. Create `AssessmentCase`.
+16. Create `CriterionResult` rows.
+17. Append `UsageEvent`.
+18. Audit all material actions.
 
-Credit is consumed only at step 14.
+Credit is consumed only at step 17.
 
 ### Company-Initiated Request
 
