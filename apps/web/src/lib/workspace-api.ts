@@ -47,6 +47,49 @@ export interface WorkspaceOverview {
   }
 }
 
+export interface WorkspaceTeamMember {
+  id: string
+  role: string
+  status: string
+  invitedAt: string | null
+  joinedAt: string | null
+  lastActiveAt: string | null
+  user: {
+    id: string
+    name: string
+    email: string
+  }
+}
+
+export interface WorkspaceInvitationEmailDelivery {
+  attempted: boolean
+  sent: boolean
+  provider: string
+  reason?: string
+  messageId?: string
+}
+
+export interface WorkspaceTeamInvitation {
+  id: string
+  email: string
+  role: string
+  status: string
+  token: string
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
+  emailDelivery?: WorkspaceInvitationEmailDelivery
+}
+
+export interface WorkspaceTeamSettings {
+  organisation: Omit<WorkspaceOrganisation, 'member'>
+  member: WorkspaceOrganisation['member']
+  members: WorkspaceTeamMember[]
+  invitations: WorkspaceTeamInvitation[]
+}
+
 interface PersonRef {
   id: string | null
   name: string
@@ -192,6 +235,54 @@ export const workspaceApi = {
       workspaceFetch<WorkspaceOverview>(
         `/organisations/${encodeURIComponent(organisationSlug)}/overview`,
         {},
+        token
+      ),
+    team: (token: string, organisationSlug: string) =>
+      workspaceFetch<WorkspaceTeamSettings>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/team`,
+        {},
+        token
+      ),
+    inviteMember: (
+      token: string,
+      organisationSlug: string,
+      data: { email: string; role?: string }
+    ) =>
+      workspaceFetch<WorkspaceTeamInvitation>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/invitations`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    resendInvitation: (token: string, organisationSlug: string, invitationId: string) =>
+      workspaceFetch<WorkspaceTeamInvitation>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/invitations/${encodeURIComponent(invitationId)}/resend`,
+        { method: 'POST' },
+        token
+      ),
+    revokeInvitation: (token: string, organisationSlug: string, invitationId: string) =>
+      workspaceFetch<WorkspaceTeamInvitation>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/invitations/${encodeURIComponent(invitationId)}/revoke`,
+        { method: 'POST' },
+        token
+      ),
+    updateMemberRole: (token: string, organisationSlug: string, memberId: string, role: string) =>
+      workspaceFetch<WorkspaceTeamMember>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/members/${encodeURIComponent(
+          memberId
+        )}/role`,
+        { method: 'POST', body: JSON.stringify({ role }) },
+        token
+      ),
+    removeMember: (token: string, organisationSlug: string, memberId: string) =>
+      workspaceFetch<WorkspaceTeamMember>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/members/${encodeURIComponent(
+          memberId
+        )}/remove`,
+        { method: 'POST' },
         token
       ),
     cases: (token: string, organisationSlug: string) =>

@@ -1,10 +1,5 @@
-import { WorkspacePlaceholder } from '@/components/workspace/workspace-placeholder'
+import { TeamSettingsView } from '@/components/workspace/team-settings-view'
 
-export default function SettingsPage() {
-  return (
-    <WorkspacePlaceholder
-      title="Team & settings"
-      description="Manage company members, roles and organisation-level settings."
-    />
-  )
+export default function SettingsPage({ params }: { params: { organisationSlug: string } }) {
+  return <TeamSettingsView organisationSlug={params.organisationSlug} />
 }

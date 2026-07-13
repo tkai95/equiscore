@@ -59,6 +59,7 @@ Built:
 - Admin access clarity added: an authenticated but unauthorised email sees an "Admin access required" screen before any admin sidebar or admin data renders.
 - Internal admin and partner organisation invitations now have database-backed copy-link, resend, revoke, accepted, pending, expired, and revoked management states in the admin UI.
 - Invite email delivery has been wired through Resend for internal admin and partner organisation create/resend flows, with safe fallback messaging when live email variables are not configured.
+- Partner workspace team management is now available under Team & settings: members can be invited, invitation emails can be resent, invitations can be revoked, member roles can be updated, and members can be removed by roles with `members:manage`.
 - The product URL decision is reflected in UI copy and middleware as `partners.equiscore.app/o/{organisationSlug}/...` while the app route group remains `/workspace` for the monorepo implementation.
 - The workspace shell has been aligned with the existing consumer dashboard styling so the partner layer feels like part of EquiScore while remaining a distinct product surface.
 
@@ -77,7 +78,7 @@ Known remaining setup:
 
 - Environment variables must remain deployment/local-only and must not be committed. Clerk, database, API, and domain values should be managed per environment.
 - Invite email delivery is code-wired through Resend. Live deployment requires `RESEND_API_KEY` and `INVITE_EMAIL_FROM=EquiScore <noreply@equiscore.app>` in the API service environment.
-- Partner team management is still mostly admin-operated. Partner owners/admins should later be able to invite, suspend, and remove members within their own organisation.
+- Partner team management has a first workspace-owned implementation for invite, resend, revoke, role update, and remove actions. More granular suspension/reactivation and notification analytics remain future hardening.
 - Case detail, reviewer workflow depth, policy builder, missing-information workflows, billing exports, and tenant-isolation tests remain to be built.
 - Tests/CI still need to be introduced; current verification is schema validation, TypeScript, and production build.
 
@@ -1166,9 +1167,9 @@ Immediate next slices, in order:
    - Remaining: add branded email analytics/bounce visibility after the first real invite traffic.
 
 2. **Partner team management**
-   - Let partner owners/admins invite and remove their own organisation members.
-   - Enforce role capabilities in both UI and API.
-   - Audit all membership and role changes.
+   - Done: partner owners/admins with `members:manage` can invite members, resend/revoke invitations, update roles, and remove members inside their own organisation.
+   - Done: membership and invitation actions are organisation-audited.
+   - Remaining: add suspend/reactivate flows, owner transfer polish, and notification analytics.
 
 3. **Assessment case detail and reviewer workflow**
    - Build case detail view with snapshot, criteria, evidence summary, notes, status, and decision controls.

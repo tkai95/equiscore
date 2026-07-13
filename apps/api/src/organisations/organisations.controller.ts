@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -38,5 +38,74 @@ export class OrganisationsController {
   @ApiOperation({ summary: 'Get company workspace overview metrics' })
   async overview(@CurrentOrganisation() organisation: OrganisationContext) {
     return this.organisations.getOverview(organisation)
+  }
+
+  @Get(':organisationSlug/team')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get organisation members and invitations' })
+  async team(@CurrentOrganisation() organisation: OrganisationContext) {
+    return this.organisations.getTeamSettings(organisation)
+  }
+
+  @Post(':organisationSlug/invitations')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Invite a member into the current organisation' })
+  async inviteMember(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Body() body: { email: string; role?: string }
+  ) {
+    return this.organisations.inviteMember(user.dbUserId!, organisation, body)
+  }
+
+  @Post(':organisationSlug/invitations/:invitationId/resend')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh an organisation member invitation' })
+  async resendInvitation(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.organisations.resendInvitation(user.dbUserId!, organisation, invitationId)
+  }
+
+  @Post(':organisationSlug/invitations/:invitationId/revoke')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke an organisation member invitation' })
+  async revokeInvitation(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.organisations.revokeInvitation(user.dbUserId!, organisation, invitationId)
+  }
+
+  @Post(':organisationSlug/members/:memberId/role')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update an organisation member role' })
+  async updateMemberRole(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('memberId') memberId: string,
+    @Body() body: { role: string }
+  ) {
+    return this.organisations.updateMemberRole(user.dbUserId!, organisation, memberId, body.role)
+  }
+
+  @Post(':organisationSlug/members/:memberId/remove')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove an organisation member' })
+  async removeMember(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('memberId') memberId: string
+  ) {
+    return this.organisations.removeMember(user.dbUserId!, organisation, memberId)
   }
 }
