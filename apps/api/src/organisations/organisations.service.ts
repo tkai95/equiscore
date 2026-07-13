@@ -1,16 +1,21 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { db } from '@equiscore/database'
+import { db, type Prisma } from '@equiscore/database'
 import { randomBytes } from 'crypto'
 import {
   InvitationEmailService,
   type InvitationEmailDelivery,
 } from '../common/invitation-email.service'
-import { permissionsForRole, type OrganisationRole } from './permissions'
+import {
+  permissionsForRole,
+  type OrganisationPermission,
+  type OrganisationRole,
+} from './permissions'
 import type { OrganisationContext } from './organisation-context'
 
 interface CreateOrganisationInput {
@@ -21,6 +26,10 @@ interface CreateOrganisationInput {
 interface InviteOrganisationMemberInput {
   email: string
   role?: string
+}
+
+interface ImportOrganisationSharedProfileInput {
+  shareCode?: string
 }
 
 const ORGANISATION_ROLES: OrganisationRole[] = [
@@ -263,6 +272,102 @@ export class OrganisationsService {
       })),
       invitations: invitations.map((invitation) => this.mapInvitation(invitation)),
     }
+  }
+
+  async listSharedProfiles(context: OrganisationContext) {
+    this.requirePermission(context, 'assessments:read')
+
+    const intakes = await db.organisationSharedProfile.findMany({
+      where: { organisationId: context.organisationId },
+      orderBy: { importedAt: 'desc' },
+      take: 100,
+      include: this.organisationSharedProfileInclude(),
+    })
+
+    const now = new Date()
+    return intakes.map((item) => this.mapOrganisationSharedProfile(item, now))
+  }
+
+  async importSharedProfile(
+    actorUserId: string,
+    context: OrganisationContext,
+    input: ImportOrganisationSharedProfileInput
+  ) {
+    this.requirePermission(context, 'assessments:write')
+
+    const shareToken = this.extractShareToken(input.shareCode)
+    if (!shareToken) throw new BadRequestException('Share link or code is required')
+
+    const sharedProfile = await db.sharedProfile.findUnique({
+      where: { shareToken },
+      include: {
+        user: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        trustScore: {
+          select: {
+            id: true,
+            overallScore: true,
+            overallTier: true,
+            computedAt: true,
+            financialDataAsOf: true,
+            validUntil: true,
+          },
+        },
+      },
+    })
+
+    if (!sharedProfile) throw new NotFoundException('Share link not found')
+    if (sharedProfile.revokedAt) {
+      throw new ForbiddenException('The applicant has revoked this share link')
+    }
+    if (sharedProfile.expiresAt < new Date()) {
+      throw new ForbiddenException('This share link has expired')
+    }
+
+    const include = this.organisationSharedProfileInclude()
+    const existing = await db.organisationSharedProfile.findUnique({
+      where: {
+        organisationId_sharedProfileId: {
+          organisationId: context.organisationId,
+          sharedProfileId: sharedProfile.id,
+        },
+      },
+      include,
+    })
+    if (existing) return this.mapOrganisationSharedProfile(existing)
+
+    const intake = await db.$transaction(async (tx) => {
+      const created = await tx.organisationSharedProfile.create({
+        data: {
+          organisationId: context.organisationId,
+          sharedProfileId: sharedProfile.id,
+          importedById: actorUserId,
+          status: 'ready_to_assess',
+          source: 'partner_import',
+        },
+        include,
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: actorUserId,
+          action: 'organisation_shared_profile_imported',
+          targetType: 'organisation_shared_profile',
+          targetId: created.id,
+          metadata: {
+            sharedProfileId: sharedProfile.id,
+            applicantId: sharedProfile.userId,
+            shareTokenSuffix: shareToken.slice(-6),
+            source: 'partner_import',
+          },
+        },
+      })
+
+      return created
+    })
+
+    return this.mapOrganisationSharedProfile(intake)
   }
 
   async inviteMember(
@@ -601,10 +706,7 @@ export class OrganisationsService {
     throw new ConflictException('Unsupported organisation role')
   }
 
-  private requirePermission(
-    context: OrganisationContext,
-    permission: 'members:manage' | 'organisation:read'
-  ) {
+  private requirePermission(context: OrganisationContext, permission: OrganisationPermission) {
     if (!context.permissions.includes(permission)) {
       throw new ForbiddenException('This partner role cannot perform that action')
     }
@@ -715,6 +817,93 @@ export class OrganisationsService {
       createdAt: invitation.createdAt,
       updatedAt: invitation.updatedAt,
     }
+  }
+
+  private organisationSharedProfileInclude() {
+    return {
+      sharedProfile: {
+        include: {
+          user: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          trustScore: {
+            select: {
+              id: true,
+              overallScore: true,
+              overallTier: true,
+              computedAt: true,
+              financialDataAsOf: true,
+              validUntil: true,
+            },
+          },
+        },
+      },
+      importedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+    } satisfies Prisma.OrganisationSharedProfileInclude
+  }
+
+  private mapOrganisationSharedProfile(
+    item: Prisma.OrganisationSharedProfileGetPayload<{
+      include: ReturnType<OrganisationsService['organisationSharedProfileInclude']>
+    }>,
+    now = new Date()
+  ) {
+    const shareStatus = item.sharedProfile.revokedAt
+      ? 'revoked'
+      : item.sharedProfile.expiresAt < now
+        ? 'expired'
+        : item.status
+
+    return {
+      id: item.id,
+      status: shareStatus,
+      source: item.source,
+      notes: item.notes,
+      importedAt: item.importedAt,
+      updatedAt: item.updatedAt,
+      acceptedAt: item.acceptedAt,
+      declinedAt: item.declinedAt,
+      assessedAt: item.assessedAt,
+      applicant: this.mapMemberPerson(item.sharedProfile.user),
+      importedBy: this.mapMemberPerson(item.importedBy),
+      share: {
+        id: item.sharedProfile.id,
+        path: `/share/${item.sharedProfile.shareToken}`,
+        tokenPreview: `...${item.sharedProfile.shareToken.slice(-6)}`,
+        targetType: item.sharedProfile.targetType,
+        targetName: item.sharedProfile.targetName,
+        expiresAt: item.sharedProfile.expiresAt,
+        createdAt: item.sharedProfile.createdAt,
+        revokedAt: item.sharedProfile.revokedAt,
+        viewCount: item.sharedProfile.viewCount,
+        lastViewedAt: item.sharedProfile.lastViewedAt,
+      },
+      trustScore: {
+        id: item.sharedProfile.trustScore.id,
+        overallScore: item.sharedProfile.trustScore.overallScore,
+        overallTier: item.sharedProfile.trustScore.overallTier,
+        computedAt: item.sharedProfile.trustScore.computedAt,
+        financialDataAsOf: item.sharedProfile.trustScore.financialDataAsOf,
+        validUntil: item.sharedProfile.trustScore.validUntil,
+      },
+    }
+  }
+
+  private extractShareToken(value: string | undefined | null): string {
+    const raw = value?.trim() ?? ''
+    if (!raw) return ''
+
+    let candidate = raw
+    try {
+      const url = new URL(raw)
+      const parts = url.pathname.split('/').filter(Boolean)
+      candidate = parts[parts.length - 1] ?? ''
+    } catch {
+      const withoutQuery = raw.split(/[?#]/)[0] ?? raw
+      const parts = withoutQuery.split('/').filter(Boolean)
+      candidate = parts[parts.length - 1] ?? withoutQuery
+    }
+
+    const token = candidate.trim()
+    return /^[A-Za-z0-9_-]{16,256}$/.test(token) ? token : ''
   }
 
   private async claimPendingInvitations(userId: string, email: string | undefined) {

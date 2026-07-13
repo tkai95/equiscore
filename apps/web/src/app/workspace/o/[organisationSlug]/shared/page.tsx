@@ -1,10 +1,5 @@
-import { WorkspacePlaceholder } from '@/components/workspace/workspace-placeholder'
+import { SharedProfilesView } from '@/components/workspace/shared-profiles-view'
 
-export default function SharedWithUsPage() {
-  return (
-    <WorkspacePlaceholder
-      title="Shared with us"
-      description="Accept user-initiated shares into structured company assessment cases."
-    />
-  )
+export default function SharedWithUsPage({ params }: { params: { organisationSlug: string } }) {
+  return <SharedProfilesView organisationSlug={params.organisationSlug} />
 }

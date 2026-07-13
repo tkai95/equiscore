@@ -22,43 +22,44 @@ model User {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  profile                          UserProfile?
-  addresses                        UserAddress[]
-  employment                       EmploymentProfile[]
-  bankConnections                  BankConnection[]
-  documents                        UploadedDocument[]
-  rentalProfiles                   RentalProfile[]
-  trustFeatures                    TrustFeature[]
-  trustScores                      TrustScore[]
-  sharedProfiles                   SharedProfile[]
-  statementImportJobs              StatementImportJob[]
-  insightQuestionAnswers           InsightQuestionAnswer[]
-  auditEvents                      AuditEvent[]
-  organisationMemberships          OrganisationMember[]
-  createdAssessmentRequests        AssessmentRequest[]       @relation("AssessmentRequestCreator")
-  applicantAssessmentRequests      AssessmentRequest[]       @relation("AssessmentRequestApplicant")
-  companyConsents                  CompanyConsent[]
-  assessmentSnapshots              AssessmentSnapshot[]
-  applicantAssessmentCases         AssessmentCase[]          @relation("AssessmentApplicant")
-  assignedAssessmentCases          AssessmentCase[]          @relation("AssessmentReviewer")
-  createdPolicies                  Policy[]                  @relation("PolicyCreator")
-  createdPolicyVersions            PolicyVersion[]           @relation("PolicyVersionCreator")
-  approvedPolicyVersions           PolicyVersion[]           @relation("PolicyVersionApprover")
-  caseNotes                        CaseNote[]
-  caseDecisions                    CaseDecision[]
-  applicantUsageEvents             UsageEvent[]              @relation("UsageApplicant")
-  initiatedUsageEvents             UsageEvent[]              @relation("UsageInitiator")
-  organisationInvitationsSent      OrganisationInvitation[]  @relation("OrganisationInvitationInviter")
-  organisationInvitationsAccepted  OrganisationInvitation[]  @relation("OrganisationInvitationAccepter")
-  internalAdminAccesses            InternalAdminAccess[]     @relation("InternalAdminAccessUser")
-  grantedInternalAdminAccesses     InternalAdminAccess[]     @relation("InternalAdminAccessGrantor")
-  internalAdminInvitationsSent     InternalAdminInvitation[] @relation("InternalAdminInvitationInviter")
-  internalAdminInvitationsAccepted InternalAdminInvitation[] @relation("InternalAdminInvitationAccepter")
-  internalAdminAuditEvents         InternalAdminAuditEvent[] @relation("InternalAdminAuditActor")
-  commitmentSettings               CommitmentSetting[]
-  reminders                        Reminder[]
-  savingsGoals                     SavingsGoal[]
-  compassDismissals                CompassDismissal[]
+  profile                            UserProfile?
+  addresses                          UserAddress[]
+  employment                         EmploymentProfile[]
+  bankConnections                    BankConnection[]
+  documents                          UploadedDocument[]
+  rentalProfiles                     RentalProfile[]
+  trustFeatures                      TrustFeature[]
+  trustScores                        TrustScore[]
+  sharedProfiles                     SharedProfile[]
+  importedOrganisationSharedProfiles OrganisationSharedProfile[] @relation("OrganisationSharedProfileImporter")
+  statementImportJobs                StatementImportJob[]
+  insightQuestionAnswers             InsightQuestionAnswer[]
+  auditEvents                        AuditEvent[]
+  organisationMemberships            OrganisationMember[]
+  createdAssessmentRequests          AssessmentRequest[]         @relation("AssessmentRequestCreator")
+  applicantAssessmentRequests        AssessmentRequest[]         @relation("AssessmentRequestApplicant")
+  companyConsents                    CompanyConsent[]
+  assessmentSnapshots                AssessmentSnapshot[]
+  applicantAssessmentCases           AssessmentCase[]            @relation("AssessmentApplicant")
+  assignedAssessmentCases            AssessmentCase[]            @relation("AssessmentReviewer")
+  createdPolicies                    Policy[]                    @relation("PolicyCreator")
+  createdPolicyVersions              PolicyVersion[]             @relation("PolicyVersionCreator")
+  approvedPolicyVersions             PolicyVersion[]             @relation("PolicyVersionApprover")
+  caseNotes                          CaseNote[]
+  caseDecisions                      CaseDecision[]
+  applicantUsageEvents               UsageEvent[]                @relation("UsageApplicant")
+  initiatedUsageEvents               UsageEvent[]                @relation("UsageInitiator")
+  organisationInvitationsSent        OrganisationInvitation[]    @relation("OrganisationInvitationInviter")
+  organisationInvitationsAccepted    OrganisationInvitation[]    @relation("OrganisationInvitationAccepter")
+  internalAdminAccesses              InternalAdminAccess[]       @relation("InternalAdminAccessUser")
+  grantedInternalAdminAccesses       InternalAdminAccess[]       @relation("InternalAdminAccessGrantor")
+  internalAdminInvitationsSent       InternalAdminInvitation[]   @relation("InternalAdminInvitationInviter")
+  internalAdminInvitationsAccepted   InternalAdminInvitation[]   @relation("InternalAdminInvitationAccepter")
+  internalAdminAuditEvents           InternalAdminAuditEvent[]   @relation("InternalAdminAuditActor")
+  commitmentSettings                 CommitmentSetting[]
+  reminders                          Reminder[]
+  savingsGoals                       SavingsGoal[]
+  compassDismissals                  CompassDismissal[]
 
   @@map("users")
 }
@@ -516,9 +517,10 @@ model SharedProfile {
   // snapshot and must never change as the applicant's later evidence changes.
   insightSnapshot Json?     @map("insight_snapshot")
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trustScore      TrustScore       @relation(fields: [trustScoreId], references: [id])
-  companyConsents CompanyConsent[]
+  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustScore          TrustScore                  @relation(fields: [trustScoreId], references: [id])
+  companyConsents     CompanyConsent[]
+  organisationIntakes OrganisationSharedProfile[]
 
   @@map("shared_profiles")
 }
@@ -543,6 +545,7 @@ model Organisation {
   members                  OrganisationMember[]
   invitations              OrganisationInvitation[]
   assessmentRequests       AssessmentRequest[]
+  sharedProfiles           OrganisationSharedProfile[]
   companyConsents          CompanyConsent[]
   assessmentSnapshots      AssessmentSnapshot[]
   assessmentCases          AssessmentCase[]
@@ -639,6 +642,40 @@ enum OrganisationMemberStatus {
   removed
 
   @@map("organisation_member_status")
+}
+
+model OrganisationSharedProfile {
+  id              String                          @id @default(cuid())
+  organisationId  String                          @map("organisation_id")
+  sharedProfileId String                          @map("shared_profile_id")
+  importedById    String                          @map("imported_by_id")
+  status          OrganisationSharedProfileStatus @default(ready_to_assess)
+  source          String                          @default("partner_import")
+  notes           String?
+  importedAt      DateTime                        @default(now()) @map("imported_at")
+  updatedAt       DateTime                        @updatedAt @map("updated_at")
+  acceptedAt      DateTime?                       @map("accepted_at")
+  declinedAt      DateTime?                       @map("declined_at")
+  assessedAt      DateTime?                       @map("assessed_at")
+
+  organisation  Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  sharedProfile SharedProfile @relation(fields: [sharedProfileId], references: [id], onDelete: Cascade)
+  importedBy    User          @relation("OrganisationSharedProfileImporter", fields: [importedById], references: [id])
+
+  @@unique([organisationId, sharedProfileId])
+  @@index([organisationId, status])
+  @@index([sharedProfileId])
+  @@map("organisation_shared_profiles")
+}
+
+enum OrganisationSharedProfileStatus {
+  ready_to_assess
+  assessed
+  declined
+  expired
+  revoked
+
+  @@map("organisation_shared_profile_status")
 }
 
 model AssessmentRequest {

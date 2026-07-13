@@ -145,6 +145,40 @@ export interface CreateWorkspaceAssessmentRequestInput {
   deadline?: string
 }
 
+export interface WorkspaceSharedProfile {
+  id: string
+  status: string
+  source: string
+  notes: string | null
+  importedAt: string
+  updatedAt: string
+  acceptedAt: string | null
+  declinedAt: string | null
+  assessedAt: string | null
+  applicant: PersonRef
+  importedBy: PersonRef
+  share: {
+    id: string
+    path: string
+    tokenPreview: string
+    targetType: string | null
+    targetName: string | null
+    expiresAt: string
+    createdAt: string
+    revokedAt: string | null
+    viewCount: number
+    lastViewedAt: string | null
+  }
+  trustScore: {
+    id: string
+    overallScore: number
+    overallTier: string
+    computedAt: string
+    financialDataAsOf: string | null
+    validUntil: string | null
+  }
+}
+
 export interface PublicAssessmentRequest {
   id: string
   organisation: { id: string; name: string; slug: string }
@@ -283,6 +317,18 @@ export const workspaceApi = {
           memberId
         )}/remove`,
         { method: 'POST' },
+        token
+      ),
+    sharedProfiles: (token: string, organisationSlug: string) =>
+      workspaceFetch<WorkspaceSharedProfile[]>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/shared-profiles`,
+        {},
+        token
+      ),
+    importSharedProfile: (token: string, organisationSlug: string, data: { shareCode: string }) =>
+      workspaceFetch<WorkspaceSharedProfile>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/shared-profiles/import`,
+        { method: 'POST', body: JSON.stringify(data) },
         token
       ),
     cases: (token: string, organisationSlug: string) =>

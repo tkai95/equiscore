@@ -48,6 +48,26 @@ export class OrganisationsController {
     return this.organisations.getTeamSettings(organisation)
   }
 
+  @Get(':organisationSlug/shared-profiles')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List shared profiles imported into the current organisation' })
+  async sharedProfiles(@CurrentOrganisation() organisation: OrganisationContext) {
+    return this.organisations.listSharedProfiles(organisation)
+  }
+
+  @Post(':organisationSlug/shared-profiles/import')
+  @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Import a consumer share link into the current organisation' })
+  async importSharedProfile(
+    @CurrentUser() user: RequestUser,
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Body() body: { shareCode?: string }
+  ) {
+    return this.organisations.importSharedProfile(user.dbUserId!, organisation, body)
+  }
+
   @Post(':organisationSlug/invitations')
   @UseGuards(ClerkAuthGuard, OrganisationAccessGuard)
   @ApiBearerAuth()
