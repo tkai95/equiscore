@@ -117,6 +117,151 @@ export interface WorkspaceAssessmentCase {
   counts: { criterionResults: number; notes: number; informationRequests: number }
 }
 
+export interface WorkspaceAssessmentCaseDetail {
+  id: string
+  applicant: PersonRef
+  assessmentType: string
+  source: string
+  status: string
+  assessmentOutcome: string | null
+  assessmentConfidence: string | null
+  companyDecision: string | null
+  decisionRationale: string | null
+  reference: string | null
+  proposedCommitment: number | null
+  creditConsumed: boolean
+  assessedAt: string | null
+  expiresAt: string | null
+  closedAt: string | null
+  createdAt: string
+  updatedAt: string
+  reviewer: PersonRef | null
+  request: {
+    id: string
+    applicantEmail: string
+    applicantName: string | null
+    status: string
+    requestToken: string | null
+    requestUrl: string | null
+    deadline: string | null
+    createdAt: string
+    sentAt: string | null
+    completedAt: string | null
+  } | null
+  policy: {
+    id: string
+    versionNumber: number
+    status: string
+    effectiveFrom: string | null
+    approvedAt: string | null
+    policy: { id: string; name: string; assessmentType: string; status: string }
+  } | null
+  consent: {
+    id: string
+    status: string
+    purpose: string | null
+    permittedDataScope: unknown
+    consentTextVersion: string
+    grantedAt: string | null
+    expiresAt: string | null
+    revokedAt: string | null
+    companyReference: string | null
+    createdAt: string
+  }
+  snapshot: {
+    id: string
+    version: number
+    dataPeriodStart: string | null
+    dataPeriodEnd: string | null
+    sourceFreshness: string | null
+    permittedDataScope: unknown
+    trustScoreSummary: unknown
+    insightSummary: unknown
+    incomeSummary: unknown
+    affordabilitySummary: unknown
+    commitmentsSummary: unknown
+    verificationSummary: unknown
+    evidenceManifest: unknown
+    evidenceReferences: unknown
+    integrityHash: string
+    createdAt: string
+  }
+  criterionResults: Array<{
+    id: string
+    result: string
+    observedValue: unknown
+    thresholdValue: unknown
+    confidence: string | null
+    evidenceReferences: unknown
+    assumptions: unknown
+    missingInformation: unknown
+    createdAt: string
+    policyRule: {
+      id: string
+      name: string
+      description: string | null
+      inputField: string
+      operator: string
+      threshold: unknown
+      missingDataBehaviour: string
+      priority: number
+    } | null
+  }>
+  notes: Array<{
+    id: string
+    visibility: string
+    body: string
+    createdAt: string
+    updatedAt: string
+    author: PersonRef
+  }>
+  informationRequests: Array<{
+    id: string
+    requestType: string
+    message: string
+    requestedFields: unknown
+    status: string
+    dueAt: string | null
+    createdById: string
+    applicantResponse: string | null
+    createdAt: string
+    respondedAt: string | null
+    resolvedAt: string | null
+  }>
+  decisions: Array<{
+    id: string
+    decision: string
+    conditions: unknown
+    rationale: string
+    assessmentOutcomeAtDecision: string | null
+    overrideFlag: boolean
+    overrideReason: string | null
+    createdAt: string
+    decisionMaker: PersonRef
+  }>
+  usageEvents: Array<{
+    id: string
+    eventType: string
+    quantity: number
+    unit: string
+    occurredAt: string
+    includedOrOverage: string | null
+    currency: string
+  }>
+  auditEvents: Array<{
+    id: string
+    actorType: string
+    actorId: string | null
+    action: string
+    targetType: string
+    targetId: string | null
+    beforeStateReference: string | null
+    afterStateReference: string | null
+    metadata: unknown
+    createdAt: string
+  }>
+}
+
 export interface WorkspaceAssessmentRequest {
   id: string
   applicant: PersonRef
@@ -334,6 +479,14 @@ export const workspaceApi = {
     cases: (token: string, organisationSlug: string) =>
       workspaceFetch<WorkspaceAssessmentCase[]>(
         `/organisations/${encodeURIComponent(organisationSlug)}/assessment-cases`,
+        {},
+        token
+      ),
+    caseDetail: (token: string, organisationSlug: string, caseId: string) =>
+      workspaceFetch<WorkspaceAssessmentCaseDetail>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/assessment-cases/${encodeURIComponent(caseId)}`,
         {},
         token
       ),

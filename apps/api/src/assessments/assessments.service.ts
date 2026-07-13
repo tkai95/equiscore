@@ -152,6 +152,211 @@ export class AssessmentsService {
     }))
   }
 
+  async getCase(context: OrganisationContext, caseId: string) {
+    const assessmentCase = await db.assessmentCase.findFirst({
+      where: { id: caseId, organisationId: context.organisationId },
+      include: {
+        applicant: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        reviewer: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        assessmentRequest: {
+          select: {
+            id: true,
+            applicantEmail: true,
+            applicantName: true,
+            status: true,
+            requestToken: true,
+            deadline: true,
+            createdAt: true,
+            sentAt: true,
+            completedAt: true,
+          },
+        },
+        policyVersion: {
+          select: {
+            id: true,
+            versionNumber: true,
+            status: true,
+            effectiveFrom: true,
+            approvedAt: true,
+            policy: { select: { id: true, name: true, assessmentType: true, status: true } },
+          },
+        },
+        assessmentSnapshot: true,
+        consent: {
+          select: {
+            id: true,
+            status: true,
+            purpose: true,
+            permittedDataScope: true,
+            consentTextVersion: true,
+            grantedAt: true,
+            expiresAt: true,
+            revokedAt: true,
+            companyReference: true,
+            createdAt: true,
+          },
+        },
+        criterionResults: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            policyRule: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                inputField: true,
+                operator: true,
+                threshold: true,
+                missingDataBehaviour: true,
+                priority: true,
+              },
+            },
+          },
+        },
+        notes: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: {
+            author: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          },
+        },
+        informationRequests: { orderBy: { createdAt: 'desc' }, take: 25 },
+        decisions: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: {
+            decisionMaker: {
+              select: { id: true, email: true, profile: { select: { fullName: true } } },
+            },
+          },
+        },
+        usageEvents: {
+          orderBy: { occurredAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            eventType: true,
+            quantity: true,
+            unit: true,
+            occurredAt: true,
+            includedOrOverage: true,
+            currency: true,
+          },
+        },
+        auditEvents: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          select: {
+            id: true,
+            actorType: true,
+            actorId: true,
+            action: true,
+            targetType: true,
+            targetId: true,
+            beforeStateReference: true,
+            afterStateReference: true,
+            metadata: true,
+            createdAt: true,
+          },
+        },
+      },
+    })
+
+    if (!assessmentCase) throw new NotFoundException('Assessment case not found')
+
+    return {
+      id: assessmentCase.id,
+      applicant: this.mapPerson(assessmentCase.applicant),
+      assessmentType: assessmentCase.assessmentType,
+      source: assessmentCase.source,
+      status: assessmentCase.status,
+      assessmentOutcome: assessmentCase.assessmentOutcome,
+      assessmentConfidence: assessmentCase.assessmentConfidence,
+      companyDecision: assessmentCase.companyDecision,
+      decisionRationale: assessmentCase.decisionRationale,
+      reference: assessmentCase.reference,
+      proposedCommitment: assessmentCase.proposedCommitment,
+      creditConsumed: assessmentCase.creditConsumed,
+      assessedAt: assessmentCase.assessedAt,
+      expiresAt: assessmentCase.expiresAt,
+      closedAt: assessmentCase.closedAt,
+      createdAt: assessmentCase.createdAt,
+      updatedAt: assessmentCase.updatedAt,
+      reviewer: assessmentCase.reviewer ? this.mapPerson(assessmentCase.reviewer) : null,
+      request: assessmentCase.assessmentRequest
+        ? {
+            ...assessmentCase.assessmentRequest,
+            requestUrl: assessmentCase.assessmentRequest.requestToken
+              ? `/requests/${assessmentCase.assessmentRequest.requestToken}`
+              : null,
+          }
+        : null,
+      policy: assessmentCase.policyVersion
+        ? {
+            id: assessmentCase.policyVersion.id,
+            versionNumber: assessmentCase.policyVersion.versionNumber,
+            status: assessmentCase.policyVersion.status,
+            effectiveFrom: assessmentCase.policyVersion.effectiveFrom,
+            approvedAt: assessmentCase.policyVersion.approvedAt,
+            policy: assessmentCase.policyVersion.policy,
+          }
+        : null,
+      consent: assessmentCase.consent,
+      snapshot: {
+        id: assessmentCase.assessmentSnapshot.id,
+        version: assessmentCase.assessmentSnapshot.snapshotVersion,
+        dataPeriodStart: assessmentCase.assessmentSnapshot.dataPeriodStart,
+        dataPeriodEnd: assessmentCase.assessmentSnapshot.dataPeriodEnd,
+        sourceFreshness: assessmentCase.assessmentSnapshot.sourceFreshness,
+        permittedDataScope: assessmentCase.assessmentSnapshot.permittedDataScope,
+        trustScoreSummary: assessmentCase.assessmentSnapshot.trustScoreSummary,
+        insightSummary: assessmentCase.assessmentSnapshot.insightSummary,
+        incomeSummary: assessmentCase.assessmentSnapshot.incomeSummary,
+        affordabilitySummary: assessmentCase.assessmentSnapshot.affordabilitySummary,
+        commitmentsSummary: assessmentCase.assessmentSnapshot.commitmentsSummary,
+        verificationSummary: assessmentCase.assessmentSnapshot.verificationSummary,
+        evidenceManifest: assessmentCase.assessmentSnapshot.evidenceManifest,
+        evidenceReferences: assessmentCase.assessmentSnapshot.evidenceReferences,
+        integrityHash: assessmentCase.assessmentSnapshot.integrityHash,
+        createdAt: assessmentCase.assessmentSnapshot.createdAt,
+      },
+      criterionResults: assessmentCase.criterionResults.map((result) => ({
+        id: result.id,
+        result: result.result,
+        observedValue: result.observedValue,
+        thresholdValue: result.thresholdValue,
+        confidence: result.confidence,
+        evidenceReferences: result.evidenceReferences,
+        assumptions: result.assumptions,
+        missingInformation: result.missingInformation,
+        createdAt: result.createdAt,
+        policyRule: result.policyRule,
+      })),
+      notes: assessmentCase.notes.map((note) => ({
+        id: note.id,
+        visibility: note.visibility,
+        body: note.body,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        author: this.mapPerson(note.author),
+      })),
+      informationRequests: assessmentCase.informationRequests,
+      decisions: assessmentCase.decisions.map((decision) => ({
+        id: decision.id,
+        decision: decision.decision,
+        conditions: decision.conditions,
+        rationale: decision.rationale,
+        assessmentOutcomeAtDecision: decision.assessmentOutcomeAtDecision,
+        overrideFlag: decision.overrideFlag,
+        overrideReason: decision.overrideReason,
+        createdAt: decision.createdAt,
+        decisionMaker: this.mapPerson(decision.decisionMaker),
+      })),
+      usageEvents: assessmentCase.usageEvents,
+      auditEvents: assessmentCase.auditEvents,
+    }
+  }
+
   async listRequests(context: OrganisationContext) {
     const requests = await db.assessmentRequest.findMany({
       where: { organisationId: context.organisationId },
@@ -687,6 +892,18 @@ export class AssessmentsService {
           }
         : null,
       counts: request._count,
+    }
+  }
+
+  private mapPerson(user: {
+    id: string
+    email: string
+    profile?: { fullName: string | null } | null
+  }) {
+    return {
+      id: user.id,
+      name: user.profile?.fullName ?? user.email,
+      email: user.email,
     }
   }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -21,6 +21,15 @@ export class AssessmentsController {
   @ApiOperation({ summary: 'List organisation assessment cases' })
   async cases(@CurrentOrganisation() organisation: OrganisationContext) {
     return this.assessments.listCases(organisation)
+  }
+
+  @Get('assessment-cases/:caseId')
+  @ApiOperation({ summary: 'Get an organisation assessment case detail' })
+  async caseDetail(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('caseId') caseId: string
+  ) {
+    return this.assessments.getCase(organisation, caseId)
   }
 
   @Get('assessment-requests')

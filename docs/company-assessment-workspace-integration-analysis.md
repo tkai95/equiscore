@@ -1209,7 +1209,8 @@ Immediate next slices, in order:
    - Deliver a case only after explicit active consent for the organisation, purpose, and data scope.
 
 4. **Assessment case detail and reviewer workflow**
-   - Build case detail view with snapshot, criteria, evidence summary, notes, status, and decision controls.
+   - Done: added an organisation-scoped assessment case detail API and first partner-facing case detail page with snapshot, consent/request context, financial summaries, criteria results, review activity, and audit trail.
+   - Add reviewer decision controls on the case detail page.
    - Add missing-information/request-more-evidence flow.
    - Keep company decisions separate from EquiScore outcome.
 

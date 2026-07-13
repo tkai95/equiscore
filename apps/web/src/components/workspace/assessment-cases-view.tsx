@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
-import { LinkIcon, Plus } from 'lucide-react'
+import { Eye, LinkIcon, Plus } from 'lucide-react'
 import { workspaceApi } from '@/lib/workspace-api'
 import { buttonClasses, Card, PageHeader, PageLayout, StatusPill } from '@/components/ui'
 import {
@@ -55,7 +55,16 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
           />
         ) : (
           <WorkspaceTable
-            columns={['Applicant', 'Type', 'Outcome', 'Status', 'Policy', 'Reviewer', 'Assessed']}
+            columns={[
+              'Applicant',
+              'Type',
+              'Outcome',
+              'Status',
+              'Policy',
+              'Reviewer',
+              'Assessed',
+              'Actions',
+            ]}
           >
             {cases.map((item) => (
               <tr key={item.id}>
@@ -76,6 +85,15 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
                 </Cell>
                 <Cell muted>{item.reviewer?.name ?? 'Unassigned'}</Cell>
                 <Cell muted>{formatMaybeDate(item.assessedAt ?? item.createdAt)}</Cell>
+                <Cell>
+                  <Link
+                    href={`/workspace/o/${organisationSlug}/assessments/${item.id}`}
+                    className={buttonClasses('secondary', 'sm')}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </Link>
+                </Cell>
               </tr>
             ))}
           </WorkspaceTable>
