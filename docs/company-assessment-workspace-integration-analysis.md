@@ -78,6 +78,7 @@ Known remaining setup:
 
 - Environment variables must remain deployment/local-only and must not be committed. Clerk, database, API, and domain values should be managed per environment.
 - Invite email delivery is code-wired through Resend. Live deployment requires `RESEND_API_KEY` and `INVITE_EMAIL_FROM=EquiScore <noreply@equiscore.app>` in the API service environment.
+- Waitlist confirmation email delivery is wired through the existing public website endpoint, `/api/register-interest`. Because that endpoint runs on the web deployment for `equiscore.app`, it also needs `RESEND_API_KEY` plus `WAITLIST_EMAIL_FROM=EquiScore <noreply@equiscore.app>` or the existing sender fallback in the public web environment.
 - Partner team management has a first workspace-owned implementation for invite, resend, revoke, role update, and remove actions. More granular suspension/reactivation and notification analytics remain future hardening.
 - Case detail, reviewer workflow depth, policy builder, missing-information workflows, billing exports, and tenant-isolation tests remain to be built.
 - Tests/CI still need to be introduced; current verification is schema validation, TypeScript, and production build.

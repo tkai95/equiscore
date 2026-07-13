@@ -9,7 +9,7 @@ export interface InvitationEmailDelivery {
   messageId?: string
 }
 
-interface InvitationEmailInput {
+interface BrandedEmailInput {
   to: string
   subject: string
   eyebrow: string
@@ -17,11 +17,18 @@ interface InvitationEmailInput {
   preview: string
   intro: string
   body?: string
+  ctaLabel?: string
+  ctaUrl?: string
+  surfaceLabel: string
+  details?: Array<{ label: string; value: string }>
+  footerNote?: string
+  recipientNote?: string
+}
+
+interface InvitationEmailInput extends Omit<BrandedEmailInput, 'ctaLabel' | 'ctaUrl' | 'details'> {
   ctaLabel: string
   ctaUrl: string
-  surfaceLabel: string
   details: Array<{ label: string; value: string }>
-  footerNote?: string
 }
 
 @Injectable()
@@ -31,6 +38,16 @@ export class InvitationEmailService {
   constructor(private readonly config: ConfigService) {}
 
   async sendInvitation(input: InvitationEmailInput): Promise<InvitationEmailDelivery> {
+    return this.sendBrandedEmail({
+      ...input,
+      footerNote:
+        input.footerNote ??
+        `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`,
+      recipientNote: `EquiScore protects access by checking the email address you sign in with. Use ${input.to} to accept this invitation.`,
+    })
+  }
+
+  async sendBrandedEmail(input: BrandedEmailInput): Promise<InvitationEmailDelivery> {
     const apiKey = this.configValue('RESEND_API_KEY')
     const from =
       this.configValue('INVITE_EMAIL_FROM') ??
@@ -39,7 +56,7 @@ export class InvitationEmailService {
 
     if (!apiKey || !from) {
       this.logger.warn(
-        `Invitation email not sent to ${input.to}: RESEND_API_KEY and invite sender are not configured`
+        `Email not sent to ${input.to}: RESEND_API_KEY and sender are not configured`
       )
       return {
         attempted: false,
@@ -68,10 +85,7 @@ export class InvitationEmailService {
       if (!response.ok) {
         const body = await response.text().catch(() => '')
         this.logger.error(
-          `Invitation email failed for ${input.to}: Resend returned ${response.status} ${body.slice(
-            0,
-            300
-          )}`
+          `Email failed for ${input.to}: Resend returned ${response.status} ${body.slice(0, 300)}`
         )
         return {
           attempted: true,
@@ -90,7 +104,7 @@ export class InvitationEmailService {
       }
     } catch (error) {
       this.logger.error(
-        `Invitation email failed for ${input.to}`,
+        `Email failed for ${input.to}`,
         error instanceof Error ? error.stack : String(error)
       )
       return {
@@ -107,8 +121,8 @@ export class InvitationEmailService {
     return value || null
   }
 
-  private renderHtml(input: InvitationEmailInput): string {
-    const details = input.details
+  private renderHtml(input: BrandedEmailInput): string {
+    const details = (input.details ?? [])
       .map(
         (detail) => `
           <tr>
@@ -126,9 +140,33 @@ export class InvitationEmailService {
           input.body
         )}</p>`
       : ''
-    const footerNote =
-      input.footerNote ??
-      `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`
+    const cta =
+      input.ctaLabel && input.ctaUrl
+        ? `<tr>
+              <td style="padding: 0 28px 22px;">
+                <a href="${this.escapeAttribute(
+                  input.ctaUrl
+                )}" style="display: inline-block; background: #064638; color: #fffdf5; text-decoration: none; border-radius: 9px; padding: 13px 18px; font-size: 14px; font-weight: 800;">${this.escape(
+                  input.ctaLabel
+                )}</a>
+              </td>
+            </tr>`
+        : ''
+    const detailTable = details
+      ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #e6ebe5;">
+                  ${details}
+                </table>`
+      : ''
+    const footerNote = input.footerNote
+      ? `<p style="margin: 18px 0 0; color: #66736f; font-size: 13px; line-height: 1.5;">${this.escape(
+          input.footerNote
+        )}</p>`
+      : ''
+    const recipientNote = input.recipientNote
+      ? `<p style="margin: 10px 0 0; color: #7a8582; font-size: 12px; line-height: 1.5;">${this.escape(
+          input.recipientNote
+        )}</p>`
+      : ''
 
     return `<!doctype html>
 <html>
@@ -176,26 +214,12 @@ export class InvitationEmailService {
                 ${body}
               </td>
             </tr>
-            <tr>
-              <td style="padding: 0 28px 22px;">
-                <a href="${this.escapeAttribute(
-                  input.ctaUrl
-                )}" style="display: inline-block; background: #064638; color: #fffdf5; text-decoration: none; border-radius: 9px; padding: 13px 18px; font-size: 14px; font-weight: 800;">${this.escape(
-                  input.ctaLabel
-                )}</a>
-              </td>
-            </tr>
+            ${cta}
             <tr>
               <td style="padding: 0 28px 28px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #e6ebe5;">
-                  ${details}
-                </table>
-                <p style="margin: 18px 0 0; color: #66736f; font-size: 13px; line-height: 1.5;">${this.escape(
-                  footerNote
-                )}</p>
-                <p style="margin: 10px 0 0; color: #7a8582; font-size: 12px; line-height: 1.5;">EquiScore protects access by checking the email address you sign in with. Use ${this.escape(
-                  input.to
-                )} to accept this invitation.</p>
+                ${detailTable}
+                ${footerNote}
+                ${recipientNote}
               </td>
             </tr>
           </table>
@@ -206,8 +230,8 @@ export class InvitationEmailService {
 </html>`
   }
 
-  private renderText(input: InvitationEmailInput): string {
-    const details = input.details.map((detail) => `${detail.label}: ${detail.value}`).join('\n')
+  private renderText(input: BrandedEmailInput): string {
+    const details = (input.details ?? []).map((detail) => `${detail.label}: ${detail.value}`)
 
     return [
       'EquiScore',
@@ -219,15 +243,16 @@ export class InvitationEmailService {
       input.intro,
       input.body ? `\n${input.body}` : '',
       '',
-      `${input.ctaLabel}: ${input.ctaUrl}`,
+      input.ctaLabel && input.ctaUrl ? `${input.ctaLabel}: ${input.ctaUrl}` : '',
       '',
-      details,
+      ...details,
       '',
-      input.footerNote ??
-        `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`,
+      input.footerNote ?? '',
       '',
-      `Use ${input.to} to accept this invitation.`,
-    ].join('\n')
+      input.recipientNote ?? '',
+    ]
+      .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
+      .join('\n')
   }
 
   private escape(value: string): string {
