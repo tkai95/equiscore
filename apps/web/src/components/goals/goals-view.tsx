@@ -53,8 +53,38 @@ type InsightProfile = {
     currentRent: number | null
     maxAffordableRent: number
     headroomForNewRent: number
-    ratios: { rentToIncome: number | null }
+    fixedCommitments?: number
+    ratios: {
+      rentToIncome: number | null
+      debtToIncome?: number
+      commitmentsToIncome?: number
+      essentialsToIncome?: number
+    }
   }
+  expenses?: {
+    averageMonthlySpend: number
+    categories: Array<{
+      key: string
+      label: string
+      monthlyAverage: number
+      share: number
+      essential: boolean
+      unconfirmed: boolean
+    }>
+  }
+  commitments?: Array<{
+    name: string
+    key: string
+    category: string
+    amount: number
+    cadence: string
+    typicalDayOfMonth: number | null
+    consistency: string
+    occurrences: number
+    monthsCovered: number
+    missedCount: number
+    returnedCount: number
+  }>
   paymentBehaviour: {
     onTimeRatio: number
     missedPayments: number
@@ -98,6 +128,12 @@ type GoalTemplate = {
 }
 
 type GoalAction = { title: string; detail: string; href: string; cta: string }
+type GoalPlanAction = GoalAction & {
+  kind: 'evidence' | 'money' | 'readiness' | 'share' | 'strategy'
+  value?: string
+  impact: string
+  disclosure?: string
+}
 type ReadinessKey = 'ready' | 'ready_with_conditions' | 'action_required' | 'not_enough_information'
 type GoalReadiness = {
   key: ReadinessKey
@@ -649,6 +685,202 @@ function metricsForGoal(
   ]
 }
 
+function monthlyEquivalent(amount: number, cadence: string) {
+  const factor: Record<string, number> = {
+    weekly: 52 / 12,
+    fortnightly: 26 / 12,
+    four_weekly: 13 / 12,
+    monthly: 1,
+    quarterly: 1 / 3,
+  }
+  return amount * (factor[cadence] ?? 1)
+}
+
+function addPlanAction(actions: GoalPlanAction[], action: GoalPlanAction) {
+  if (!actions.some((existing) => existing.title === action.title)) actions.push(action)
+}
+
+function reviewableSpend(profile: InsightProfile | null | undefined) {
+  const categories = profile?.expenses?.categories ?? []
+  const categorySpend = categories
+    .filter((category) =>
+      ['subscriptions', 'mobile_internet', 'discretionary'].includes(category.key)
+    )
+    .reduce((sum, category) => sum + category.monthlyAverage, 0)
+
+  const commitmentSpend = (profile?.commitments ?? [])
+    .filter((commitment) => ['entertainment', 'utilities'].includes(commitment.category))
+    .reduce((sum, commitment) => sum + monthlyEquivalent(commitment.amount, commitment.cadence), 0)
+
+  return Math.max(categorySpend, commitmentSpend)
+}
+
+function buildGoalPlanActions(
+  type: ConsumerGoalType,
+  template: GoalTemplate,
+  profile: InsightProfile | null | undefined,
+  score: Score,
+  goal: ConsumerGoal | null | undefined,
+  readiness: GoalReadiness
+): GoalPlanAction[] {
+  const actions: GoalPlanAction[] = []
+
+  if (!profile || profile.period.transactionCount === 0) {
+    return [
+      {
+        kind: 'evidence',
+        title: 'Connect financial evidence',
+        detail:
+          'Start with Open Banking or a statement upload so EquiScore can turn this goal into a real plan.',
+        href: '/dashboard/connections',
+        cta: 'Connect account',
+        impact: 'Unlocks personalised actions',
+      },
+    ]
+  }
+
+  const targetRent = goal?.targetMonthlyRent ?? null
+  const affordabilityGap =
+    type === 'rental' && targetRent && profile.affordability.maxAffordableRent > 0
+      ? Math.max(0, targetRent - profile.affordability.maxAffordableRent)
+      : 0
+  const surplus = profile.affordability.surplusAfterAll
+  const reviewable = reviewableSpend(profile)
+  const firstPassSaving = Math.round(Math.min(75, Math.max(15, reviewable * 0.15)))
+  const overdraftMonths = profile.paymentBehaviour.overdraftMonths ?? 0
+  const returnedPayments = profile.paymentBehaviour.returnedPayments
+  const identityScore = score?.identityConfidenceScore ?? 0
+  const verificationScore = score?.verificationStrengthScore ?? 0
+  const bufferContribution =
+    surplus > 0 ? Math.round(Math.min(150, Math.max(25, surplus * 0.2))) : 0
+
+  if (affordabilityGap > 0) {
+    addPlanAction(actions, {
+      kind: 'readiness',
+      title: 'Close the rent affordability gap',
+      detail:
+        'Your target rent is above the current estimated sustainable rent. Lower the target, add context for support, or reduce monthly pressure before sharing.',
+      href: '#goal-settings',
+      cta: 'Update target',
+      value: `${formatCurrency(affordabilityGap)}/mo gap`,
+      impact: 'Most direct route to rental readiness',
+    })
+  }
+
+  if (reviewable >= 30) {
+    addPlanAction(actions, {
+      kind: 'money',
+      title: 'Review flexible bills and subscriptions',
+      detail:
+        'EquiScore has detected monthly spend that may be reviewable. This is where comparison or affiliate links can be added later, once provider data is wired.',
+      href: '/dashboard/my-money',
+      cta: 'Open My Money',
+      value: `${formatCurrency(Math.round(reviewable))}/mo reviewable`,
+      impact: `First-pass target: ${formatCurrency(firstPassSaving)}/mo`,
+      disclosure: 'Planning estimate only; no provider recommendation yet.',
+    })
+  }
+
+  if (bufferContribution > 0 && ['rental', 'future_credit', 'stronger_profile'].includes(type)) {
+    addPlanAction(actions, {
+      kind: 'strategy',
+      title: 'Build a visible buffer',
+      detail:
+        'A small recurring buffer can make affordability and resilience easier to explain, especially before renting or future-credit goals.',
+      href: '/dashboard/my-money',
+      cta: 'Review surplus',
+      value: `${formatCurrency(bufferContribution)}/mo suggested`,
+      impact: 'Improves resilience story',
+    })
+  }
+
+  if (returnedPayments > 0 || overdraftMonths > 0) {
+    addPlanAction(actions, {
+      kind: 'readiness',
+      title: 'Create a clean-payment streak',
+      detail:
+        'Avoiding returned payments and reducing overdraft reliance for the next few months would make this goal easier to support.',
+      href: '/dashboard/my-money',
+      cta: 'Review patterns',
+      value: `${returnedPayments} returned, ${overdraftMonths} overdraft mo`,
+      impact: 'Aim for 3 clean months',
+    })
+  }
+
+  if ((type === 'banking_access' || type === 'stronger_profile') && identityScore < 70) {
+    addPlanAction(actions, {
+      kind: 'evidence',
+      title: 'Strengthen identity evidence',
+      detail:
+        'Banking-access and whole-profile goals need a clear identity foundation before other evidence carries much weight.',
+      href: '/dashboard/documents',
+      cta: 'Add evidence',
+      value: `${identityScore}/100`,
+      impact: 'Improves confidence',
+    })
+  }
+
+  if ((type === 'income_proof' || type === 'stronger_profile') && verificationScore < 70) {
+    addPlanAction(actions, {
+      kind: 'evidence',
+      title: 'Add supporting documents',
+      detail:
+        'Payslips, employment letters or tax documents can make the income story easier for someone else to trust.',
+      href: '/dashboard/documents',
+      cta: 'Upload documents',
+      value: `${verificationScore}/100`,
+      impact: 'Improves verification strength',
+    })
+  }
+
+  if (profile.period.months < 6) {
+    addPlanAction(actions, {
+      kind: 'evidence',
+      title: 'Extend evidence history',
+      detail:
+        'More months of data make patterns more credible and reduce the need for manual explanation.',
+      href: '/dashboard/connections',
+      cta: 'Add history',
+      value: `${profile.period.months}/6 months`,
+      impact: 'Improves confidence over time',
+    })
+  }
+
+  if (readiness.key === 'ready' && type === 'rental') {
+    addPlanAction(actions, {
+      kind: 'share',
+      title: 'Prepare the rental share pack',
+      detail:
+        'The next useful step is to turn the goal and evidence into a recipient-safe pack with clear limitations.',
+      href: '/dashboard/share',
+      cta: 'Preview pack',
+      impact: 'Moves from readiness to action',
+    })
+  }
+
+  if (actions.length === 0) {
+    addPlanAction(actions, {
+      kind: 'strategy',
+      title: `Keep ${template.shortTitle.toLowerCase()} fresh`,
+      detail:
+        'No urgent action is visible. Keep evidence connected and revisit this goal when income, rent, bills or documents change.',
+      href: '/dashboard/to-do',
+      cta: 'Open To do',
+      impact: 'Maintains readiness',
+    })
+  }
+
+  return actions.slice(0, 4)
+}
+
+const PLAN_KIND_LABEL: Record<GoalPlanAction['kind'], string> = {
+  evidence: 'Evidence',
+  money: 'Money move',
+  readiness: 'Readiness',
+  share: 'Share',
+  strategy: 'Strategy',
+}
+
 export function GoalsView() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
@@ -703,6 +935,14 @@ export function GoalsView() {
   )
   const selectedStatus = READINESS[selectedReadiness.key]
   const selectedMetrics = metricsForGoal(selectedType, profile, score ?? null, selectedGoal)
+  const goalPlanActions = buildGoalPlanActions(
+    selectedType,
+    selectedTemplate,
+    profile,
+    score ?? null,
+    selectedGoal,
+    selectedReadiness
+  )
   const savedDate = formatSavedDate(selectedGoal?.updatedAt)
 
   useEffect(() => {
@@ -960,6 +1200,56 @@ export function GoalsView() {
                 />
               ))}
             </div>
+
+            <section className="space-y-4">
+              <div className="border-line-subtle flex items-end justify-between gap-4 border-b pb-3">
+                <div>
+                  <h3 className="text-content text-base font-semibold">Goal plan</h3>
+                  <p className="text-content-secondary mt-1 text-sm">
+                    Practical moves EquiScore can already infer from your evidence. Product links
+                    and AI strategy can plug into these cards later.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {goalPlanActions.map((action) => (
+                  <div
+                    key={action.title}
+                    className="rounded-panel border-line-subtle bg-surface-card border p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <StatusPill
+                          status={action.kind === 'money' ? 'success' : 'neutral'}
+                          label={PLAN_KIND_LABEL[action.kind]}
+                        />
+                        <h4 className="text-content mt-3 text-sm font-semibold">{action.title}</h4>
+                      </div>
+                      {action.value ? (
+                        <span className="bg-brand-50 text-brand-900 rounded-full px-2.5 py-1 text-xs font-semibold">
+                          {action.value}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-content-secondary mt-2 text-sm">{action.detail}</p>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-content text-xs font-semibold">{action.impact}</p>
+                        {action.disclosure ? (
+                          <p className="text-content-muted mt-1 text-xs">{action.disclosure}</p>
+                        ) : null}
+                      </div>
+                      <Link
+                        href={action.href}
+                        className={buttonClasses('secondary', 'sm', 'shrink-0')}
+                      >
+                        {action.cta}
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <InsetPanel id="goal-settings" className="space-y-4" padding="md">
               <div className="flex flex-wrap items-start justify-between gap-3">

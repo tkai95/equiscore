@@ -67,6 +67,22 @@ My Money, To do and Sharing.
 - Existing financial evidence is interpreted differently per goal, instead of
   forcing every outcome through the rental-readiness lens.
 
+## Built In Goal Action Slice
+
+- Added a first deterministic Goal Plan layer inside Goals.
+- Goals now surface practical inferred actions such as:
+  - close a target-rent affordability gap
+  - review flexible bills and subscriptions
+  - build a visible buffer from available monthly surplus
+  - create a clean-payment streak after returned payments or overdraft reliance
+  - strengthen identity or document evidence
+  - extend evidence history
+  - prepare a rental share pack when ready
+- Money-related cards show planning estimates, not provider recommendations.
+- This creates the future slot for comparison/affiliate offers and AI strategy
+  explainers without making the current product depend on marketplace data or
+  regulated advice.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -107,17 +123,25 @@ history.
    - Preview what the recipient sees.
    - Show limitations and evidence confidence before sharing.
 
-3. Add contextual supporting information:
+3. Add solution opportunities:
+   - Add a provider/comparison abstraction for non-regulated switching first:
+     subscriptions, mobile, broadband and energy.
+   - Keep affiliate/commercial disclosure visible on any monetised action.
+   - Add click/referral tracking without changing EquiScore readiness itself.
+   - Add AI explanations on top of deterministic calculations, not instead of
+     them.
+
+4. Add contextual supporting information:
    - Keep bank connections and documents as functional routes.
    - Surface them from Financial Profile, Goals and To do instead of top-level navigation.
 
-4. Refine Home:
+5. Refine Home:
    - Show current goal status.
    - Show one money insight.
    - Show only genuinely actionable To do items.
    - Show recent activity such as share created, recipient viewed, assessment updated.
 
-5. Later:
+6. Later:
    - Banking access readiness.
    - Utilities or phone contract readiness.
    - Future credit readiness.
