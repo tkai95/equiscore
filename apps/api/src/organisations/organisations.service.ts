@@ -636,18 +636,23 @@ export class OrganisationsService {
   ): Promise<InvitationEmailDelivery> {
     return this.invitationEmail.sendInvitation({
       to: invitation.email,
-      subject: `You are invited to ${organisation.name} on EquiScore`,
-      heading: `Join ${organisation.name} on EquiScore`,
-      preview: 'Sign in with your invited email to access the partner workspace.',
-      intro:
-        'Your organisation has invited you to its EquiScore partner workspace. Sign in with the email address this invitation was sent to.',
+      subject: `${organisation.name} invited you to EquiScore`,
+      eyebrow: 'Team invitation',
+      heading: `Join your team on EquiScore`,
+      preview: `You have been invited to ${organisation.name}'s EquiScore workspace.`,
+      intro: `${organisation.name} has invited you to its EquiScore partner workspace for assessment requests, case review and workspace collaboration.`,
+      body: 'This invitation is organisation-specific. Sign in with the invited email address to claim the role shown below.',
       ctaLabel: 'Open partner workspace',
       ctaUrl: this.absolutePartnerUrl(`/o/${organisation.slug}`),
+      surfaceLabel: 'Partner workspace',
       details: [
+        { label: 'Portal', value: 'partners.equiscore.app' },
         { label: 'Organisation', value: organisation.name },
         { label: 'Role', value: this.label(invitation.role) },
         { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
       ],
+      footerNote:
+        'Only accept this invitation if you expected access to this organisation on EquiScore. If you were not expecting this, you can ignore this email.',
     })
   }
 

@@ -12,12 +12,16 @@ export interface InvitationEmailDelivery {
 interface InvitationEmailInput {
   to: string
   subject: string
+  eyebrow: string
   heading: string
   preview: string
   intro: string
+  body?: string
   ctaLabel: string
   ctaUrl: string
+  surfaceLabel: string
   details: Array<{ label: string; value: string }>
+  footerNote?: string
 }
 
 @Injectable()
@@ -108,15 +112,23 @@ export class InvitationEmailService {
       .map(
         (detail) => `
           <tr>
-            <td style="padding: 8px 0; color: #66736f; font-size: 14px;">${this.escape(
+            <td style="padding: 10px 0; color: #66736f; font-size: 14px; border-top: 1px solid #e6ebe5;">${this.escape(
               detail.label
             )}</td>
-            <td style="padding: 8px 0; color: #10231d; font-size: 14px; font-weight: 600; text-align: right;">${this.escape(
+            <td style="padding: 10px 0; color: #10231d; font-size: 14px; font-weight: 700; text-align: right; border-top: 1px solid #e6ebe5;">${this.escape(
               detail.value
             )}</td>
           </tr>`
       )
       .join('')
+    const body = input.body
+      ? `<p style="margin: 10px 0 0; color: #52615d; font-size: 15px; line-height: 1.55;">${this.escape(
+          input.body
+        )}</p>`
+      : ''
+    const footerNote =
+      input.footerNote ??
+      `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`
 
     return `<!doctype html>
 <html>
@@ -125,40 +137,65 @@ export class InvitationEmailService {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${this.escape(input.subject)}</title>
   </head>
-  <body style="margin: 0; padding: 0; background: #f6f7f3; font-family: Arial, sans-serif; color: #10231d;">
+  <body style="margin: 0; padding: 0; background: #f6f7f3; font-family: Arial, Helvetica, sans-serif; color: #10231d;">
     <div style="display: none; max-height: 0; overflow: hidden;">${this.escape(input.preview)}</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: #f6f7f3; padding: 32px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 560px; background: #ffffff; border: 1px solid #dfe5df; border-radius: 14px; overflow: hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background: #ffffff; border: 1px solid #dfe5df; border-radius: 16px; overflow: hidden;">
+            <tr>
+              <td style="background: #064638; padding: 22px 28px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td>
+                      <table role="presentation" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td style="width: 38px; height: 38px; border-radius: 12px; background: #fffdf5; color: #064638; font-size: 24px; font-weight: 800; text-align: center; line-height: 38px;">E</td>
+                          <td style="padding-left: 12px; color: #fffdf5; font-size: 22px; font-weight: 700; letter-spacing: 0;">EquiScore</td>
+                        </tr>
+                      </table>
+                    </td>
+                    <td align="right" style="color: #d6e4dc; font-size: 13px; font-weight: 700;">${this.escape(
+                      input.surfaceLabel
+                    )}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
             <tr>
               <td style="padding: 28px 28px 18px;">
-                <p style="margin: 0 0 18px; color: #0b4c3d; font-size: 20px; font-weight: 700;">EquiScore</p>
-                <h1 style="margin: 0; color: #10231d; font-size: 24px; line-height: 1.25;">${this.escape(
+                <p style="margin: 0 0 10px; color: #0b4c3d; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">${this.escape(
+                  input.eyebrow
+                )}</p>
+                <h1 style="margin: 0; color: #10231d; font-size: 25px; line-height: 1.25;">${this.escape(
                   input.heading
                 )}</h1>
                 <p style="margin: 12px 0 0; color: #52615d; font-size: 15px; line-height: 1.55;">${this.escape(
                   input.intro
                 )}</p>
+                ${body}
               </td>
             </tr>
             <tr>
               <td style="padding: 0 28px 22px;">
                 <a href="${this.escapeAttribute(
                   input.ctaUrl
-                )}" style="display: inline-block; background: #064638; color: #fffdf5; text-decoration: none; border-radius: 8px; padding: 12px 18px; font-size: 14px; font-weight: 700;">${this.escape(
+                )}" style="display: inline-block; background: #064638; color: #fffdf5; text-decoration: none; border-radius: 9px; padding: 13px 18px; font-size: 14px; font-weight: 800;">${this.escape(
                   input.ctaLabel
                 )}</a>
               </td>
             </tr>
             <tr>
               <td style="padding: 0 28px 28px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top: 1px solid #e6ebe5; border-bottom: 1px solid #e6ebe5;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #e6ebe5;">
                   ${details}
                 </table>
-                <p style="margin: 18px 0 0; color: #66736f; font-size: 13px; line-height: 1.5;">This invitation is tied to ${this.escape(
+                <p style="margin: 18px 0 0; color: #66736f; font-size: 13px; line-height: 1.5;">${this.escape(
+                  footerNote
+                )}</p>
+                <p style="margin: 10px 0 0; color: #7a8582; font-size: 12px; line-height: 1.5;">EquiScore protects access by checking the email address you sign in with. Use ${this.escape(
                   input.to
-                )}. If you were not expecting this, you can ignore this email.</p>
+                )} to accept this invitation.</p>
               </td>
             </tr>
           </table>
@@ -175,15 +212,21 @@ export class InvitationEmailService {
     return [
       'EquiScore',
       '',
+      input.eyebrow,
+      '',
       input.heading,
       '',
       input.intro,
+      input.body ? `\n${input.body}` : '',
       '',
       `${input.ctaLabel}: ${input.ctaUrl}`,
       '',
       details,
       '',
-      `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`,
+      input.footerNote ??
+        `This invitation is tied to ${input.to}. If you were not expecting this, you can ignore this email.`,
+      '',
+      `Use ${input.to} to accept this invitation.`,
     ].join('\n')
   }
 

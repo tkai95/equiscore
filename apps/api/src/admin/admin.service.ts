@@ -1254,17 +1254,23 @@ export class AdminService {
   }): Promise<InvitationEmailDelivery> {
     return this.invitationEmail.sendInvitation({
       to: invitation.email,
-      subject: 'You are invited to EquiScore admin',
-      heading: 'You are invited to EquiScore admin',
-      preview: 'Sign in with your invited email to access the EquiScore admin portal.',
+      subject: 'EquiScore admin access invitation',
+      eyebrow: 'Internal admin invitation',
+      heading: 'Access the EquiScore admin portal',
+      preview: 'Sign in with your invited email to access internal EquiScore operations.',
       intro:
-        'An EquiScore administrator has invited you to the internal admin portal. Sign in with the email address this invitation was sent to.',
+        'You have been invited to the internal EquiScore admin portal for platform operations, partner setup and support workflows.',
+      body: 'This is separate from consumer and partner workspace access. Your internal admin role controls what you can view and manage.',
       ctaLabel: 'Open admin portal',
       ctaUrl: this.absoluteAdminUrl('/admin'),
+      surfaceLabel: 'Internal admin',
       details: [
+        { label: 'Portal', value: 'admin.equiscore.app' },
         { label: 'Role', value: this.label(invitation.role) },
         { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
       ],
+      footerNote:
+        'Only accept this invitation if you expected EquiScore internal admin access. If you were not expecting this, you can ignore this email.',
     })
   }
 
@@ -1274,18 +1280,24 @@ export class AdminService {
   ): Promise<InvitationEmailDelivery> {
     return this.invitationEmail.sendInvitation({
       to: invitation.email,
-      subject: `You are invited to ${organisation.name} on EquiScore`,
-      heading: `Join ${organisation.name} on EquiScore`,
-      preview: 'Sign in with your invited email to access the partner workspace.',
+      subject: `${organisation.name} invited you to EquiScore`,
+      eyebrow: 'Partner workspace invitation',
+      heading: `Join ${organisation.name}'s EquiScore workspace`,
+      preview: 'Sign in with your invited email to access company assessment workflows.',
       intro:
-        'An EquiScore administrator has invited you to a partner workspace. Sign in with the email address this invitation was sent to.',
+        'An EquiScore administrator has invited you to a company workspace for assessment requests, applicant cases, policy reviews and usage tracking.',
+      body: 'This access is limited to the organisation shown below and does not grant internal EquiScore admin privileges.',
       ctaLabel: 'Open partner workspace',
       ctaUrl: this.absolutePartnerUrl(`/o/${organisation.slug}`),
+      surfaceLabel: 'Partner workspace',
       details: [
+        { label: 'Portal', value: 'partners.equiscore.app' },
         { label: 'Organisation', value: organisation.name },
         { label: 'Role', value: this.label(invitation.role) },
         { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
       ],
+      footerNote:
+        'Only accept this invitation if you expected workspace access for this organisation. If you were not expecting this, you can ignore this email.',
     })
   }
 
