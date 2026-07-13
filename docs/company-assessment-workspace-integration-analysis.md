@@ -1189,7 +1189,7 @@ Immediate next slices, in order:
    - Remaining: add suspend/reactivate flows, owner transfer polish, and notification analytics.
 
 3. **Partner intake and applicant consent pairing**
-   - Add "Shared with us" intake where partners paste a consumer share link/code and convert it into an organisation-scoped intake row.
+   - Done (`58f62ae`): added "Shared with us" intake where partners paste a consumer share link/code and convert it into an organisation-scoped, audited intake row without consuming usage credits.
    - Add applicant authorisation states for both flows: partner-requested assessment and user-initiated share intake.
    - Ensure existing users sign in and approve/decline the partner access request; new users complete signup/onboarding and then approve/decline.
    - Keep generic public share links separate from partner workspace case intake.
@@ -1273,6 +1273,6 @@ Start with Phase 0, Phase 1, and Phase 1A together:
 
 Then build the first real vertical slice:
 
-> Accept a user-shared profile into a company workspace, create an immutable snapshot, evaluate one default rental policy, create an assessment case, append exactly one usage event, and show the case in the company assessment table.
+> Continue the partner-share vertical slice: let a partner accept an imported share into an explicit applicant authorisation flow, create an immutable snapshot after consent, evaluate one default rental policy, create an assessment case, append exactly one usage event, and show the case in the company assessment table.
 
 That slice proves the core product model without needing every role, AI feature, portfolio chart, or workflow automation on day one.
