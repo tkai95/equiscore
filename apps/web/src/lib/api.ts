@@ -39,6 +39,8 @@ export interface ConsumerGoal {
 
 export interface UpdateConsumerGoalInput {
   type?: ConsumerGoalType
+  status?: 'active' | 'paused' | 'archived'
+  isPrimary?: boolean
   label?: string | null
   targetMonthlyRent?: number | null
   moveDate?: string | null
@@ -208,6 +210,7 @@ export const api = {
     getRental: (token: string) => apiFetch('/profile/rental', {}, token),
   },
   goals: {
+    list: (token: string) => apiFetch<ConsumerGoal[]>('/goals', {}, token),
     getPrimary: (token: string) => apiFetch<ConsumerGoal>('/goals/primary', {}, token),
     updatePrimary: (token: string, data: UpdateConsumerGoalInput) =>
       apiFetch<ConsumerGoal>(
@@ -215,6 +218,14 @@ export const api = {
         { method: 'PUT', body: JSON.stringify(data) },
         token
       ),
+    update: (token: string, type: ConsumerGoalType, data: UpdateConsumerGoalInput) =>
+      apiFetch<ConsumerGoal>(
+        `/goals/types/${type}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+        token
+      ),
+    setPrimary: (token: string, type: ConsumerGoalType) =>
+      apiFetch<ConsumerGoal>(`/goals/types/${type}/primary`, { method: 'POST' }, token),
   },
   banking: {
     getLinkUrl: (token: string) =>

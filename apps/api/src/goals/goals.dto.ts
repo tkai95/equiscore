@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsNumber,
@@ -26,6 +27,14 @@ export class UpdateConsumerGoalDto {
     | 'future_credit'
     | 'income_proof'
     | 'stronger_profile'
+
+  @IsOptional()
+  @IsIn(['active', 'paused', 'archived'])
+  status?: 'active' | 'paused' | 'archived'
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean
 
   @IsOptional()
   @IsString()

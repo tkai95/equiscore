@@ -1,25 +1,30 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { LucideIcon } from 'lucide-react'
 import {
   AlertTriangle,
   ArrowRight,
   Banknote,
+  BriefcaseBusiness,
   CheckCircle2,
   CreditCard,
   Home,
   Phone,
+  Plus,
   Save,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
 } from 'lucide-react'
 import {
   api,
   type ConsumerGoal,
   type ConsumerGoalApplicationMode,
+  type ConsumerGoalType,
   type UpdateConsumerGoalInput,
 } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
@@ -83,33 +88,85 @@ type GoalForm = {
   notes: string
 }
 
+type GoalTemplate = {
+  type: ConsumerGoalType
+  title: string
+  shortTitle: string
+  description: string
+  evidenceFocus: string
+  icon: LucideIcon
+}
+
+type GoalAction = { title: string; detail: string; href: string; cta: string }
 type ReadinessKey = 'ready' | 'ready_with_conditions' | 'action_required' | 'not_enough_information'
+type GoalReadiness = {
+  key: ReadinessKey
+  summary: string
+  strengths: string[]
+  friction: string[]
+  actions: GoalAction[]
+}
 
 const READINESS: Record<
   ReadinessKey,
-  { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral'; body: string }
+  { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }
 > = {
-  ready: {
-    label: 'Ready',
-    tone: 'success',
-    body: 'Your current evidence looks strong enough to prepare a rental share pack.',
-  },
-  ready_with_conditions: {
-    label: 'Ready with conditions',
-    tone: 'warning',
-    body: 'You have usable evidence, but a few points may need context before you share.',
-  },
-  action_required: {
-    label: 'Action required',
-    tone: 'danger',
-    body: 'There are likely friction points to address before this is ready for a rental review.',
-  },
-  not_enough_information: {
-    label: 'Not enough information',
-    tone: 'neutral',
-    body: 'Connect financial evidence first so EquiScore can assess rental readiness.',
-  },
+  ready: { label: 'Ready', tone: 'success' },
+  ready_with_conditions: { label: 'Ready with conditions', tone: 'warning' },
+  action_required: { label: 'Action required', tone: 'danger' },
+  not_enough_information: { label: 'Needs evidence', tone: 'neutral' },
 }
+
+const GOAL_TEMPLATES: GoalTemplate[] = [
+  {
+    type: 'rental',
+    title: 'Rent a home',
+    shortTitle: 'Rental readiness',
+    description: 'Prepare a landlord or letting-agent ready profile.',
+    evidenceFocus: 'Affordability, rent reliability, income, identity',
+    icon: Home,
+  },
+  {
+    type: 'banking_access',
+    title: 'Open or recover banking access',
+    shortTitle: 'Banking access',
+    description: 'Build a clearer profile for basic account access or review.',
+    evidenceFocus: 'Identity, account history, payment stability, explanations',
+    icon: Banknote,
+  },
+  {
+    type: 'utilities_phone',
+    title: 'Set up utilities or a phone contract',
+    shortTitle: 'Utilities & phone',
+    description: 'Show stable income and reliable everyday payment behaviour.',
+    evidenceFocus: 'Bill consistency, failed payments, surplus, address evidence',
+    icon: Phone,
+  },
+  {
+    type: 'future_credit',
+    title: 'Prepare for future credit',
+    shortTitle: 'Future credit',
+    description: 'Understand what would strengthen a future responsible-credit application.',
+    evidenceFocus: 'Surplus, overdraft reliance, payment behaviour, trend',
+    icon: CreditCard,
+  },
+  {
+    type: 'income_proof',
+    title: 'Prove income clearly',
+    shortTitle: 'Income proof',
+    description: 'Turn salary, gig, benefits or self-employed income into a clear evidence story.',
+    evidenceFocus: 'Income sources, consistency, volatility, supporting documents',
+    icon: BriefcaseBusiness,
+  },
+  {
+    type: 'stronger_profile',
+    title: 'Strengthen my Trust Profile',
+    shortTitle: 'Profile strength',
+    description: 'Improve the underlying evidence quality across your whole EquiScore profile.',
+    evidenceFocus: 'Identity, data coverage, documents, confidence, gaps',
+    icon: ShieldCheck,
+  },
+]
 
 const EMPTY_GOAL_FORM: GoalForm = {
   targetMonthlyRent: '',
@@ -119,19 +176,13 @@ const EMPTY_GOAL_FORM: GoalForm = {
   notes: '',
 }
 
-const futureGoals = [
-  { title: 'Open or recover banking access', icon: Banknote, status: 'Next' },
-  { title: 'Set up utilities or phone contract', icon: Phone, status: 'Later' },
-  { title: 'Prepare for future credit', icon: CreditCard, status: 'Later' },
-]
-
 function pct(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return 'n/a'
   return `${Math.round(value * 100)}%`
 }
 
-function humanConsistency(value: string) {
-  return value.replaceAll('_', ' ')
+function humanConsistency(value: string | null | undefined) {
+  return value ? value.replaceAll('_', ' ') : 'unknown'
 }
 
 function toInputDate(value: string | null | undefined) {
@@ -174,32 +225,48 @@ function formatSavedDate(value: string | null | undefined) {
   }).format(new Date(value))
 }
 
+function completeReadiness(
+  summary: string,
+  strengths: string[],
+  friction: string[],
+  actions: GoalAction[],
+  hardBlock = false
+): GoalReadiness {
+  return {
+    key: hardBlock ? 'action_required' : friction.length > 0 ? 'ready_with_conditions' : 'ready',
+    summary,
+    strengths,
+    friction,
+    actions: actions.slice(0, 3),
+  }
+}
+
+function noEvidenceReadiness(template: GoalTemplate): GoalReadiness {
+  return {
+    key: 'not_enough_information',
+    summary: `Connect financial evidence so EquiScore can assess ${template.shortTitle.toLowerCase()} against real behaviour.`,
+    strengths: [],
+    friction: ['No connected financial evidence is available yet.'],
+    actions: [
+      {
+        title: 'Connect financial evidence',
+        detail:
+          'Open Banking gives the strongest current view for income, spending and payment behaviour.',
+        href: '/dashboard/connections',
+        cta: 'Connect account',
+      },
+    ],
+  }
+}
+
 function buildRentalReadiness(
-  profile: InsightProfile | null | undefined,
+  profile: InsightProfile,
   score: Score,
   goal: ConsumerGoal | null | undefined
-) {
-  if (!profile || profile.period.transactionCount === 0) {
-    return {
-      key: 'not_enough_information' as const,
-      strengths: [] as string[],
-      friction: [
-        'Connect a bank account or upload a statement to analyse income, rent, bills and affordability.',
-      ],
-      actions: [
-        {
-          title: 'Connect financial evidence',
-          detail: 'Open Banking gives the strongest current view for rental readiness.',
-          href: '/dashboard/connections',
-          cta: 'Connect account',
-        },
-      ],
-    }
-  }
-
+): GoalReadiness {
   const strengths: string[] = []
   const friction: string[] = []
-  const actions: Array<{ title: string; detail: string; href: string; cta: string }> = []
+  const actions: GoalAction[] = []
   const targetRent = goal?.targetMonthlyRent ?? null
   const monthlyIncome = profile.income.averageMonthlyIncome
   const targetRentToIncome = targetRent && monthlyIncome > 0 ? targetRent / monthlyIncome : null
@@ -211,13 +278,13 @@ function buildRentalReadiness(
 
   if (targetRent && targetRent > 0 && targetRentToIncome != null) {
     if (!targetOverLimit && targetRentToIncome <= 0.35) {
-      strengths.push(`Your saved target rent is within the estimated sustainable range.`)
+      strengths.push('Saved target rent is within the estimated sustainable range.')
     } else {
-      friction.push(`Your saved target rent may be high for the current verified income pattern.`)
+      friction.push('Saved target rent may be high for the current verified income pattern.')
       actions.push({
         title: 'Review the target rent',
         detail:
-          'Adjust your target or add evidence that explains extra support, savings or joint affordability.',
+          'Adjust the target or add evidence that explains savings, support or joint affordability.',
         href: '#goal-settings',
         cta: 'Update goal',
       })
@@ -228,8 +295,7 @@ function buildRentalReadiness(
     )
     actions.push({
       title: 'Save your rental target',
-      detail:
-        'Add the rent and move timing you are working towards so the readiness check becomes specific.',
+      detail: 'Add rent and move timing so the readiness check becomes specific.',
       href: '#goal-settings',
       cta: 'Set target',
     })
@@ -253,8 +319,7 @@ function buildRentalReadiness(
     friction.push('Direct rent reliability evidence is limited or not yet detected.')
     actions.push({
       title: 'Add rent evidence',
-      detail:
-        'A tenancy agreement, rent statement or clear rent-payment proof can strengthen this goal.',
+      detail: 'A tenancy agreement, rent statement or rent-payment proof can strengthen this goal.',
       href: '/dashboard/documents',
       cta: 'Upload evidence',
     })
@@ -269,54 +334,11 @@ function buildRentalReadiness(
     friction.push(
       `Affordability appears ${humanConsistency(profile.affordability.rating)} on current evidence.`
     )
-    actions.push({
-      title: 'Review affordability headroom',
-      detail:
-        'Check your current rent, essentials and monthly surplus before creating a rental pack.',
-      href: '/dashboard/my-money',
-      cta: 'Open My Money',
-    })
-  }
-
-  if (profile.stability.billsPaidOnTime) strengths.push('Essential bills appear reliably paid.')
-  else friction.push('Essential bill consistency may need more evidence.')
-
-  if (profile.period.months >= 6)
-    strengths.push(`${profile.period.months} months of financial history are available.`)
-  else {
-    friction.push('The available financial history is still short.')
-    actions.push({
-      title: 'Add more history where possible',
-      detail: 'Longer evidence coverage helps an assessor trust the pattern.',
-      href: '/dashboard/connections',
-      cta: 'Add history',
-    })
   }
 
   if ((score?.identityConfidenceScore ?? 0) >= 70)
     strengths.push('Identity evidence supports the profile.')
-  else {
-    friction.push('Identity evidence may limit confidence.')
-    actions.push({
-      title: 'Complete identity evidence',
-      detail: 'Verified identity makes the rental pack easier for a recipient to trust.',
-      href: '/dashboard/documents',
-      cta: 'Verify identity',
-    })
-  }
-
-  if (
-    !profile.stability.noOverdraftDependency ||
-    (profile.paymentBehaviour.overdraftMonths ?? 0) > 0
-  ) {
-    friction.push('Overdraft reliance may be viewed as a resilience risk.')
-  }
-  if (
-    !profile.stability.noRecurringFailedPayments ||
-    profile.paymentBehaviour.returnedPayments > 0
-  ) {
-    friction.push('Returned or failed payments may need context.')
-  }
+  else friction.push('Identity evidence may limit confidence.')
 
   const hardBlock =
     targetOverLimit ||
@@ -324,19 +346,315 @@ function buildRentalReadiness(
     profile.affordability.surplusAfterAll < 0 ||
     profile.paymentBehaviour.returnedPayments > 1
 
-  const key: ReadinessKey = hardBlock
-    ? 'action_required'
-    : friction.length > 0
-      ? 'ready_with_conditions'
-      : 'ready'
+  return completeReadiness(
+    'A practical rental view of affordability, rent reliability and confidence.',
+    strengths,
+    friction,
+    actions,
+    hardBlock
+  )
+}
 
-  return { key, strengths, friction, actions: actions.slice(0, 3) }
+function buildGoalReadiness(
+  template: GoalTemplate,
+  profile: InsightProfile | null | undefined,
+  score: Score,
+  goal: ConsumerGoal | null | undefined
+): GoalReadiness {
+  if (!profile || profile.period.transactionCount === 0) return noEvidenceReadiness(template)
+  if (template.type === 'rental') return buildRentalReadiness(profile, score, goal)
+
+  const strengths: string[] = []
+  const friction: string[] = []
+  const actions: GoalAction[] = []
+  const returnedPayments = profile.paymentBehaviour.returnedPayments
+  const overdraftMonths = profile.paymentBehaviour.overdraftMonths ?? 0
+  const identityScore = score?.identityConfidenceScore ?? 0
+  const verificationScore = score?.verificationStrengthScore ?? 0
+  const hasLongHistory = profile.period.months >= 6
+
+  if (template.type === 'banking_access') {
+    if (identityScore >= 70)
+      strengths.push('Identity evidence is strong enough to support access conversations.')
+    else {
+      friction.push('Identity evidence needs strengthening before this goal is compelling.')
+      actions.push({
+        title: 'Complete identity evidence',
+        detail: 'Clear identity evidence is the first signal for banking-access goals.',
+        href: '/dashboard/documents',
+        cta: 'Verify identity',
+      })
+    }
+    if (returnedPayments === 0)
+      strengths.push('No returned payments are visible in the analysed period.')
+    else friction.push('Returned payments may need clear context.')
+    if (hasLongHistory)
+      strengths.push(`${profile.period.months} months of account history are available.`)
+    else friction.push('More account history would make the access story stronger.')
+    if (overdraftMonths > 0) friction.push('Overdraft reliance may be read as a stability risk.')
+    return completeReadiness(
+      'A banking-access view of identity, stability and explainable account behaviour.',
+      strengths,
+      friction,
+      actions,
+      returnedPayments > 2
+    )
+  }
+
+  if (template.type === 'utilities_phone') {
+    if (profile.stability.billsPaidOnTime) strengths.push('Essential bills appear reliably paid.')
+    else friction.push('Bill consistency needs more evidence or explanation.')
+    if (returnedPayments === 0)
+      strengths.push('No returned payments are visible in the analysed period.')
+    else friction.push('Returned payments can make utilities or phone onboarding harder.')
+    if (profile.stability.positiveMonthlySurplus)
+      strengths.push('Current evidence shows positive monthly surplus.')
+    else friction.push('Monthly surplus looks tight or negative.')
+    if (profile.stability.stableIncome)
+      strengths.push('Income appears stable enough for recurring commitments.')
+    else friction.push('Income variability may need context.')
+    return completeReadiness(
+      'A recurring-contract view of bills, surplus and payment reliability.',
+      strengths,
+      friction,
+      actions,
+      returnedPayments > 1 || profile.affordability.surplusAfterAll < 0
+    )
+  }
+
+  if (template.type === 'future_credit') {
+    if (profile.stability.positiveMonthlySurplus)
+      strengths.push('Positive monthly surplus supports responsible affordability.')
+    else
+      friction.push('Negative or tight surplus is the biggest current credit-readiness constraint.')
+    if (overdraftMonths === 0) strengths.push('No overdraft dependency is visible.')
+    else
+      friction.push(
+        `${overdraftMonths} overdraft month${overdraftMonths === 1 ? '' : 's'} may need improvement.`
+      )
+    if (profile.stability.noRecurringFailedPayments)
+      strengths.push('Recurring failed-payment risk appears low.')
+    else friction.push('Failed-payment patterns need work before future credit readiness improves.')
+    if (hasLongHistory) strengths.push('Financial history is long enough to show a pattern.')
+    else friction.push('Longer evidence coverage would make the trend more credible.')
+    return completeReadiness(
+      'A future-credit view of affordability, resilience and repayment reliability.',
+      strengths,
+      friction,
+      actions,
+      profile.affordability.surplusAfterAll < 0 || returnedPayments > 1
+    )
+  }
+
+  if (template.type === 'income_proof') {
+    if (profile.stability.stableIncome)
+      strengths.push('Income appears stable across the available history.')
+    else friction.push('Income is variable and needs a clearer explanation.')
+    if (profile.income.averageMonthlyIncome > 0)
+      strengths.push('Verified income is visible from the connected data.')
+    else friction.push('Verified income is not yet clear enough.')
+    if (hasLongHistory)
+      strengths.push(`${profile.period.months} months of income history are available.`)
+    else friction.push('More history would make income proof stronger.')
+    actions.push({
+      title: 'Review income sources',
+      detail: 'Check the income breakdown and add context for any irregular sources.',
+      href: '/dashboard/trust-profile/financial-profile',
+      cta: 'Review income',
+    })
+    return completeReadiness(
+      'An income-proof view of sources, consistency and explainability.',
+      strengths,
+      friction,
+      actions
+    )
+  }
+
+  if (identityScore >= 70) strengths.push('Identity confidence is strong.')
+  else friction.push('Identity confidence needs improvement.')
+  if (verificationScore >= 70) strengths.push('Verification strength is good.')
+  else friction.push('Verification strength could be improved with more evidence.')
+  if (hasLongHistory) strengths.push('Data coverage is strong enough to show behaviour over time.')
+  else friction.push('More history would strengthen the profile.')
+  if (profile.stability.noRecurringFailedPayments)
+    strengths.push('No recurring failed-payment concern is visible.')
+  else friction.push('Failed-payment context would improve the profile.')
+
+  return completeReadiness(
+    'A whole-profile view of evidence strength, confidence and missing signals.',
+    strengths,
+    friction,
+    [
+      {
+        title: 'Complete the next evidence gap',
+        detail: 'Use To do to add the missing item most likely to strengthen your profile.',
+        href: '/dashboard/to-do',
+        cta: 'Open To do',
+      },
+    ]
+  )
+}
+
+function metricsForGoal(
+  type: ConsumerGoalType,
+  profile: InsightProfile | null | undefined,
+  score: Score,
+  goal: ConsumerGoal | null | undefined
+) {
+  const hasData = (profile?.period.transactionCount ?? 0) > 0
+  const monthlyIncome = profile?.income.averageMonthlyIncome ?? 0
+  const targetRent = goal?.targetMonthlyRent ?? null
+  const targetRentToIncome = targetRent && monthlyIncome > 0 ? targetRent / monthlyIncome : null
+  if (type === 'rental') {
+    return [
+      {
+        label: 'Monthly income',
+        value: hasData ? formatCurrency(monthlyIncome) : 'n/a',
+        hint: humanConsistency(profile?.income.consistency),
+      },
+      {
+        label: 'Target rent',
+        value: targetRent ? formatCurrency(targetRent) : 'Not set',
+        hint: 'Saved goal',
+      },
+      {
+        label: 'Target rent to income',
+        value: targetRentToIncome != null ? pct(targetRentToIncome) : 'n/a',
+        hint: 'Based on saved target',
+      },
+      {
+        label: 'Max sustainable rent',
+        value: hasData ? formatCurrency(profile?.affordability.maxAffordableRent ?? 0) : 'n/a',
+        hint: 'Estimated from evidence',
+      },
+    ]
+  }
+  if (type === 'banking_access') {
+    return [
+      {
+        label: 'Identity confidence',
+        value: score ? `${score.identityConfidenceScore}/100` : 'n/a',
+        hint: 'Profile signal',
+      },
+      {
+        label: 'Returned payments',
+        value: hasData ? String(profile?.paymentBehaviour.returnedPayments ?? 0) : 'n/a',
+        hint: 'Analysed period',
+      },
+      {
+        label: 'History',
+        value: hasData ? `${profile?.period.months ?? 0} mo` : 'n/a',
+        hint: 'Connected evidence',
+      },
+      {
+        label: 'Overdraft months',
+        value: hasData ? String(profile?.paymentBehaviour.overdraftMonths ?? 0) : 'n/a',
+        hint: 'Stability signal',
+      },
+    ]
+  }
+  if (type === 'utilities_phone') {
+    return [
+      {
+        label: 'Bills paid on time',
+        value: profile?.stability.billsPaidOnTime ? 'Yes' : 'Needs evidence',
+        hint: 'Essential bills',
+      },
+      {
+        label: 'Monthly surplus',
+        value: hasData ? formatCurrency(profile?.affordability.surplusAfterAll ?? 0) : 'n/a',
+        hint: 'After core spend',
+      },
+      {
+        label: 'Returned payments',
+        value: hasData ? String(profile?.paymentBehaviour.returnedPayments ?? 0) : 'n/a',
+        hint: 'Friction signal',
+      },
+      {
+        label: 'Income consistency',
+        value: hasData ? humanConsistency(profile?.income.consistency) : 'n/a',
+        hint: 'Recurring contracts',
+      },
+    ]
+  }
+  if (type === 'future_credit') {
+    return [
+      {
+        label: 'EquiScore tier',
+        value: score?.overallTier ? `Tier ${score.overallTier}` : 'n/a',
+        hint: score?.status?.replaceAll('_', ' ') ?? 'Assessment',
+      },
+      {
+        label: 'Monthly surplus',
+        value: hasData ? formatCurrency(profile?.affordability.surplusAfterAll ?? 0) : 'n/a',
+        hint: 'Affordability',
+      },
+      {
+        label: 'Overdraft months',
+        value: hasData ? String(profile?.paymentBehaviour.overdraftMonths ?? 0) : 'n/a',
+        hint: 'Resilience',
+      },
+      {
+        label: 'Failed payments',
+        value: hasData ? String(profile?.paymentBehaviour.returnedPayments ?? 0) : 'n/a',
+        hint: 'Payment behaviour',
+      },
+    ]
+  }
+  if (type === 'income_proof') {
+    return [
+      {
+        label: 'Monthly income',
+        value: hasData ? formatCurrency(monthlyIncome) : 'n/a',
+        hint: 'Verified average',
+      },
+      {
+        label: 'Consistency',
+        value: hasData ? humanConsistency(profile?.income.consistency) : 'n/a',
+        hint: 'Income pattern',
+      },
+      {
+        label: 'History',
+        value: hasData ? `${profile?.period.months ?? 0} mo` : 'n/a',
+        hint: 'Evidence coverage',
+      },
+      {
+        label: 'Surplus',
+        value: hasData ? formatCurrency(profile?.affordability.surplusAfterAll ?? 0) : 'n/a',
+        hint: 'After outgoings',
+      },
+    ]
+  }
+  return [
+    {
+      label: 'EquiScore',
+      value: score ? `${score.overallScore}/100` : 'n/a',
+      hint: score?.overallTier ? `Tier ${score.overallTier}` : 'Assessment',
+    },
+    {
+      label: 'Identity',
+      value: score ? `${score.identityConfidenceScore}/100` : 'n/a',
+      hint: 'Confidence',
+    },
+    {
+      label: 'Verification',
+      value: score ? `${score.verificationStrengthScore}/100` : 'n/a',
+      hint: 'Evidence strength',
+    },
+    {
+      label: 'History',
+      value: hasData ? `${profile?.period.months ?? 0} mo` : 'n/a',
+      hint: 'Connected data',
+    },
+  ]
 }
 
 export function GoalsView() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const { items: actionItems } = useActionItems()
+  const [selectedType, setSelectedType] = useState<ConsumerGoalType>('rental')
+  const [selectedTouched, setSelectedTouched] = useState(false)
   const [form, setForm] = useState<GoalForm>(EMPTY_GOAL_FORM)
   const [isDirty, setIsDirty] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -344,8 +662,8 @@ export function GoalsView() {
 
   const {
     data: profile,
-    isLoading,
-    isError,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
   } = useQuery<InsightProfile | null>({
     queryKey: ['insight-profile'],
     staleTime: 5 * 60 * 1000,
@@ -359,23 +677,53 @@ export function GoalsView() {
   })
 
   const {
-    data: goal,
-    isLoading: isGoalLoading,
-    isError: isGoalError,
-  } = useQuery<ConsumerGoal>({
-    queryKey: ['consumer-goal', 'primary'],
-    queryFn: async () => api.goals.getPrimary((await getToken())!),
+    data: savedGoals = [],
+    isLoading: isGoalsLoading,
+    isError: isGoalsError,
+  } = useQuery<ConsumerGoal[]>({
+    queryKey: ['consumer-goals'],
+    queryFn: async () => api.goals.list((await getToken())!),
   })
 
+  const savedByType = useMemo(
+    () => new Map(savedGoals.map((goal) => [goal.type, goal] as const)),
+    [savedGoals]
+  )
+  const activeGoals = savedGoals.filter((goal) => goal.status === 'active')
+  const selectedTemplate =
+    GOAL_TEMPLATES.find((template) => template.type === selectedType) ?? GOAL_TEMPLATES[0]!
+  const SelectedIcon = selectedTemplate.icon
+  const selectedGoal = savedByType.get(selectedType)
+  const selectedIsActive = selectedGoal?.status === 'active'
+  const selectedReadiness = buildGoalReadiness(
+    selectedTemplate,
+    profile,
+    score ?? null,
+    selectedGoal
+  )
+  const selectedStatus = READINESS[selectedReadiness.key]
+  const selectedMetrics = metricsForGoal(selectedType, profile, score ?? null, selectedGoal)
+  const savedDate = formatSavedDate(selectedGoal?.updatedAt)
+
   useEffect(() => {
-    if (!isDirty) setForm(goalToForm(goal))
-  }, [goal, isDirty])
+    const primary = savedGoals.find((goal) => goal.isPrimary && goal.status === 'active')
+    if (primary && !selectedTouched) setSelectedType(primary.type)
+  }, [savedGoals, selectedTouched])
+
+  useEffect(() => {
+    if (!isDirty) setForm(goalToForm(selectedGoal))
+  }, [selectedGoal, isDirty])
+
+  const invalidateGoals = () => {
+    void queryClient.invalidateQueries({ queryKey: ['consumer-goals'] })
+    void queryClient.invalidateQueries({ queryKey: ['consumer-goal', 'primary'] })
+  }
 
   const saveGoal = useMutation({
-    mutationFn: async (data: UpdateConsumerGoalInput) =>
-      api.goals.updatePrimary((await getToken())!, data),
-    onSuccess: (saved) => {
-      queryClient.setQueryData(['consumer-goal', 'primary'], saved)
+    mutationFn: async ({ type, data }: { type: ConsumerGoalType; data: UpdateConsumerGoalInput }) =>
+      api.goals.update((await getToken())!, type, data),
+    onSuccess: () => {
+      invalidateGoals()
       setIsDirty(false)
       setFormError(null)
       setSaveMessage('Saved')
@@ -386,6 +734,17 @@ export function GoalsView() {
     },
   })
 
+  const setFocus = useMutation({
+    mutationFn: async (type: ConsumerGoalType) => api.goals.setPrimary((await getToken())!, type),
+    onSuccess: () => {
+      invalidateGoals()
+      setSaveMessage('Focus goal updated')
+    },
+    onError: (error) => {
+      setFormError(error instanceof Error ? error.message : 'We could not update the focus goal.')
+    },
+  })
+
   const updateForm = <K extends keyof GoalForm>(key: K, value: GoalForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
     setIsDirty(true)
@@ -393,27 +752,48 @@ export function GoalsView() {
     setSaveMessage(null)
   }
 
-  const handleSave = () => {
-    const targetMonthlyRent = parseMoneyInput(form.targetMonthlyRent)
-    const depositAvailable = parseMoneyInput(form.depositAvailable)
-    saveGoal.mutate({
-      type: 'rental',
-      label: 'Rent a home',
-      targetMonthlyRent,
-      moveDate: inputDateToIso(form.moveDate),
-      applicationMode: form.applicationMode,
-      depositAvailable,
-      notes: form.notes.trim() || null,
-    })
+  const selectGoal = (type: ConsumerGoalType) => {
+    setSelectedType(type)
+    setSelectedTouched(true)
+    setIsDirty(false)
+    setFormError(null)
+    setSaveMessage(null)
   }
 
-  const readiness = buildRentalReadiness(profile, score ?? null, goal ?? null)
-  const status = READINESS[readiness.key]
-  const hasData = (profile?.period.transactionCount ?? 0) > 0
-  const targetRent = goal?.targetMonthlyRent ?? null
-  const monthlyIncome = profile?.income.averageMonthlyIncome ?? 0
-  const targetRentToIncome = targetRent && monthlyIncome > 0 ? targetRent / monthlyIncome : null
-  const savedDate = formatSavedDate(goal?.updatedAt)
+  const goalPayload = (status: 'active' | 'paused' = 'active'): UpdateConsumerGoalInput => {
+    const payload: UpdateConsumerGoalInput = {
+      type: selectedType,
+      status,
+      label: selectedTemplate.title,
+      notes: form.notes.trim() || null,
+    }
+    if (status === 'active' && (activeGoals.length === 0 || selectedGoal?.isPrimary)) {
+      payload.isPrimary = true
+    }
+    if (selectedType === 'rental') {
+      payload.targetMonthlyRent = parseMoneyInput(form.targetMonthlyRent)
+      payload.moveDate = inputDateToIso(form.moveDate)
+      payload.applicationMode = form.applicationMode
+      payload.depositAvailable = parseMoneyInput(form.depositAvailable)
+    }
+    return payload
+  }
+
+  const handleSave = () => {
+    saveGoal.mutate({ type: selectedType, data: goalPayload('active') })
+  }
+
+  const handlePause = () => {
+    saveGoal.mutate({
+      type: selectedType,
+      data: {
+        type: selectedType,
+        status: 'paused',
+        isPrimary: false,
+        label: selectedTemplate.title,
+      },
+    })
+  }
 
   const fallbackActions = actionItems.slice(0, 3).map((item) => ({
     title: item.title,
@@ -421,25 +801,25 @@ export function GoalsView() {
     href: item.href,
     cta: item.cta,
   }))
-  const actions = readiness.actions.length > 0 ? readiness.actions : fallbackActions
+  const actions = selectedReadiness.actions.length > 0 ? selectedReadiness.actions : fallbackActions
 
   return (
     <PageLayout>
       <PageHeader
         title="Goals"
-        description="Choose what you are trying to do, see how ready your Trust Profile is, and fix the most important evidence gaps before you share."
+        description="Set the outcomes you are working towards, understand readiness by goal, and turn your financial evidence into a practical plan."
       />
 
-      {isLoading ? (
+      {isProfileLoading || isGoalsLoading ? (
         <div className="space-y-4">
-          <div className="rounded-card bg-surface-hover h-56 animate-pulse" />
+          <div className="rounded-card bg-surface-hover h-52 animate-pulse" />
           <div className="grid gap-4 md:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="rounded-card bg-surface-hover h-28 animate-pulse" />
+              <div key={i} className="rounded-card bg-surface-hover h-32 animate-pulse" />
             ))}
           </div>
         </div>
-      ) : isError ? (
+      ) : isProfileError || isGoalsError ? (
         <Card className="flex items-start gap-3">
           <AlertTriangle className="text-warning-strong mt-0.5 h-5 w-5 shrink-0" />
           <div>
@@ -451,111 +831,213 @@ export function GoalsView() {
         </Card>
       ) : (
         <>
+          <Card padding="lg" className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-content-muted mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
+                  <Sparkles className="h-4 w-4" />
+                  Goal portfolio
+                </div>
+                <h2 className="text-content text-2xl font-semibold">
+                  Work towards more than one outcome
+                </h2>
+                <p className="text-content-secondary mt-2 max-w-3xl text-sm">
+                  Each goal reads the same Trust Profile differently. Rental readiness cares about
+                  affordability and rent reliability; income proof cares about source clarity;
+                  future credit cares about surplus and resilience.
+                </p>
+              </div>
+              <StatusPill
+                status={activeGoals.length > 0 ? 'success' : 'neutral'}
+                label={`${activeGoals.length} active`}
+              />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {GOAL_TEMPLATES.map((template) => {
+                const saved = savedByType.get(template.type)
+                const readiness = buildGoalReadiness(template, profile, score ?? null, saved)
+                const status = READINESS[readiness.key]
+                const isSelected = template.type === selectedType
+                const isActive = saved?.status === 'active'
+                const Icon = template.icon
+                return (
+                  <button
+                    key={template.type}
+                    type="button"
+                    onClick={() => selectGoal(template.type)}
+                    className={`rounded-xl border p-4 text-left transition-colors ${
+                      isSelected
+                        ? 'border-brand-900 bg-brand-50'
+                        : 'border-line bg-surface-card hover:bg-surface-hover'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-panel bg-surface-inset flex h-10 w-10 shrink-0 items-center justify-center">
+                        <Icon className="text-brand-900 h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-content font-semibold">{template.shortTitle}</p>
+                          {saved?.isPrimary && isActive ? (
+                            <StatusPill status="success" label="Focus" />
+                          ) : null}
+                          {isActive ? (
+                            <StatusPill status={status.tone} label={status.label} />
+                          ) : (
+                            <StatusPill status="neutral" label="Available" />
+                          )}
+                        </div>
+                        <p className="text-content-secondary mt-1 text-sm">
+                          {template.description}
+                        </p>
+                        <p className="text-content-muted mt-2 text-xs">{template.evidenceFocus}</p>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+
           <Card padding="lg" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-content-muted mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
-                  <Home className="h-4 w-4" />
-                  Current goal
+                  <SelectedIcon className="h-4 w-4" />
+                  Selected goal
                 </div>
-                <h2 className="text-content text-2xl font-semibold">Rent a home</h2>
+                <h2 className="text-content text-2xl font-semibold">{selectedTemplate.title}</h2>
                 <p className="text-content-secondary mt-2 max-w-2xl text-sm">
-                  A readiness check for rental applications, using income, affordability, payment
-                  behaviour, identity confidence and evidence coverage.
+                  {selectedTemplate.description}
                 </p>
               </div>
-              <StatusPill status={status.tone} label={status.label} />
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill status={selectedStatus.tone} label={selectedStatus.label} />
+                {selectedIsActive ? <StatusPill status="success" label="Active" /> : null}
+              </div>
             </div>
 
             <InsetPanel className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-content text-lg font-semibold">{status.label}</p>
-                <p className="text-content-secondary mt-1 max-w-2xl text-sm">{status.body}</p>
+                <p className="text-content text-lg font-semibold">{selectedStatus.label}</p>
+                <p className="text-content-secondary mt-1 max-w-2xl text-sm">
+                  {selectedReadiness.summary}
+                </p>
               </div>
-              <Link href="/dashboard/share" className={buttonClasses('primary', 'md', 'shrink-0')}>
-                Preview share pack <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {!selectedIsActive ? (
+                  <Button type="button" onClick={handleSave} loading={saveGoal.isPending}>
+                    <Plus className="h-4 w-4" />
+                    Start goal
+                  </Button>
+                ) : null}
+                {selectedIsActive && !selectedGoal?.isPrimary ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setFocus.mutate(selectedType)}
+                    loading={setFocus.isPending}
+                  >
+                    Set as focus
+                  </Button>
+                ) : null}
+                {selectedType === 'rental' ? (
+                  <Link href="/dashboard/share" className={buttonClasses('primary', 'md')}>
+                    Preview share pack <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
             </InsetPanel>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {selectedMetrics.map((metric) => (
+                <MetricCard
+                  key={metric.label}
+                  label={metric.label}
+                  value={metric.value}
+                  hint={metric.hint}
+                />
+              ))}
+            </div>
 
             <InsetPanel id="goal-settings" className="space-y-4" padding="md">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-content text-base font-semibold">Rental target</h3>
+                  <h3 className="text-content text-base font-semibold">Goal details</h3>
                   <p className="text-content-secondary mt-1 text-sm">
-                    Save the rent and move timing you are working towards so the readiness check
-                    becomes specific to the application.
+                    Save the practical context for this goal so the guidance can become more
+                    specific over time.
                   </p>
                 </div>
                 <div className="text-content-muted text-right text-xs">
-                  {isGoalLoading
-                    ? 'Loading saved goal'
-                    : savedDate
-                      ? `Last saved ${savedDate}`
-                      : 'Not saved yet'}
+                  {savedDate ? `Last saved ${savedDate}` : 'Not saved yet'}
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-4">
-                <label className="text-content block text-sm font-medium">
-                  Target monthly rent
-                  <div className="border-line bg-surface-card mt-1 flex h-10 items-center rounded-lg border px-3">
-                    <span className="text-content-muted mr-2">£</span>
+              {selectedType === 'rental' ? (
+                <div className="grid gap-4 lg:grid-cols-4">
+                  <label className="text-content block text-sm font-medium">
+                    Target monthly rent
+                    <div className="border-line bg-surface-card mt-1 flex h-10 items-center rounded-lg border px-3">
+                      <span className="text-content-muted mr-2">£</span>
+                      <input
+                        value={form.targetMonthlyRent}
+                        onChange={(event) => updateForm('targetMonthlyRent', event.target.value)}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        className="placeholder:text-content-muted h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+                        placeholder="1,800"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="text-content block text-sm font-medium">
+                    Move date
                     <input
-                      value={form.targetMonthlyRent}
-                      onChange={(event) => updateForm('targetMonthlyRent', event.target.value)}
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      className="placeholder:text-content-muted h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-                      placeholder="1,800"
+                      value={form.moveDate}
+                      onChange={(event) => updateForm('moveDate', event.target.value)}
+                      type="date"
+                      className="border-line bg-surface-card mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
                     />
-                  </div>
-                </label>
+                  </label>
 
-                <label className="text-content block text-sm font-medium">
-                  Move date
-                  <input
-                    value={form.moveDate}
-                    onChange={(event) => updateForm('moveDate', event.target.value)}
-                    type="date"
-                    className="border-line bg-surface-card mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
-                  />
-                </label>
+                  <label className="text-content block text-sm font-medium">
+                    Application type
+                    <select
+                      value={form.applicationMode}
+                      onChange={(event) =>
+                        updateForm(
+                          'applicationMode',
+                          event.target.value as ConsumerGoalApplicationMode
+                        )
+                      }
+                      className="border-line bg-surface-card mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
+                    >
+                      <option value="unknown">Not sure yet</option>
+                      <option value="alone">Applying alone</option>
+                      <option value="joint">Joint application</option>
+                    </select>
+                  </label>
 
-                <label className="text-content block text-sm font-medium">
-                  Application type
-                  <select
-                    value={form.applicationMode}
-                    onChange={(event) =>
-                      updateForm(
-                        'applicationMode',
-                        event.target.value as ConsumerGoalApplicationMode
-                      )
-                    }
-                    className="border-line bg-surface-card mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
-                  >
-                    <option value="unknown">Not sure yet</option>
-                    <option value="alone">Applying alone</option>
-                    <option value="joint">Joint application</option>
-                  </select>
-                </label>
-
-                <label className="text-content block text-sm font-medium">
-                  Deposit available
-                  <div className="border-line bg-surface-card mt-1 flex h-10 items-center rounded-lg border px-3">
-                    <span className="text-content-muted mr-2">£</span>
-                    <input
-                      value={form.depositAvailable}
-                      onChange={(event) => updateForm('depositAvailable', event.target.value)}
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      className="placeholder:text-content-muted h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-                      placeholder="2,500"
-                    />
-                  </div>
-                </label>
-              </div>
+                  <label className="text-content block text-sm font-medium">
+                    Deposit available
+                    <div className="border-line bg-surface-card mt-1 flex h-10 items-center rounded-lg border px-3">
+                      <span className="text-content-muted mr-2">£</span>
+                      <input
+                        value={form.depositAvailable}
+                        onChange={(event) => updateForm('depositAvailable', event.target.value)}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        className="placeholder:text-content-muted h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+                        placeholder="2,500"
+                      />
+                    </div>
+                  </label>
+                </div>
+              ) : null}
 
               <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
                 <label className="text-content block text-sm font-medium">
@@ -566,76 +1048,53 @@ export function GoalsView() {
                     rows={3}
                     maxLength={500}
                     className="border-line bg-surface-card placeholder:text-content-muted mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                    placeholder="Add context, for example guarantor, joint applicant, savings, or timing."
+                    placeholder="Add context you want EquiScore to remember for this goal."
                   />
                 </label>
                 <div className="flex flex-col items-start gap-2 lg:items-end">
-                  <Button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={!isDirty || isGoalLoading}
-                    loading={saveGoal.isPending}
-                  >
-                    <Save className="h-4 w-4" />
-                    Save goal
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedIsActive ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handlePause}
+                        loading={saveGoal.isPending}
+                      >
+                        Pause
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={!isDirty && selectedIsActive}
+                      loading={saveGoal.isPending}
+                    >
+                      <Save className="h-4 w-4" />
+                      {selectedIsActive ? 'Save goal' : 'Start goal'}
+                    </Button>
+                  </div>
                   {saveMessage && (
                     <p className="text-success-strong text-xs font-medium">{saveMessage}</p>
                   )}
-                  {(formError || isGoalError) && (
-                    <p className="text-danger-strong text-xs font-medium">
-                      {formError ?? 'We could not load your saved goal.'}
-                    </p>
+                  {formError && (
+                    <p className="text-danger-strong text-xs font-medium">{formError}</p>
                   )}
                 </div>
               </div>
             </InsetPanel>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricCard
-                label="Monthly income"
-                value={hasData ? formatCurrency(monthlyIncome) : 'n/a'}
-                hint={
-                  hasData
-                    ? humanConsistency(profile?.income.consistency ?? 'unknown')
-                    : 'Add evidence first'
-                }
-              />
-              <MetricCard
-                label="Target rent"
-                value={targetRent ? formatCurrency(targetRent) : 'Not set'}
-                hint={
-                  profile?.affordability.currentRent
-                    ? `Current detected rent ${formatCurrency(profile.affordability.currentRent)}`
-                    : 'Saved goal'
-                }
-              />
-              <MetricCard
-                label="Target rent to income"
-                value={targetRentToIncome != null ? pct(targetRentToIncome) : 'n/a'}
-                hint="Based on saved target"
-              />
-              <MetricCard
-                label="Max sustainable rent"
-                value={
-                  hasData ? formatCurrency(profile?.affordability.maxAffordableRent ?? 0) : 'n/a'
-                }
-                hint="Estimated from current evidence"
-              />
-            </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
                 <h3 className="text-content mb-3 text-base font-semibold">
                   What supports this goal
                 </h3>
-                {readiness.strengths.length === 0 ? (
+                {selectedReadiness.strengths.length === 0 ? (
                   <p className="rounded-panel bg-surface-inset text-content-secondary p-4 text-sm">
                     Add financial and identity evidence to surface positive readiness signals.
                   </p>
                 ) : (
                   <ul className="space-y-2.5">
-                    {readiness.strengths.map((item) => (
+                    {selectedReadiness.strengths.map((item) => (
                       <li
                         key={item}
                         className="text-content-secondary flex items-start gap-2.5 text-sm"
@@ -650,13 +1109,13 @@ export function GoalsView() {
 
               <div>
                 <h3 className="text-content mb-3 text-base font-semibold">Possible friction</h3>
-                {readiness.friction.length === 0 ? (
+                {selectedReadiness.friction.length === 0 ? (
                   <p className="rounded-panel bg-success-soft text-success-strong p-4 text-sm">
-                    No major rental-readiness friction points detected from the current evidence.
+                    No major friction points detected from the current evidence.
                   </p>
                 ) : (
                   <ul className="space-y-2.5">
-                    {readiness.friction.slice(0, 5).map((item) => (
+                    {selectedReadiness.friction.slice(0, 5).map((item) => (
                       <li
                         key={item}
                         className="text-content-secondary flex items-start gap-2.5 text-sm"
@@ -677,13 +1136,14 @@ export function GoalsView() {
                 <div>
                   <h2 className="text-content text-base font-semibold">Next best actions</h2>
                   <p className="text-content-secondary mt-1 text-sm">
-                    The smallest set of actions likely to improve this goal.
+                    The smallest set of actions likely to improve the selected goal.
                   </p>
                 </div>
               </div>
               {actions.length === 0 ? (
                 <p className="text-content-secondary text-sm">
-                  Nothing urgent. Your next step is to create or preview a rental share pack.
+                  Nothing urgent. Keep your evidence fresh and revisit this goal when your
+                  circumstances change.
                 </p>
               ) : (
                 <ol className="space-y-3">
@@ -715,59 +1175,22 @@ export function GoalsView() {
 
             <Card>
               <div className="border-line-subtle mb-4 flex items-center gap-2 border-b pb-3">
-                <ShieldCheck className="text-brand-900 h-4 w-4" />
-                <h2 className="text-content text-base font-semibold">Share readiness</h2>
+                <UploadCloud className="text-brand-900 h-4 w-4" />
+                <h2 className="text-content text-base font-semibold">How this gets smarter</h2>
               </div>
               <p className="text-content-secondary text-sm">
-                A goal-specific pack should explain what supports the goal, what is limited, and
-                what the recipient can safely rely on.
+                Goals become sharper as EquiScore sees more reliable evidence. The same transaction
+                history can support several outcomes, but each goal weighs the signals differently.
               </p>
               <div className="rounded-panel bg-surface-inset text-content-secondary mt-4 p-3 text-sm">
-                <p className="text-content font-medium">Rental pack</p>
+                <p className="text-content font-medium">Next product layer</p>
                 <p className="mt-1">
-                  {readiness.key === 'ready'
-                    ? 'Ready to preview.'
-                    : readiness.key === 'not_enough_information'
-                      ? 'Evidence required before sharing.'
-                      : 'Can be shared with limitations clearly explained.'}
+                  Goal-specific share packs and a clearer evidence checklist for each selected
+                  outcome.
                 </p>
               </div>
-              <Link
-                href="/dashboard/share"
-                className={buttonClasses('primary', 'md', 'mt-4 w-full')}
-              >
-                Open Sharing
-              </Link>
             </Card>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {futureGoals.map(({ title, icon: Icon, status: goalStatus }) => (
-              <Card key={title} padding="sm" className="flex items-start gap-3">
-                <div className="rounded-panel bg-surface-inset flex h-10 w-10 shrink-0 items-center justify-center">
-                  <Icon className="text-brand-900 h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-content text-sm font-semibold">{title}</p>
-                    <StatusPill status="neutral" label={goalStatus} />
-                  </div>
-                  <p className="text-content-muted mt-1 text-sm">
-                    This goal will reuse the same Trust Profile evidence in a different context.
-                  </p>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          <InsetPanel className="flex items-start gap-3">
-            <UploadCloud className="text-brand-900 mt-0.5 h-5 w-5 shrink-0" />
-            <p className="text-content-secondary text-sm">
-              Evidence uploaded through To do or supporting-information flows should appear
-              contextually in Assessment, Financial Profile, Goals and Sharing, rather than living
-              as a separate top-level destination.
-            </p>
-          </InsetPanel>
         </>
       )}
     </PageLayout>

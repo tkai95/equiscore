@@ -48,6 +48,25 @@ My Money, To do and Sharing.
 - Production database migration `20260713203000_consumer_goals` has been
   applied.
 
+## Built In Multi-Goal Slice
+
+- Goals now behave as a goal portfolio rather than a single rental-readiness
+  page.
+- Consumers can save multiple active goals:
+  - rent a home
+  - open or recover banking access
+  - set up utilities or a phone contract
+  - prepare for future credit
+  - prove income clearly
+  - strengthen the overall Trust Profile
+- One active goal can be marked as the focus goal.
+- The Goals API now supports listing saved goals, updating a specific goal
+  type, and setting the focus goal.
+- The Goals UI now shows a selectable goal library, active/focus status, saved
+  notes, and goal-specific readiness signals.
+- Existing financial evidence is interpreted differently per goal, instead of
+  forcing every outcome through the rental-readiness lens.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -73,14 +92,18 @@ history.
 
 ## Next Build Slices
 
-1. Build Rental Readiness depth:
-   - Add target monthly rent input.
+1. Build goal-specific depth:
+   - Add clearer readiness explanations for each active goal.
+   - Add required vs optional evidence checklists per goal.
+   - Add "how the recipient may view this" summaries per goal type.
+   - Keep Rental Readiness as the first deep implementation.
    - Compare target rent against income, current commitments and detected headroom.
    - Add "how a letting agent may view this" summary.
-   - Show required evidence and optional evidence separately.
 
 2. Connect Goals to Sharing:
    - Create a rental share-pack mode.
+   - Create a generic goal share-pack structure that can later support banking,
+     utilities, phone, income-proof and credit-readiness use cases.
    - Preview what the recipient sees.
    - Show limitations and evidence confidence before sharing.
 
