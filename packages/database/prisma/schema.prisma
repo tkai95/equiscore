@@ -59,6 +59,7 @@ model User {
   commitmentSettings                 CommitmentSetting[]
   reminders                          Reminder[]
   savingsGoals                       SavingsGoal[]
+  consumerGoals                      ConsumerGoal[]
   compassDismissals                  CompassDismissal[]
 
   @@map("users")
@@ -1491,4 +1492,59 @@ model CompassDismissal {
 
   @@unique([userId, kind, key])
   @@map("compass_dismissals")
+}
+
+// ─── Consumer Goals ──────────────────────────────────────────────────────────
+
+/// A consumer-facing goal that frames readiness around a real outcome. This is
+/// intentionally outside Compass so all consumers can save their primary
+/// objective before any premium coaching layer is enabled.
+model ConsumerGoal {
+  id                String                       @id @default(cuid())
+  userId            String                       @map("user_id")
+  type              ConsumerGoalType             @default(rental)
+  status            ConsumerGoalStatus           @default(active)
+  isPrimary         Boolean                      @default(false) @map("is_primary")
+  label             String?
+  targetMonthlyRent Float?                       @map("target_monthly_rent")
+  moveDate          DateTime?                    @map("move_date")
+  applicationMode   ConsumerGoalApplicationMode? @map("application_mode")
+  depositAvailable  Float?                       @map("deposit_available")
+  notes             String?
+  createdAt         DateTime                     @default(now()) @map("created_at")
+  updatedAt         DateTime                     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId, status])
+  @@index([userId, isPrimary])
+  @@map("consumer_goals")
+}
+
+enum ConsumerGoalType {
+  rental
+  banking_access
+  utilities_phone
+  future_credit
+  income_proof
+  stronger_profile
+
+  @@map("consumer_goal_type")
+}
+
+enum ConsumerGoalStatus {
+  active
+  paused
+  archived
+
+  @@map("consumer_goal_status")
+}
+
+enum ConsumerGoalApplicationMode {
+  alone
+  joint
+  unknown
+
+  @@map("consumer_goal_application_mode")
 }

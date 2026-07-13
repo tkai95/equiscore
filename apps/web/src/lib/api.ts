@@ -12,6 +12,41 @@ export interface Me {
   profile: { fullName: string | null; profileStage: string } | null
 }
 
+export type ConsumerGoalType =
+  | 'rental'
+  | 'banking_access'
+  | 'utilities_phone'
+  | 'future_credit'
+  | 'income_proof'
+  | 'stronger_profile'
+
+export type ConsumerGoalApplicationMode = 'alone' | 'joint' | 'unknown'
+
+export interface ConsumerGoal {
+  id: string
+  type: ConsumerGoalType
+  status: 'active' | 'paused' | 'archived'
+  isPrimary: boolean
+  label: string | null
+  targetMonthlyRent: number | null
+  moveDate: string | null
+  applicationMode: ConsumerGoalApplicationMode | null
+  depositAvailable: number | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UpdateConsumerGoalInput {
+  type?: ConsumerGoalType
+  label?: string | null
+  targetMonthlyRent?: number | null
+  moveDate?: string | null
+  applicationMode?: ConsumerGoalApplicationMode | null
+  depositAvailable?: number | null
+  notes?: string | null
+}
+
 export type ImportJobStatus = 'processing' | 'completed' | 'failed' | 'cancelled'
 
 export interface StatementImportResult {
@@ -172,6 +207,15 @@ export const api = {
     getEmployment: (token: string) => apiFetch('/profile/employment', {}, token),
     getRental: (token: string) => apiFetch('/profile/rental', {}, token),
   },
+  goals: {
+    getPrimary: (token: string) => apiFetch<ConsumerGoal>('/goals/primary', {}, token),
+    updatePrimary: (token: string, data: UpdateConsumerGoalInput) =>
+      apiFetch<ConsumerGoal>(
+        '/goals/primary',
+        { method: 'PUT', body: JSON.stringify(data) },
+        token
+      ),
+  },
   banking: {
     getLinkUrl: (token: string) =>
       apiFetch<{ url: string }>('/open-banking/link-token', { method: 'POST' }, token),
@@ -215,7 +259,9 @@ export const api = {
         body: form,
       })
       if (!res.ok) {
-        const error = (await res.json().catch(() => ({ message: res.statusText }))) as { message?: string }
+        const error = (await res.json().catch(() => ({ message: res.statusText }))) as {
+          message?: string
+        }
         throw new Error(error.message ?? 'Upload failed')
       }
       return res.json()
@@ -228,8 +274,7 @@ export const api = {
   scores: {
     recompute: (token: string, type = 'general') =>
       apiFetch(`/scores/recompute?type=${type}`, { method: 'POST' }, token),
-    latest: (token: string, type = 'general') =>
-      apiFetch(`/scores/latest?type=${type}`, {}, token),
+    latest: (token: string, type = 'general') => apiFetch(`/scores/latest?type=${type}`, {}, token),
     improvements: (token: string, type = 'general') =>
       apiFetch<ScoreImprovements>(`/scores/improvements?type=${type}`, {}, token),
     history: (token: string) => apiFetch('/scores/history', {}, token),
@@ -245,12 +290,15 @@ export const api = {
   },
   analytics: {
     summary: (token: string) => apiFetch('/analytics/summary', {}, token),
-    insights: (token: string) =>
-      apiFetch('/analytics/insights', { method: 'POST' }, token),
+    insights: (token: string) => apiFetch('/analytics/insights', { method: 'POST' }, token),
   },
   insights: {
     getProfile: (token: string) => apiFetch('/insights/profile', {}, token),
-    getBreakdown: (token: string, type: 'category' | 'commitment' | 'income' | 'month', key: string) =>
+    getBreakdown: (
+      token: string,
+      type: 'category' | 'commitment' | 'income' | 'month',
+      key: string
+    ) =>
       apiFetch<Breakdown>(
         `/insights/breakdown?type=${type}&key=${encodeURIComponent(key)}`,
         {},
@@ -290,8 +338,7 @@ export const api = {
       }
       return res.json() as Promise<{ jobId: string; status: ImportJobStatus }>
     },
-    listImportJobs: (token: string) =>
-      apiFetch<ImportJob[]>('/insights/import-jobs', {}, token),
+    listImportJobs: (token: string) => apiFetch<ImportJob[]>('/insights/import-jobs', {}, token),
     getImportJob: (token: string, id: string) =>
       apiFetch<ImportJob>(`/insights/import-jobs/${id}`, {}, token),
     cancelImportJob: (token: string, id: string) =>
@@ -316,7 +363,12 @@ export const api = {
     confirmCommitment: (
       token: string,
       key: string,
-      data: { status: 'active' | 'inactive' | 'unknown'; name?: string; renewalDate?: string; remind?: boolean }
+      data: {
+        status: 'active' | 'inactive' | 'unknown'
+        name?: string
+        renewalDate?: string
+        remind?: boolean
+      }
     ) =>
       apiFetch<{ ok: true }>(
         `/compass/commitments/${encodeURIComponent(key)}/confirm`,
@@ -325,7 +377,13 @@ export const api = {
       ),
     createReminder: (
       token: string,
-      data: { title: string; dueDate: string; type?: string; commitmentKey?: string; offsetDays?: number[] }
+      data: {
+        title: string
+        dueDate: string
+        type?: string
+        commitmentKey?: string
+        offsetDays?: number[]
+      }
     ) => apiFetch('/compass/reminders', { method: 'POST', body: JSON.stringify(data) }, token),
     updateReminder: (token: string, id: string, status: 'completed' | 'dismissed') =>
       apiFetch<{ ok: true }>(
@@ -335,8 +393,15 @@ export const api = {
       ),
     upsertGoal: (
       token: string,
-      data: { type?: string; label?: string; targetAmount: number; targetMonths?: number; monthlyContribution?: number }
-    ) => apiFetch<{ ok: true }>('/compass/goal', { method: 'PUT', body: JSON.stringify(data) }, token),
+      data: {
+        type?: string
+        label?: string
+        targetAmount: number
+        targetMonths?: number
+        monthlyContribution?: number
+      }
+    ) =>
+      apiFetch<{ ok: true }>('/compass/goal', { method: 'PUT', body: JSON.stringify(data) }, token),
     archiveGoal: (token: string, id: string) =>
       apiFetch<{ ok: true }>(`/compass/goal/${id}`, { method: 'DELETE' }, token),
     dismissOpportunity: (token: string, id: string) =>

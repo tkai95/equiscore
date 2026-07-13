@@ -37,6 +37,17 @@ My Money, To do and Sharing.
   - Savings & resilience
 - Goals page introduced with first Rental Readiness view using existing insight data.
 
+## Built In Persistence Slice
+
+- Added a persistent `consumer_goals` table for user-scoped readiness goals.
+- Added authenticated `/api/v1/goals/primary` read/write endpoints.
+- Rental Readiness now saves target monthly rent, move date, application type,
+  deposit available and notes.
+- Saved target rent now feeds the readiness logic and target rent-to-income
+  metrics.
+- Production database migration `20260713203000_consumer_goals` has been
+  applied.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -62,33 +73,28 @@ history.
 
 ## Next Build Slices
 
-1. Make Goals persistent:
-   - Store selected primary goal.
-   - Let users edit target rent and move date.
-   - Save readiness inputs and goal-specific notes.
-
-2. Build Rental Readiness depth:
+1. Build Rental Readiness depth:
    - Add target monthly rent input.
    - Compare target rent against income, current commitments and detected headroom.
    - Add "how a letting agent may view this" summary.
    - Show required evidence and optional evidence separately.
 
-3. Connect Goals to Sharing:
+2. Connect Goals to Sharing:
    - Create a rental share-pack mode.
    - Preview what the recipient sees.
    - Show limitations and evidence confidence before sharing.
 
-4. Add contextual supporting information:
+3. Add contextual supporting information:
    - Keep bank connections and documents as functional routes.
    - Surface them from Financial Profile, Goals and To do instead of top-level navigation.
 
-5. Refine Home:
+4. Refine Home:
    - Show current goal status.
    - Show one money insight.
    - Show only genuinely actionable To do items.
    - Show recent activity such as share created, recipient viewed, assessment updated.
 
-6. Later:
+5. Later:
    - Banking access readiness.
    - Utilities or phone contract readiness.
    - Future credit readiness.
