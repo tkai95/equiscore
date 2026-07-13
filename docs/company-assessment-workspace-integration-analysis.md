@@ -1210,8 +1210,8 @@ Immediate next slices, in order:
 
 4. **Assessment case detail and reviewer workflow**
    - Done: added an organisation-scoped assessment case detail API and first partner-facing case detail page with snapshot, consent/request context, financial summaries, criteria results, review activity, and audit trail.
-   - Add reviewer decision controls on the case detail page.
-   - Add missing-information/request-more-evidence flow.
+   - Done: added case detail reviewer actions for recording company decisions and requesting more information, with organisation audit events.
+   - Add applicant response handling for missing-information/request-more-evidence flows.
    - Keep company decisions separate from EquiScore outcome.
 
 5. **Policy builder foundation**

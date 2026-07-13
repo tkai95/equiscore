@@ -1,11 +1,24 @@
 'use client'
 
+import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, ClipboardCheck, FileText, ShieldCheck } from 'lucide-react'
-import { workspaceApi, type WorkspaceAssessmentCaseDetail } from '@/lib/workspace-api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ArrowLeft,
+  ClipboardCheck,
+  FileText,
+  MessageSquarePlus,
+  Send,
+  ShieldCheck,
+} from 'lucide-react'
+import {
+  workspaceApi,
+  type RecordWorkspaceCaseDecisionInput,
+  type WorkspaceAssessmentCaseDetail,
+} from '@/lib/workspace-api'
+import {
+  Button,
   buttonClasses,
   Card,
   Metric,
@@ -32,8 +45,16 @@ const STATUS_TONES: Record<string, StatusTone> = {
   information_required: 'warning',
   information_requested: 'warning',
   under_review: 'info',
+  review_complete: 'success',
+  company_decision_recorded: 'success',
   approved: 'success',
+  approved_with_conditions: 'success',
+  additional_information_required: 'warning',
+  guarantor_or_alternative_route_required: 'warning',
+  referred_for_manual_review: 'info',
   declined: 'danger',
+  withdrawn: 'neutral',
+  expired_without_decision: 'danger',
   expired: 'neutral',
   cancelled: 'danger',
   revoked: 'danger',
@@ -42,6 +63,22 @@ const STATUS_TONES: Record<string, StatusTone> = {
   review: 'warning',
   missing: 'warning',
 }
+
+type DecisionValue = RecordWorkspaceCaseDecisionInput['decision']
+
+const DECISION_OPTIONS: Array<{ value: DecisionValue; label: string }> = [
+  { value: 'approved', label: 'Approved' },
+  { value: 'approved_with_conditions', label: 'Approved with conditions' },
+  { value: 'additional_information_required', label: 'Additional information required' },
+  { value: 'guarantor_or_alternative_route_required', label: 'Alternative route required' },
+  { value: 'referred_for_manual_review', label: 'Refer for manual review' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'withdrawn', label: 'Withdrawn' },
+  { value: 'expired_without_decision', label: 'Expired without decision' },
+]
+
+const inputClass =
+  'border-line focus:border-brand mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none'
 
 function statusTone(value: string | null | undefined): StatusTone {
   return value ? (STATUS_TONES[value] ?? 'neutral') : 'neutral'
@@ -91,11 +128,86 @@ export function AssessmentCaseDetailView({
   caseId: string
 }) {
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
+  const detailQueryKey = ['workspace-case-detail', organisationSlug, caseId] as const
+  const [decisionForm, setDecisionForm] = useState({
+    decision: 'approved' as DecisionValue,
+    rationale: '',
+    conditions: '',
+    overrideReason: '',
+  })
+  const [infoForm, setInfoForm] = useState({
+    requestType: 'general',
+    message: '',
+    requestedFields: '',
+    dueAt: '',
+  })
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['workspace-case-detail', organisationSlug, caseId],
+    queryKey: detailQueryKey,
     queryFn: async () =>
       workspaceApi.organisations.caseDetail((await getToken())!, organisationSlug, caseId),
   })
+
+  const refreshCase = (updated: WorkspaceAssessmentCaseDetail) => {
+    queryClient.setQueryData(detailQueryKey, updated)
+    void queryClient.invalidateQueries({ queryKey: ['workspace-cases', organisationSlug] })
+    void queryClient.invalidateQueries({ queryKey: ['workspace-audit', organisationSlug] })
+    void queryClient.invalidateQueries({ queryKey: ['workspace-overview', organisationSlug] })
+  }
+
+  const recordDecision = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      return workspaceApi.organisations.recordCaseDecision(token!, organisationSlug, caseId, {
+        decision: decisionForm.decision,
+        rationale: decisionForm.rationale,
+        conditions: decisionForm.conditions || undefined,
+        overrideReason: decisionForm.overrideReason || undefined,
+      })
+    },
+    onSuccess: (updated) => {
+      refreshCase(updated)
+      setDecisionForm({
+        decision: 'approved',
+        rationale: '',
+        conditions: '',
+        overrideReason: '',
+      })
+    },
+  })
+
+  const requestInformation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      return workspaceApi.organisations.requestCaseInformation(token!, organisationSlug, caseId, {
+        requestType: infoForm.requestType || undefined,
+        message: infoForm.message,
+        requestedFields: infoForm.requestedFields || undefined,
+        dueAt: infoForm.dueAt
+          ? new Date(`${infoForm.dueAt}T23:59:59.000Z`).toISOString()
+          : undefined,
+      })
+    },
+    onSuccess: (updated) => {
+      refreshCase(updated)
+      setInfoForm({
+        requestType: 'general',
+        message: '',
+        requestedFields: '',
+        dueAt: '',
+      })
+    },
+  })
+
+  const submitDecision = (event: FormEvent) => {
+    event.preventDefault()
+    if (decisionForm.rationale.trim()) recordDecision.mutate()
+  }
+
+  const submitInformationRequest = (event: FormEvent) => {
+    event.preventDefault()
+    if (infoForm.message.trim()) requestInformation.mutate()
+  }
 
   if (isLoading) {
     return (
@@ -175,10 +287,230 @@ export function AssessmentCaseDetailView({
             <Metric label="Assessment type" value={label(data.assessmentType)} />
             <Metric label="Outcome" value={label(data.assessmentOutcome)} />
             <Metric label="Confidence" value={label(data.assessmentConfidence)} />
+            <Metric label="Company decision" value={label(data.companyDecision)} />
             <Metric label="Assessed" value={formatMaybeDate(data.assessedAt)} />
           </MetricGroup>
         </Section>
       </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card padding="lg">
+          <Section
+            title={
+              <span className="flex items-center gap-2">
+                <ClipboardCheck className="text-brand h-4 w-4" />
+                Record decision
+              </span>
+            }
+          >
+            <form onSubmit={submitDecision} className="space-y-4">
+              <div>
+                <label className="text-content block text-sm font-medium" htmlFor="case-decision">
+                  Decision
+                </label>
+                <select
+                  id="case-decision"
+                  value={decisionForm.decision}
+                  onChange={(event) =>
+                    setDecisionForm((current) => ({
+                      ...current,
+                      decision: event.target.value as DecisionValue,
+                    }))
+                  }
+                  className={inputClass}
+                >
+                  {DECISION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  className="text-content block text-sm font-medium"
+                  htmlFor="case-decision-rationale"
+                >
+                  Rationale
+                </label>
+                <textarea
+                  id="case-decision-rationale"
+                  value={decisionForm.rationale}
+                  onChange={(event) =>
+                    setDecisionForm((current) => ({
+                      ...current,
+                      rationale: event.target.value,
+                    }))
+                  }
+                  className={`${inputClass} min-h-24 resize-y`}
+                  rows={4}
+                />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label
+                    className="text-content block text-sm font-medium"
+                    htmlFor="case-decision-conditions"
+                  >
+                    Conditions
+                  </label>
+                  <textarea
+                    id="case-decision-conditions"
+                    value={decisionForm.conditions}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        conditions: event.target.value,
+                      }))
+                    }
+                    className={`${inputClass} min-h-20 resize-y`}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="text-content block text-sm font-medium"
+                    htmlFor="case-decision-override"
+                  >
+                    Override reason
+                  </label>
+                  <textarea
+                    id="case-decision-override"
+                    value={decisionForm.overrideReason}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        overrideReason: event.target.value,
+                      }))
+                    }
+                    className={`${inputClass} min-h-20 resize-y`}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              {recordDecision.isError && (
+                <p className="text-danger-strong text-sm">
+                  {(recordDecision.error as Error).message}
+                </p>
+              )}
+              <Button
+                type="submit"
+                loading={recordDecision.isPending}
+                disabled={!decisionForm.rationale.trim()}
+              >
+                <Send className="h-4 w-4" />
+                Save decision
+              </Button>
+            </form>
+          </Section>
+        </Card>
+
+        <Card padding="lg">
+          <Section
+            title={
+              <span className="flex items-center gap-2">
+                <MessageSquarePlus className="text-brand h-4 w-4" />
+                Request information
+              </span>
+            }
+          >
+            <form onSubmit={submitInformationRequest} className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label
+                    className="text-content block text-sm font-medium"
+                    htmlFor="case-info-type"
+                  >
+                    Type
+                  </label>
+                  <input
+                    id="case-info-type"
+                    value={infoForm.requestType}
+                    onChange={(event) =>
+                      setInfoForm((current) => ({
+                        ...current,
+                        requestType: event.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="text-content block text-sm font-medium" htmlFor="case-info-due">
+                    Due date
+                  </label>
+                  <input
+                    id="case-info-due"
+                    type="date"
+                    value={infoForm.dueAt}
+                    onChange={(event) =>
+                      setInfoForm((current) => ({
+                        ...current,
+                        dueAt: event.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  className="text-content block text-sm font-medium"
+                  htmlFor="case-info-fields"
+                >
+                  Requested fields
+                </label>
+                <input
+                  id="case-info-fields"
+                  value={infoForm.requestedFields}
+                  onChange={(event) =>
+                    setInfoForm((current) => ({
+                      ...current,
+                      requestedFields: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                  placeholder="income, bank connection, identity document"
+                />
+              </div>
+              <div>
+                <label
+                  className="text-content block text-sm font-medium"
+                  htmlFor="case-info-message"
+                >
+                  Message
+                </label>
+                <textarea
+                  id="case-info-message"
+                  value={infoForm.message}
+                  onChange={(event) =>
+                    setInfoForm((current) => ({
+                      ...current,
+                      message: event.target.value,
+                    }))
+                  }
+                  className={`${inputClass} min-h-28 resize-y`}
+                  rows={5}
+                />
+              </div>
+              {requestInformation.isError && (
+                <p className="text-danger-strong text-sm">
+                  {(requestInformation.error as Error).message}
+                </p>
+              )}
+              <Button
+                type="submit"
+                variant="secondary"
+                loading={requestInformation.isPending}
+                disabled={!infoForm.message.trim()}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                Request info
+              </Button>
+            </form>
+          </Section>
+        </Card>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <Card padding="lg">
@@ -320,7 +652,7 @@ export function AssessmentCaseDetailView({
       <div className="grid gap-6 xl:grid-cols-2">
         <Card padding="lg">
           <Section title="Review activity">
-            <WorkspaceTable columns={['Type', 'Status', 'Owner', 'Updated']}>
+            <WorkspaceTable columns={['Type', 'Status', 'Owner', 'Detail', 'Updated']}>
               {data.informationRequests.map((request) => (
                 <tr key={request.id}>
                   <Cell>{label(request.requestType)}</Cell>
@@ -328,6 +660,14 @@ export function AssessmentCaseDetailView({
                     <StatusPill status={statusTone(request.status)} label={label(request.status)} />
                   </Cell>
                   <Cell muted>{request.createdById}</Cell>
+                  <Cell className="max-w-md whitespace-normal">
+                    <p className="text-sm">{request.message}</p>
+                    {request.dueAt && (
+                      <p className="text-content-muted mt-1 text-xs">
+                        Due {formatMaybeDate(request.dueAt)}
+                      </p>
+                    )}
+                  </Cell>
                   <Cell muted>{formatMaybeDate(request.createdAt)}</Cell>
                 </tr>
               ))}
@@ -341,12 +681,20 @@ export function AssessmentCaseDetailView({
                     />
                   </Cell>
                   <Cell muted>{decision.decisionMaker.name}</Cell>
+                  <Cell className="max-w-md whitespace-normal">
+                    <p className="text-sm">{decision.rationale}</p>
+                    {decision.overrideFlag && (
+                      <p className="text-warning-strong mt-1 text-xs">
+                        Override: {decision.overrideReason ?? 'No reason recorded'}
+                      </p>
+                    )}
+                  </Cell>
                   <Cell muted>{formatMaybeDate(decision.createdAt)}</Cell>
                 </tr>
               ))}
               {data.informationRequests.length === 0 && data.decisions.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-content-muted px-4 py-6 text-center">
+                  <td colSpan={5} className="text-content-muted px-4 py-6 text-center">
                     No review actions recorded yet.
                   </td>
                 </tr>

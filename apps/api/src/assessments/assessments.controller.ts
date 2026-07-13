@@ -7,7 +7,11 @@ import {
   type OrganisationContext,
 } from '../organisations/organisation-context'
 import { OrganisationAccessGuard } from '../organisations/organisation-access.guard'
-import { CreateAssessmentRequestDto } from './assessment-requests.dto'
+import {
+  CreateAssessmentRequestDto,
+  RecordCaseDecisionDto,
+  RequestCaseInformationDto,
+} from './assessment-requests.dto'
 import { AssessmentsService } from './assessments.service'
 
 @ApiTags('company workspace')
@@ -30,6 +34,28 @@ export class AssessmentsController {
     @Param('caseId') caseId: string
   ) {
     return this.assessments.getCase(organisation, caseId)
+  }
+
+  @Post('assessment-cases/:caseId/decisions')
+  @ApiOperation({ summary: 'Record a partner decision on an assessment case' })
+  async recordDecision(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('caseId') caseId: string,
+    @Body() body: RecordCaseDecisionDto
+  ) {
+    return this.assessments.recordCaseDecision(organisation, caseId, user.dbUserId!, body)
+  }
+
+  @Post('assessment-cases/:caseId/information-requests')
+  @ApiOperation({ summary: 'Request more information for an assessment case' })
+  async requestInformation(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('caseId') caseId: string,
+    @Body() body: RequestCaseInformationDto
+  ) {
+    return this.assessments.requestCaseInformation(organisation, caseId, user.dbUserId!, body)
   }
 
   @Get('assessment-requests')

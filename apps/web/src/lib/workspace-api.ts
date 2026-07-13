@@ -290,6 +290,28 @@ export interface CreateWorkspaceAssessmentRequestInput {
   deadline?: string
 }
 
+export interface RecordWorkspaceCaseDecisionInput {
+  decision:
+    | 'approved'
+    | 'approved_with_conditions'
+    | 'additional_information_required'
+    | 'guarantor_or_alternative_route_required'
+    | 'referred_for_manual_review'
+    | 'declined'
+    | 'withdrawn'
+    | 'expired_without_decision'
+  rationale: string
+  conditions?: string
+  overrideReason?: string
+}
+
+export interface RequestWorkspaceCaseInformationInput {
+  requestType?: string
+  message: string
+  requestedFields?: string
+  dueAt?: string
+}
+
 export interface WorkspaceSharedProfile {
   id: string
   status: string
@@ -488,6 +510,32 @@ export const workspaceApi = {
           organisationSlug
         )}/assessment-cases/${encodeURIComponent(caseId)}`,
         {},
+        token
+      ),
+    recordCaseDecision: (
+      token: string,
+      organisationSlug: string,
+      caseId: string,
+      data: RecordWorkspaceCaseDecisionInput
+    ) =>
+      workspaceFetch<WorkspaceAssessmentCaseDetail>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/assessment-cases/${encodeURIComponent(caseId)}/decisions`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    requestCaseInformation: (
+      token: string,
+      organisationSlug: string,
+      caseId: string,
+      data: RequestWorkspaceCaseInformationInput
+    ) =>
+      workspaceFetch<WorkspaceAssessmentCaseDetail>(
+        `/organisations/${encodeURIComponent(
+          organisationSlug
+        )}/assessment-cases/${encodeURIComponent(caseId)}/information-requests`,
+        { method: 'POST', body: JSON.stringify(data) },
         token
       ),
     requests: (token: string, organisationSlug: string) =>

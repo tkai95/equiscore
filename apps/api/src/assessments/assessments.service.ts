@@ -6,9 +6,13 @@ import {
 } from '@nestjs/common'
 import { createHash, randomBytes } from 'crypto'
 import { db } from '@equiscore/database'
-import type { CompanyAssessmentType, Prisma } from '@equiscore/database'
+import type { CompanyAssessmentType, CompanyDecision, Prisma } from '@equiscore/database'
 import type { OrganisationContext } from '../organisations/organisation-context'
-import type { CreateAssessmentRequestDto } from './assessment-requests.dto'
+import type {
+  CreateAssessmentRequestDto,
+  RecordCaseDecisionDto,
+  RequestCaseInformationDto,
+} from './assessment-requests.dto'
 
 const COMPANY_REQUEST_CONSENT_VERSION = 'company-request-mvp-2026-07-12'
 const CONSENT_TTL_DAYS = 30
@@ -355,6 +359,158 @@ export class AssessmentsService {
       usageEvents: assessmentCase.usageEvents,
       auditEvents: assessmentCase.auditEvents,
     }
+  }
+
+  async recordCaseDecision(
+    context: OrganisationContext,
+    caseId: string,
+    decisionMakerId: string,
+    input: RecordCaseDecisionDto
+  ) {
+    const rationale = this.cleanString(input.rationale)
+    if (!rationale) throw new BadRequestException('Decision rationale is required')
+
+    const conditions = this.cleanString(input.conditions)
+    const overrideReason = this.cleanString(input.overrideReason)
+    const now = new Date()
+
+    const assessmentCase = await db.assessmentCase.findFirst({
+      where: { id: caseId, organisationId: context.organisationId },
+      select: {
+        id: true,
+        status: true,
+        assessmentOutcome: true,
+        companyDecision: true,
+        decisionRationale: true,
+      },
+    })
+
+    if (!assessmentCase) throw new NotFoundException('Assessment case not found')
+
+    const nextStatus = this.caseStatusForDecision(input.decision)
+    const closesCase = this.decisionClosesCase(input.decision)
+    const overrideFlag = this.isDecisionOverride(input.decision, assessmentCase.assessmentOutcome)
+
+    await db.$transaction(async (tx) => {
+      await tx.caseDecision.create({
+        data: {
+          assessmentCaseId: assessmentCase.id,
+          organisationId: context.organisationId,
+          decision: input.decision,
+          conditions: conditions ? this.asJson({ text: conditions }) : undefined,
+          rationale,
+          decisionMakerId,
+          assessmentOutcomeAtDecision: assessmentCase.assessmentOutcome,
+          overrideFlag,
+          overrideReason,
+        },
+      })
+
+      await tx.assessmentCase.update({
+        where: { id: assessmentCase.id },
+        data: {
+          companyDecision: input.decision,
+          decisionRationale: rationale,
+          reviewerId: decisionMakerId,
+          status: nextStatus,
+          closedAt: closesCase ? now : null,
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          assessmentCaseId: assessmentCase.id,
+          actorType: 'partner_user',
+          actorId: decisionMakerId,
+          action: 'assessment_case_decision_recorded',
+          targetType: 'assessment_case',
+          targetId: assessmentCase.id,
+          beforeStateReference: this.hashPayload({
+            status: assessmentCase.status,
+            companyDecision: assessmentCase.companyDecision,
+            decisionRationale: assessmentCase.decisionRationale,
+          }),
+          afterStateReference: this.hashPayload({
+            status: nextStatus,
+            companyDecision: input.decision,
+            decisionRationale: rationale,
+          }),
+          metadata: this.asJson({
+            decision: input.decision,
+            conditions: conditions ?? null,
+            overrideFlag,
+            overrideReason: overrideReason ?? null,
+          }),
+        },
+      })
+    })
+
+    return this.getCase(context, caseId)
+  }
+
+  async requestCaseInformation(
+    context: OrganisationContext,
+    caseId: string,
+    createdById: string,
+    input: RequestCaseInformationDto
+  ) {
+    const message = this.cleanString(input.message)
+    if (!message) throw new BadRequestException('Information request message is required')
+
+    const requestType = this.cleanString(input.requestType) ?? 'general'
+    const requestedFields = this.parseRequestedFields(input.requestedFields)
+    const dueAt = this.parseFutureDate(input.dueAt)
+
+    const assessmentCase = await db.assessmentCase.findFirst({
+      where: { id: caseId, organisationId: context.organisationId },
+      select: { id: true, status: true },
+    })
+
+    if (!assessmentCase) throw new NotFoundException('Assessment case not found')
+
+    await db.$transaction(async (tx) => {
+      const informationRequest = await tx.informationRequest.create({
+        data: {
+          assessmentCaseId: assessmentCase.id,
+          requestType,
+          message,
+          requestedFields:
+            requestedFields.length > 0 ? this.asJson({ fields: requestedFields }) : undefined,
+          dueAt,
+          createdById,
+        },
+      })
+
+      await tx.assessmentCase.update({
+        where: { id: assessmentCase.id },
+        data: {
+          status: 'information_requested',
+          reviewerId: createdById,
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          assessmentCaseId: assessmentCase.id,
+          actorType: 'partner_user',
+          actorId: createdById,
+          action: 'assessment_case_information_requested',
+          targetType: 'information_request',
+          targetId: informationRequest.id,
+          beforeStateReference: this.hashPayload({ status: assessmentCase.status }),
+          afterStateReference: this.hashPayload({ status: 'information_requested' }),
+          metadata: this.asJson({
+            requestType,
+            requestedFields,
+            dueAt: dueAt?.toISOString() ?? null,
+          }),
+        },
+      })
+    })
+
+    return this.getCase(context, caseId)
   }
 
   async listRequests(context: OrganisationContext) {
@@ -1048,6 +1204,44 @@ export class AssessmentsService {
     if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Invalid deadline')
     if (parsed <= new Date()) throw new BadRequestException('Deadline must be in the future')
     return parsed
+  }
+
+  private parseRequestedFields(value: string | undefined): string[] {
+    return (value ?? '')
+      .split(/[\n,]/)
+      .map((field) => field.trim())
+      .filter(Boolean)
+      .slice(0, 20)
+  }
+
+  private caseStatusForDecision(decision: CompanyDecision) {
+    if (decision === 'additional_information_required') return 'information_requested'
+    if (decision === 'referred_for_manual_review') return 'under_review'
+    return 'company_decision_recorded'
+  }
+
+  private decisionClosesCase(decision: CompanyDecision): boolean {
+    return !['additional_information_required', 'referred_for_manual_review'].includes(decision)
+  }
+
+  private isDecisionOverride(
+    decision: CompanyDecision,
+    outcome:
+      | 'meets_criteria'
+      | 'review_required'
+      | 'information_required'
+      | 'alternative_route_recommended'
+      | 'unable_to_assess'
+      | null
+  ): boolean {
+    if (!outcome) return false
+    if (decision === 'approved' || decision === 'approved_with_conditions') {
+      return outcome !== 'meets_criteria'
+    }
+    if (decision === 'declined') return outcome === 'meets_criteria'
+    if (decision === 'additional_information_required') return outcome !== 'information_required'
+    if (decision === 'referred_for_manual_review') return outcome === 'meets_criteria'
+    return false
   }
 
   private asJson(value: unknown): Prisma.InputJsonValue {
