@@ -1206,8 +1206,8 @@ export function GoalsView() {
                 <div>
                   <h3 className="text-content text-base font-semibold">Goal plan</h3>
                   <p className="text-content-secondary mt-1 text-sm">
-                    Practical moves EquiScore can already infer from your evidence. Product links
-                    and AI strategy can plug into these cards later.
+                    Practical moves EquiScore can infer from your current evidence. This updates
+                    when your goal, accounts, documents or spending patterns change.
                   </p>
                 </div>
               </div>
@@ -1466,17 +1466,17 @@ export function GoalsView() {
             <Card>
               <div className="border-line-subtle mb-4 flex items-center gap-2 border-b pb-3">
                 <UploadCloud className="text-brand-900 h-4 w-4" />
-                <h2 className="text-content text-base font-semibold">How this gets smarter</h2>
+                <h2 className="text-content text-base font-semibold">What improves this plan</h2>
               </div>
               <p className="text-content-secondary text-sm">
-                Goals become sharper as EquiScore sees more reliable evidence. The same transaction
-                history can support several outcomes, but each goal weighs the signals differently.
+                EquiScore gives clearer guidance when your goal details, financial history and
+                supporting evidence are kept up to date.
               </p>
               <div className="rounded-panel bg-surface-inset text-content-secondary mt-4 p-3 text-sm">
-                <p className="text-content font-medium">Next product layer</p>
+                <p className="text-content font-medium">Most useful updates</p>
                 <p className="mt-1">
-                  Goal-specific share packs and a clearer evidence checklist for each selected
-                  outcome.
+                  Save the target, keep accounts connected, add missing documents and complete the
+                  highest-impact To do items.
                 </p>
               </div>
             </Card>
