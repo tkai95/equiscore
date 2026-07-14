@@ -136,6 +136,30 @@ My Money, To do and Sharing.
 - Added goal name and priority controls to the detail workspace so duplicate
   goals can be distinguished by purpose.
 
+## Built In Rental Readiness Depth Slice
+
+- Added a rental-specific detail section inside the selected goal workspace.
+- Rental goals now show deeper planning figures:
+  - estimated upfront cash need
+  - deposit or upfront cash gap
+  - monthly funding required before the move date
+  - target rent to verified income
+  - target rent headroom against estimated sustainable rent
+- Added a required vs optional rental evidence checklist covering:
+  - target rent
+  - move date
+  - application type
+  - income evidence
+  - affordability
+  - upfront cash
+  - rent-payment history
+  - identity confidence
+  - supporting documents
+- Added "how a letting agent may view this" guidance with recipient-facing
+  watchouts.
+- Added explicit calculation assumptions so rental readiness is presented as a
+  planning estimate, not a guarantee of acceptance.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -161,22 +185,14 @@ history.
 
 ## Next Build Slices
 
-1. Build goal-specific depth:
-   - Add clearer readiness explanations for each active goal.
-   - Add required vs optional evidence checklists per goal.
-   - Add "how the recipient may view this" summaries per goal type.
-   - Keep Rental Readiness as the first deep implementation.
-   - Compare target rent against income, current commitments and detected headroom.
-   - Add "how a letting agent may view this" summary.
-
-2. Connect Goals to Sharing:
+1. Connect Goals to Sharing:
    - Create a rental share-pack mode.
    - Create a generic goal share-pack structure that can later support banking,
      utilities, phone, income-proof and credit-readiness use cases.
    - Preview what the recipient sees.
    - Show limitations and evidence confidence before sharing.
 
-3. Add solution opportunities:
+2. Add solution opportunities:
    - Add a provider/comparison abstraction for non-regulated switching first:
      subscriptions, mobile, broadband and energy.
    - Keep affiliate/commercial disclosure visible on any monetised action.
@@ -184,17 +200,18 @@ history.
    - Add AI explanations on top of deterministic calculations, not instead of
      them.
 
-4. Add contextual supporting information:
+3. Add contextual supporting information:
    - Keep bank connections and documents as functional routes.
    - Surface them from Financial Profile, Goals and To do instead of top-level navigation.
 
-5. Refine Home:
+4. Refine Home:
    - Show current goal status.
    - Show one money insight.
    - Show only genuinely actionable To do items.
    - Show recent activity such as share created, recipient viewed, assessment updated.
 
-6. Later:
+5. Later:
+   - Scenario planning for rental goals.
    - Banking access readiness.
    - Utilities or phone contract readiness.
    - Future credit readiness.

@@ -175,6 +175,29 @@ type GoalReadiness = {
   friction: string[]
   actions: GoalAction[]
 }
+type RentalChecklistItem = {
+  label: string
+  status: 'complete' | 'attention' | 'missing' | 'optional'
+  required: boolean
+  detail: string
+}
+type RentalDeepDive = {
+  targetRent: number | null
+  targetRentToIncome: number | null
+  estimatedUpfrontCash: number | null
+  depositAvailable: number
+  depositGap: number | null
+  monthsRemaining: number | null
+  monthlyFundingRequired: number | null
+  affordabilityGap: number | null
+  checklist: RentalChecklistItem[]
+  lettingAgentView: {
+    headline: string
+    body: string
+    watchouts: string[]
+  }
+  assumptions: string[]
+}
 
 const READINESS: Record<
   ReadinessKey,
@@ -1040,6 +1063,201 @@ function sustainableGoalCapacity(profile: InsightProfile | null | undefined) {
   return Math.max(0, Math.round(surplus - incomeReserve))
 }
 
+function checklistStatusTone(status: RentalChecklistItem['status']) {
+  if (status === 'complete') return 'success'
+  if (status === 'attention') return 'warning'
+  if (status === 'missing') return 'danger'
+  return 'neutral'
+}
+
+function checklistStatusLabel(status: RentalChecklistItem['status']) {
+  if (status === 'complete') return 'Ready'
+  if (status === 'attention') return 'Review'
+  if (status === 'missing') return 'Missing'
+  return 'Optional'
+}
+
+function buildRentalDeepDive(
+  profile: InsightProfile | null | undefined,
+  score: Score,
+  goal: ConsumerGoal | null | undefined
+): RentalDeepDive | null {
+  const targetRent = goal?.targetMonthlyRent ?? null
+  const monthlyIncome = profile?.income.averageMonthlyIncome ?? 0
+  const targetRentToIncome = targetRent && monthlyIncome > 0 ? targetRent / monthlyIncome : null
+  const estimatedUpfrontCash = estimatedRentalCashNeeded(targetRent)
+  const depositAvailable = goal?.depositAvailable ?? 0
+  const depositGap =
+    estimatedUpfrontCash != null ? Math.max(0, estimatedUpfrontCash - depositAvailable) : null
+  const monthsRemaining = monthsUntil(goal?.moveDate)
+  const monthlyFundingRequired =
+    depositGap != null && depositGap > 0 && monthsRemaining != null
+      ? Math.ceil(depositGap / monthsRemaining / 5) * 5
+      : depositGap === 0
+        ? 0
+        : null
+  const affordabilityGap =
+    profile && targetRent && profile.affordability.maxAffordableRent > 0
+      ? Math.max(0, targetRent - profile.affordability.maxAffordableRent)
+      : null
+  const identityScore = score?.identityConfidenceScore ?? 0
+  const verificationScore = score?.verificationStrengthScore ?? 0
+
+  const checklist: RentalChecklistItem[] = [
+    {
+      label: 'Target rent',
+      required: true,
+      status: targetRent ? 'complete' : 'missing',
+      detail: targetRent
+        ? `${formatCurrency(targetRent)} monthly rent saved for this goal.`
+        : 'Add the monthly rent you expect to apply for.',
+    },
+    {
+      label: 'Move date',
+      required: true,
+      status: goal?.moveDate ? 'complete' : 'missing',
+      detail: goal?.moveDate
+        ? `${monthsRemaining ?? 1} month${monthsRemaining === 1 ? '' : 's'} left to prepare.`
+        : 'Add a target move date so EquiScore can calculate monthly funding required.',
+    },
+    {
+      label: 'Application type',
+      required: true,
+      status: goal?.applicationMode && goal.applicationMode !== 'unknown' ? 'complete' : 'missing',
+      detail:
+        goal?.applicationMode && goal.applicationMode !== 'unknown'
+          ? `Application marked as ${goal.applicationMode === 'joint' ? 'joint' : 'solo'}.`
+          : 'Confirm whether you are applying alone or jointly.',
+    },
+    {
+      label: 'Income evidence',
+      required: true,
+      status: !profile
+        ? 'missing'
+        : profile.stability.stableIncome && monthlyIncome > 0
+          ? 'complete'
+          : 'attention',
+      detail: !profile
+        ? 'Connect financial evidence to assess income.'
+        : `${formatCurrency(monthlyIncome)} average monthly income; ${humanConsistency(
+            profile.income.consistency
+          )} pattern.`,
+    },
+    {
+      label: 'Affordability',
+      required: true,
+      status:
+        !profile || !targetRent ? 'missing' : affordabilityGap === 0 ? 'complete' : 'attention',
+      detail:
+        !profile || !targetRent
+          ? 'Save rent and connect evidence to compare against sustainable rent.'
+          : affordabilityGap === 0
+            ? `Target is within the estimated ${formatCurrency(
+                profile.affordability.maxAffordableRent
+              )} sustainable range.`
+            : `Target is ${formatCurrency(affordabilityGap ?? 0)}/mo above the current estimated range.`,
+    },
+    {
+      label: 'Upfront cash',
+      required: true,
+      status:
+        estimatedUpfrontCash == null
+          ? 'missing'
+          : depositGap === 0
+            ? 'complete'
+            : depositAvailable > 0
+              ? 'attention'
+              : 'missing',
+      detail:
+        estimatedUpfrontCash == null
+          ? 'Add target rent to estimate first month, deposit and moving buffer.'
+          : depositGap === 0
+            ? `${formatCurrency(depositAvailable)} covers the estimated upfront need.`
+            : `${formatCurrency(depositGap ?? 0)} estimated upfront gap remains.`,
+    },
+    {
+      label: 'Rent-payment history',
+      required: true,
+      status: !profile
+        ? 'missing'
+        : profile.paymentBehaviour.rentPaidConsistently || profile.stability.rentNeverMissed
+          ? 'complete'
+          : 'attention',
+      detail: !profile
+        ? 'Connect evidence or upload rent proof.'
+        : profile.paymentBehaviour.rentPaidConsistently || profile.stability.rentNeverMissed
+          ? 'Rent or rent-like payments appear consistent.'
+          : 'Rent reliability is limited or not detected; add rent evidence if available.',
+    },
+    {
+      label: 'Identity confidence',
+      required: true,
+      status: identityScore >= 70 ? 'complete' : identityScore > 0 ? 'attention' : 'missing',
+      detail:
+        identityScore >= 70
+          ? `${identityScore}/100 identity confidence supports sharing.`
+          : 'Add identity evidence before sharing with a recipient.',
+    },
+    {
+      label: 'Supporting documents',
+      required: false,
+      status: verificationScore >= 70 ? 'complete' : verificationScore > 0 ? 'optional' : 'missing',
+      detail:
+        verificationScore >= 70
+          ? `${verificationScore}/100 verification strength.`
+          : 'Payslips, tenancy evidence or employment letters can make the pack stronger.',
+    },
+  ]
+
+  const watchouts = checklist
+    .filter((item) => item.required && item.status !== 'complete')
+    .slice(0, 3)
+    .map((item) => item.detail)
+
+  const hasEvidence = (profile?.period.transactionCount ?? 0) > 0
+  const highRisk =
+    affordabilityGap != null && affordabilityGap > 0
+      ? true
+      : profile?.affordability.rating === 'at_risk' ||
+        (profile?.paymentBehaviour.returnedPayments ?? 0) > 1
+  const readyEnough = hasEvidence && watchouts.length === 0 && !highRisk
+  const headline = !hasEvidence
+    ? 'Not ready to share yet'
+    : readyEnough
+      ? 'Looks ready for a rental pack'
+      : highRisk
+        ? 'May need explanation before sharing'
+        : 'Ready with conditions'
+  const body = !hasEvidence
+    ? 'A letting agent would not yet have enough financial evidence to understand affordability or rent reliability.'
+    : readyEnough
+      ? 'A letting agent would see stable evidence across affordability, rent reliability, identity and upfront cash.'
+      : 'A letting agent could review this, but the pack should explain the missing details or limits before it is sent.'
+
+  return {
+    targetRent,
+    targetRentToIncome,
+    estimatedUpfrontCash,
+    depositAvailable,
+    depositGap,
+    monthsRemaining,
+    monthlyFundingRequired,
+    affordabilityGap,
+    checklist,
+    lettingAgentView: {
+      headline,
+      body,
+      watchouts,
+    },
+    assumptions: [
+      'Upfront cash is estimated as 2.5x monthly rent for planning only.',
+      'Sustainable rent is estimated from current connected income, commitments and surplus.',
+      'Joint applications, guarantors, savings outside connected accounts and employer support can change the result.',
+      'This is not a guarantee that a landlord or letting agent will accept an application.',
+    ],
+  }
+}
+
 function buildPortfolioAssessment(
   positions: GoalPosition[],
   profile: InsightProfile | null | undefined
@@ -1241,6 +1459,10 @@ export function GoalsView() {
     score ?? null,
     selectedGoalForAssessment
   )
+  const rentalDeepDive =
+    selectedTemplate.type === 'rental'
+      ? buildRentalDeepDive(profile, score ?? null, selectedGoalForAssessment)
+      : null
   const savedDate = formatSavedDate(selectedGoal?.updatedAt)
 
   useEffect(() => {
@@ -1618,7 +1840,7 @@ export function GoalsView() {
                     Start goal
                   </Button>
                 ) : null}
-                {selectedType === 'rental' ? (
+                {selectedTemplate.type === 'rental' ? (
                   <Link href="/dashboard/share" className={buttonClasses('primary', 'md')}>
                     Preview share pack <ArrowRight className="h-4 w-4" />
                   </Link>
@@ -1636,6 +1858,172 @@ export function GoalsView() {
                 />
               ))}
             </div>
+
+            {rentalDeepDive ? (
+              <section className="space-y-5">
+                <div className="border-line-subtle flex flex-wrap items-end justify-between gap-4 border-b pb-3">
+                  <div>
+                    <h3 className="text-content text-base font-semibold">
+                      Rental readiness detail
+                    </h3>
+                    <p className="text-content-secondary mt-1 text-sm">
+                      The rental-specific checks behind this goal. These are planning estimates
+                      based on the evidence currently available.
+                    </p>
+                  </div>
+                  <StatusPill
+                    status={selectedStatus.tone}
+                    label={rentalDeepDive.lettingAgentView.headline}
+                  />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <InsetPanel padding="sm">
+                        <p className="text-content-muted text-xs font-semibold uppercase">
+                          Deposit gap
+                        </p>
+                        <p className="text-content mt-1 text-xl font-semibold">
+                          {rentalDeepDive.depositGap == null
+                            ? 'n/a'
+                            : formatCurrency(rentalDeepDive.depositGap)}
+                        </p>
+                        <p className="text-content-secondary mt-1 text-xs">
+                          {rentalDeepDive.estimatedUpfrontCash == null
+                            ? 'Add target rent'
+                            : `${formatCurrency(
+                                rentalDeepDive.depositAvailable
+                              )} available of ${formatCurrency(
+                                rentalDeepDive.estimatedUpfrontCash
+                              )} estimated`}
+                        </p>
+                      </InsetPanel>
+
+                      <InsetPanel padding="sm">
+                        <p className="text-content-muted text-xs font-semibold uppercase">
+                          Monthly funding
+                        </p>
+                        <p className="text-content mt-1 text-xl font-semibold">
+                          {rentalDeepDive.monthlyFundingRequired == null
+                            ? 'n/a'
+                            : formatCurrency(rentalDeepDive.monthlyFundingRequired)}
+                        </p>
+                        <p className="text-content-secondary mt-1 text-xs">
+                          {rentalDeepDive.monthsRemaining
+                            ? `${rentalDeepDive.monthsRemaining} month${
+                                rentalDeepDive.monthsRemaining === 1 ? '' : 's'
+                              } to move date`
+                            : 'Add move date'}
+                        </p>
+                      </InsetPanel>
+
+                      <InsetPanel padding="sm">
+                        <p className="text-content-muted text-xs font-semibold uppercase">
+                          Rent to income
+                        </p>
+                        <p className="text-content mt-1 text-xl font-semibold">
+                          {pct(rentalDeepDive.targetRentToIncome)}
+                        </p>
+                        <p className="text-content-secondary mt-1 text-xs">
+                          Based on verified average income
+                        </p>
+                      </InsetPanel>
+
+                      <InsetPanel padding="sm">
+                        <p className="text-content-muted text-xs font-semibold uppercase">
+                          Rent headroom
+                        </p>
+                        <p className="text-content mt-1 text-xl font-semibold">
+                          {rentalDeepDive.affordabilityGap == null
+                            ? 'n/a'
+                            : rentalDeepDive.affordabilityGap > 0
+                              ? `-${formatCurrency(rentalDeepDive.affordabilityGap)}`
+                              : 'Within range'}
+                        </p>
+                        <p className="text-content-secondary mt-1 text-xs">
+                          Compared with estimated sustainable rent
+                        </p>
+                      </InsetPanel>
+                    </div>
+
+                    <div>
+                      <h4 className="text-content mb-3 text-sm font-semibold">
+                        Evidence checklist
+                      </h4>
+                      <div className="border-line-subtle overflow-hidden rounded-xl border">
+                        {rentalDeepDive.checklist.map((item, index) => (
+                          <div
+                            key={item.label}
+                            className={`grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-start ${
+                              index === 0 ? '' : 'border-line-subtle border-t'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-content text-sm font-semibold">{item.label}</p>
+                                <span className="text-content-muted text-xs">
+                                  {item.required ? 'Required' : 'Optional'}
+                                </span>
+                              </div>
+                              <p className="text-content-secondary mt-1 text-sm">{item.detail}</p>
+                            </div>
+                            <StatusPill
+                              status={checklistStatusTone(item.status)}
+                              label={checklistStatusLabel(item.status)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <InsetPanel padding="md">
+                      <h4 className="text-content text-sm font-semibold">
+                        How a letting agent may view this
+                      </h4>
+                      <p className="text-content-secondary mt-2 text-sm">
+                        {rentalDeepDive.lettingAgentView.body}
+                      </p>
+                      <div className="mt-4 space-y-2">
+                        {rentalDeepDive.lettingAgentView.watchouts.length === 0 ? (
+                          <div className="flex gap-2 text-sm">
+                            <CheckCircle2 className="text-success-strong mt-0.5 h-4 w-4 shrink-0" />
+                            <p className="text-content-secondary">
+                              No major recipient-facing watchouts detected from the current
+                              evidence.
+                            </p>
+                          </div>
+                        ) : (
+                          rentalDeepDive.lettingAgentView.watchouts.map((watchout) => (
+                            <div key={watchout} className="flex gap-2 text-sm">
+                              <AlertTriangle className="text-warning-strong mt-0.5 h-4 w-4 shrink-0" />
+                              <p className="text-content-secondary">{watchout}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </InsetPanel>
+
+                    <InsetPanel padding="md">
+                      <h4 className="text-content text-sm font-semibold">Assumptions used</h4>
+                      <ul className="mt-3 space-y-2">
+                        {rentalDeepDive.assumptions.map((assumption) => (
+                          <li
+                            key={assumption}
+                            className="text-content-secondary flex gap-2 text-sm"
+                          >
+                            <CheckCircle2 className="text-brand-900 mt-0.5 h-4 w-4 shrink-0" />
+                            {assumption}
+                          </li>
+                        ))}
+                      </ul>
+                    </InsetPanel>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             <section className="space-y-4">
               <div className="border-line-subtle flex items-end justify-between gap-4 border-b pb-3">
@@ -1730,7 +2118,7 @@ export function GoalsView() {
                 </label>
               </div>
 
-              {selectedType === 'rental' ? (
+              {selectedTemplate.type === 'rental' ? (
                 <div className="grid gap-4 lg:grid-cols-4">
                   <label className="text-content block text-sm font-medium">
                     Target monthly rent
