@@ -28,6 +28,7 @@ import {
   api,
   type ConsumerGoal,
   type ConsumerGoalApplicationMode,
+  type ConsumerGoalPriority,
   type ConsumerGoalType,
   type UpdateConsumerGoalInput,
 } from '@/lib/api'
@@ -116,6 +117,8 @@ type Score = {
 } | null
 
 type GoalForm = {
+  title: string
+  priority: ConsumerGoalPriority
   targetMonthlyRent: string
   moveDate: string
   applicationMode: ConsumerGoalApplicationMode
@@ -235,6 +238,8 @@ const GOAL_TEMPLATES: GoalTemplate[] = [
 ]
 
 const EMPTY_GOAL_FORM: GoalForm = {
+  title: '',
+  priority: 'normal',
   targetMonthlyRent: '',
   moveDate: '',
   applicationMode: 'unknown',
@@ -274,6 +279,8 @@ function inputDateToIso(value: string) {
 function goalToForm(goal: ConsumerGoal | null | undefined): GoalForm {
   if (!goal) return EMPTY_GOAL_FORM
   return {
+    title: goal.title ?? goal.label ?? '',
+    priority: goal.priority ?? 'normal',
     targetMonthlyRent: toMoneyInput(goal.targetMonthlyRent),
     moveDate: toInputDate(goal.moveDate),
     applicationMode: goal.applicationMode ?? 'unknown',
@@ -316,7 +323,12 @@ function estimatedRentalCashNeeded(targetMonthlyRent: number | null | undefined)
 }
 
 function goalTitle(template: GoalTemplate, goal: ConsumerGoal | null | undefined) {
-  return goal?.label?.trim() || template.title
+  return goal?.title?.trim() || goal?.label?.trim() || template.title
+}
+
+function priorityMeta(goal: ConsumerGoal | null | undefined) {
+  if (!goal || goal.priority === 'normal') return null
+  return `${goal.priority === 'high' ? 'High' : 'Low'} priority`
 }
 
 function completeReadiness(
@@ -963,7 +975,10 @@ function buildGoalPosition(
       meta: [
         deadlineLabel ? `Move by ${deadlineLabel}` : 'Move date not set',
         targetRent ? `${formatCurrency(targetRent)} rent` : 'Target rent not set',
-      ].join(' · '),
+        priorityMeta(goal),
+      ]
+        .filter(Boolean)
+        .join(' · '),
       statusLabel: status.label,
       statusTone: status.tone,
       monthlyRequirement,
@@ -994,9 +1009,14 @@ function buildGoalPosition(
 
   return {
     title,
-    meta: formatMonthYear(goal?.moveDate)
-      ? `Target by ${formatMonthYear(goal?.moveDate)}`
-      : 'No deadline set',
+    meta: [
+      formatMonthYear(goal?.moveDate)
+        ? `Target by ${formatMonthYear(goal?.moveDate)}`
+        : 'No deadline set',
+      priorityMeta(goal),
+    ]
+      .filter(Boolean)
+      .join(' · '),
     statusLabel: status.label,
     statusTone: status.tone,
     monthlyRequirement: 0,
@@ -1118,6 +1138,7 @@ export function GoalsView() {
   const queryClient = useQueryClient()
   const { items: actionItems } = useActionItems()
   const [selectedType, setSelectedType] = useState<ConsumerGoalType>('rental')
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null)
   const [selectedTouched, setSelectedTouched] = useState(false)
   const [addGoalOpen, setAddGoalOpen] = useState(false)
   const [form, setForm] = useState<GoalForm>(EMPTY_GOAL_FORM)
@@ -1150,26 +1171,36 @@ export function GoalsView() {
     queryFn: async () => api.goals.list((await getToken())!),
   })
 
-  const savedByType = useMemo(
-    () => new Map(savedGoals.map((goal) => [goal.type, goal] as const)),
-    [savedGoals]
-  )
   const activeGoals = savedGoals.filter((goal) => goal.status === 'active')
+  const selectedSavedGoal = selectedGoalId
+    ? savedGoals.find((goal) => goal.id === selectedGoalId)
+    : null
   const selectedTemplate =
-    GOAL_TEMPLATES.find((template) => template.type === selectedType) ?? GOAL_TEMPLATES[0]!
+    GOAL_TEMPLATES.find(
+      (template) => template.type === (selectedSavedGoal?.type ?? selectedType)
+    ) ?? GOAL_TEMPLATES[0]!
   const SelectedIcon = selectedTemplate.icon
-  const selectedGoal = savedByType.get(selectedType)
+  const selectedGoal = selectedSavedGoal ?? null
   const selectedGoalForAssessment: ConsumerGoal = {
     id: selectedGoal?.id ?? `draft-${selectedType}`,
-    type: selectedType,
+    type: selectedGoal?.type ?? selectedType,
     status: selectedGoal?.status ?? 'active',
     isPrimary: selectedGoal?.isPrimary ?? false,
-    label: selectedGoal?.label ?? selectedTemplate.title,
+    title: form.title.trim() || selectedGoal?.title || selectedTemplate.title,
+    priority: form.priority,
+    label: form.title.trim() || selectedGoal?.label || selectedTemplate.title,
+    targetDate: inputDateToIso(form.moveDate),
+    targetAmount: parseMoneyInput(form.targetMonthlyRent),
+    currentAmount: parseMoneyInput(form.depositAvailable),
+    monthlyContribution: null,
+    reservedFunds: parseMoneyInput(form.depositAvailable),
+    assumptions: null,
     targetMonthlyRent: parseMoneyInput(form.targetMonthlyRent),
     moveDate: inputDateToIso(form.moveDate),
     applicationMode: form.applicationMode,
     depositAvailable: parseMoneyInput(form.depositAvailable),
     notes: form.notes.trim() || null,
+    completedAt: null,
     createdAt: selectedGoal?.createdAt ?? new Date(0).toISOString(),
     updatedAt: selectedGoal?.updatedAt ?? new Date(0).toISOString(),
   }
@@ -1214,7 +1245,10 @@ export function GoalsView() {
 
   useEffect(() => {
     const primary = savedGoals.find((goal) => goal.isPrimary && goal.status === 'active')
-    if (primary && !selectedTouched) setSelectedType(primary.type)
+    if (primary && !selectedTouched) {
+      setSelectedGoalId(primary.id)
+      setSelectedType(primary.type)
+    }
   }, [savedGoals, selectedTouched])
 
   useEffect(() => {
@@ -1227,10 +1261,20 @@ export function GoalsView() {
   }
 
   const saveGoal = useMutation({
-    mutationFn: async ({ type, data }: { type: ConsumerGoalType; data: UpdateConsumerGoalInput }) =>
-      api.goals.update((await getToken())!, type, data),
-    onSuccess: () => {
+    mutationFn: async ({
+      goalId,
+      data,
+    }: {
+      goalId: string | null
+      data: UpdateConsumerGoalInput
+    }) => {
+      const token = (await getToken())!
+      return goalId ? api.goals.updateById(token, goalId, data) : api.goals.create(token, data)
+    },
+    onSuccess: (goal) => {
       invalidateGoals()
+      setSelectedGoalId(goal.id)
+      setSelectedType(goal.type)
       setIsDirty(false)
       setFormError(null)
       setSaveMessage('Saved')
@@ -1248,8 +1292,9 @@ export function GoalsView() {
     setSaveMessage(null)
   }
 
-  const selectGoal = (type: ConsumerGoalType) => {
-    setSelectedType(type)
+  const selectGoal = (goal: ConsumerGoal) => {
+    setSelectedGoalId(goal.id)
+    setSelectedType(goal.type)
     setSelectedTouched(true)
     setIsDirty(false)
     setFormError(null)
@@ -1257,7 +1302,16 @@ export function GoalsView() {
   }
 
   const openGoalTemplate = (type: ConsumerGoalType) => {
-    selectGoal(type)
+    setSelectedGoalId(null)
+    setSelectedType(type)
+    setSelectedTouched(true)
+    setForm({
+      ...EMPTY_GOAL_FORM,
+      title: GOAL_TEMPLATES.find((template) => template.type === type)?.title ?? 'New goal',
+    })
+    setIsDirty(true)
+    setFormError(null)
+    setSaveMessage(null)
     setAddGoalOpen(false)
     window.setTimeout(() => {
       document.getElementById('goal-workspace')?.scrollIntoView({ behavior: 'smooth' })
@@ -1266,35 +1320,41 @@ export function GoalsView() {
 
   const goalPayload = (status: 'active' | 'paused' = 'active'): UpdateConsumerGoalInput => {
     const payload: UpdateConsumerGoalInput = {
-      type: selectedType,
+      type: selectedGoal?.type ?? selectedType,
       status,
-      label: selectedTemplate.title,
+      title: form.title.trim() || selectedTemplate.title,
+      label: form.title.trim() || selectedTemplate.title,
+      priority: form.priority,
       notes: form.notes.trim() || null,
     }
     if (status === 'active' && (activeGoals.length === 0 || selectedGoal?.isPrimary)) {
       payload.isPrimary = true
     }
-    if (selectedType === 'rental') {
+    if ((selectedGoal?.type ?? selectedType) === 'rental') {
       payload.targetMonthlyRent = parseMoneyInput(form.targetMonthlyRent)
       payload.moveDate = inputDateToIso(form.moveDate)
+      payload.targetDate = inputDateToIso(form.moveDate)
       payload.applicationMode = form.applicationMode
       payload.depositAvailable = parseMoneyInput(form.depositAvailable)
+      payload.currentAmount = parseMoneyInput(form.depositAvailable)
+      payload.reservedFunds = parseMoneyInput(form.depositAvailable)
     }
     return payload
   }
 
   const handleSave = () => {
-    saveGoal.mutate({ type: selectedType, data: goalPayload('active') })
+    saveGoal.mutate({ goalId: selectedGoal?.id ?? null, data: goalPayload('active') })
   }
 
   const handlePause = () => {
     saveGoal.mutate({
-      type: selectedType,
+      goalId: selectedGoal?.id ?? null,
       data: {
-        type: selectedType,
+        type: selectedGoal?.type ?? selectedType,
         status: 'paused',
         isPrimary: false,
-        label: selectedTemplate.title,
+        title: form.title.trim() || selectedTemplate.title,
+        label: form.title.trim() || selectedTemplate.title,
       },
     })
   }
@@ -1439,12 +1499,12 @@ export function GoalsView() {
               ) : (
                 activeGoalPositions.map(({ goal, template, position }) => {
                   const Icon = template.icon
-                  const isSelected = goal.type === selectedType
+                  const isSelected = goal.id === selectedGoal?.id
                   return (
                     <button
                       key={goal.id}
                       type="button"
-                      onClick={() => selectGoal(goal.type)}
+                      onClick={() => selectGoal(goal)}
                       className={`border-line-subtle grid w-full gap-4 rounded-xl border p-4 text-left transition-colors lg:grid-cols-[1fr_15rem_auto] lg:items-center ${
                         isSelected
                           ? 'bg-brand-50 ring-brand-900 ring-1'
@@ -1639,6 +1699,35 @@ export function GoalsView() {
                 <div className="text-content-muted text-right text-xs">
                   {savedDate ? `Last saved ${savedDate}` : 'Not saved yet'}
                 </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1fr_12rem]">
+                <label className="text-content block text-sm font-medium">
+                  Goal name
+                  <input
+                    value={form.title}
+                    onChange={(event) => updateForm('title', event.target.value)}
+                    type="text"
+                    maxLength={80}
+                    className="border-line bg-surface-card placeholder:text-content-muted mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
+                    placeholder={selectedTemplate.title}
+                  />
+                </label>
+
+                <label className="text-content block text-sm font-medium">
+                  Priority
+                  <select
+                    value={form.priority}
+                    onChange={(event) =>
+                      updateForm('priority', event.target.value as ConsumerGoalPriority)
+                    }
+                    className="border-line bg-surface-card mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none"
+                  >
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                  </select>
+                </label>
               </div>
 
               {selectedType === 'rental' ? (
@@ -1876,8 +1965,9 @@ export function GoalsView() {
 
           <div className="space-y-2">
             {GOAL_TEMPLATES.map((template) => {
-              const saved = savedByType.get(template.type)
-              const isActive = saved?.status === 'active'
+              const activeCountForType = activeGoals.filter(
+                (goal) => goal.type === template.type
+              ).length
               const Icon = template.icon
               return (
                 <button
@@ -1892,7 +1982,9 @@ export function GoalsView() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-content text-sm font-semibold">{template.title}</p>
-                      {isActive ? <StatusPill status="success" label="Active" /> : null}
+                      {activeCountForType > 0 ? (
+                        <StatusPill status="success" label={`${activeCountForType} active`} />
+                      ) : null}
                     </div>
                     <p className="text-content-secondary mt-1 text-sm">{template.description}</p>
                     <p className="text-content-muted mt-2 text-xs">{template.evidenceFocus}</p>

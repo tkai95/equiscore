@@ -21,18 +21,28 @@ export type ConsumerGoalType =
   | 'stronger_profile'
 
 export type ConsumerGoalApplicationMode = 'alone' | 'joint' | 'unknown'
+export type ConsumerGoalPriority = 'high' | 'normal' | 'low'
 
 export interface ConsumerGoal {
   id: string
   type: ConsumerGoalType
   status: 'active' | 'paused' | 'archived'
   isPrimary: boolean
+  title: string | null
+  priority: ConsumerGoalPriority
   label: string | null
+  targetDate: string | null
+  targetAmount: number | null
+  currentAmount: number | null
+  monthlyContribution: number | null
+  reservedFunds: number | null
+  assumptions: Record<string, unknown> | null
   targetMonthlyRent: number | null
   moveDate: string | null
   applicationMode: ConsumerGoalApplicationMode | null
   depositAvailable: number | null
   notes: string | null
+  completedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -41,12 +51,21 @@ export interface UpdateConsumerGoalInput {
   type?: ConsumerGoalType
   status?: 'active' | 'paused' | 'archived'
   isPrimary?: boolean
+  title?: string | null
+  priority?: ConsumerGoalPriority | null
   label?: string | null
+  targetDate?: string | null
+  targetAmount?: number | null
+  currentAmount?: number | null
+  monthlyContribution?: number | null
+  reservedFunds?: number | null
+  assumptions?: Record<string, unknown> | null
   targetMonthlyRent?: number | null
   moveDate?: string | null
   applicationMode?: ConsumerGoalApplicationMode | null
   depositAvailable?: number | null
   notes?: string | null
+  completedAt?: string | null
 }
 
 export type ImportJobStatus = 'processing' | 'completed' | 'failed' | 'cancelled'
@@ -211,6 +230,8 @@ export const api = {
   },
   goals: {
     list: (token: string) => apiFetch<ConsumerGoal[]>('/goals', {}, token),
+    create: (token: string, data: UpdateConsumerGoalInput) =>
+      apiFetch<ConsumerGoal>('/goals', { method: 'POST', body: JSON.stringify(data) }, token),
     getPrimary: (token: string) => apiFetch<ConsumerGoal>('/goals/primary', {}, token),
     updatePrimary: (token: string, data: UpdateConsumerGoalInput) =>
       apiFetch<ConsumerGoal>(
@@ -218,12 +239,16 @@ export const api = {
         { method: 'PUT', body: JSON.stringify(data) },
         token
       ),
+    updateById: (token: string, id: string, data: UpdateConsumerGoalInput) =>
+      apiFetch<ConsumerGoal>(`/goals/${id}`, { method: 'PUT', body: JSON.stringify(data) }, token),
     update: (token: string, type: ConsumerGoalType, data: UpdateConsumerGoalInput) =>
       apiFetch<ConsumerGoal>(
         `/goals/types/${type}`,
         { method: 'PUT', body: JSON.stringify(data) },
         token
       ),
+    setPrimaryById: (token: string, id: string) =>
+      apiFetch<ConsumerGoal>(`/goals/${id}/primary`, { method: 'POST' }, token),
     setPrimary: (token: string, type: ConsumerGoalType) =>
       apiFetch<ConsumerGoal>(`/goals/types/${type}/primary`, { method: 'POST' }, token),
   },

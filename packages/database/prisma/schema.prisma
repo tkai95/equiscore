@@ -1500,25 +1500,35 @@ model CompassDismissal {
 /// intentionally outside Compass so all consumers can save their primary
 /// objective before any premium coaching layer is enabled.
 model ConsumerGoal {
-  id                String                       @id @default(cuid())
-  userId            String                       @map("user_id")
-  type              ConsumerGoalType             @default(rental)
-  status            ConsumerGoalStatus           @default(active)
-  isPrimary         Boolean                      @default(false) @map("is_primary")
-  label             String?
-  targetMonthlyRent Float?                       @map("target_monthly_rent")
-  moveDate          DateTime?                    @map("move_date")
-  applicationMode   ConsumerGoalApplicationMode? @map("application_mode")
-  depositAvailable  Float?                       @map("deposit_available")
-  notes             String?
-  createdAt         DateTime                     @default(now()) @map("created_at")
-  updatedAt         DateTime                     @updatedAt @map("updated_at")
+  id                  String                       @id @default(cuid())
+  userId              String                       @map("user_id")
+  type                ConsumerGoalType             @default(rental)
+  status              ConsumerGoalStatus           @default(active)
+  isPrimary           Boolean                      @default(false) @map("is_primary")
+  title               String?
+  priority            ConsumerGoalPriority         @default(normal)
+  label               String?
+  targetDate          DateTime?                    @map("target_date")
+  targetAmount        Float?                       @map("target_amount")
+  currentAmount       Float?                       @map("current_amount")
+  monthlyContribution Float?                       @map("monthly_contribution")
+  reservedFunds       Float?                       @map("reserved_funds")
+  assumptions         Json?
+  targetMonthlyRent   Float?                       @map("target_monthly_rent")
+  moveDate            DateTime?                    @map("move_date")
+  applicationMode     ConsumerGoalApplicationMode? @map("application_mode")
+  depositAvailable    Float?                       @map("deposit_available")
+  notes               String?
+  completedAt         DateTime?                    @map("completed_at")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, type])
   @@index([userId, status])
   @@index([userId, isPrimary])
+  @@index([userId, type, status])
+  @@index([userId, updatedAt])
   @@map("consumer_goals")
 }
 
@@ -1539,6 +1549,14 @@ enum ConsumerGoalStatus {
   archived
 
   @@map("consumer_goal_status")
+}
+
+enum ConsumerGoalPriority {
+  high
+  normal
+  low
+
+  @@map("consumer_goal_priority")
 }
 
 enum ConsumerGoalApplicationMode {
