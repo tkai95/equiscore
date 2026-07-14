@@ -195,7 +195,6 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
     <PageLayout width="wide">
       <PageHeader
         title="Assessments"
-        description="Work through applicant assessments, delivered snapshots, policy outcomes, reviewer state and decisions."
         actions={
           <>
             <Link
@@ -225,10 +224,7 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
             body="Cases will appear here after a company accepts a shared profile or an applicant completes a company request."
           />
         ) : (
-          <Section
-            title="Assessment pipeline"
-            description="Prioritise delivered cases, applicant responses, information follow-ups and recorded decisions."
-          >
+          <Section title="Assessment pipeline">
             <MetricGroup className="mb-2 sm:grid-cols-4">
               <Metric label="Total cases" value={cases.length} />
               <Metric label="Needs review" value={needsReviewCount} tone="negative" />

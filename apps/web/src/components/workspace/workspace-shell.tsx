@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react'
 import {
   Activity,
   BarChart3,
-  Building2,
   ChevronDown,
   ClipboardList,
   FileClock,
@@ -219,15 +218,6 @@ function WorkspaceSidebar() {
         </button>
       </div>
 
-      {!collapsed && (
-        <div className="border-sidebar-border bg-sidebar-active mx-3 mb-3 rounded-lg border px-3 py-2">
-          <div className="text-sidebar-text flex items-center gap-2 text-sm font-medium">
-            <Building2 className="h-[18px] w-[18px]" />
-            Company workspace
-          </div>
-        </div>
-      )}
-
       <WorkspaceNav collapsed={collapsed} />
       <WorkspaceFooter collapsed={collapsed} />
     </aside>
@@ -285,12 +275,6 @@ function WorkspaceMobileTopBar() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="border-sidebar-border bg-sidebar-active mx-3 mb-3 rounded-lg border px-3 py-2">
-              <div className="text-sidebar-text flex items-center gap-2 text-sm font-medium">
-                <Building2 className="h-[18px] w-[18px]" />
-                Company workspace
-              </div>
-            </div>
             <WorkspaceNav onNavigate={() => setOpen(false)} />
             <WorkspaceFooter />
           </div>
@@ -307,7 +291,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceMobileTopBar />
-        <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-[1200px]">{children}</div>
+        </main>
       </div>
 
       <ChatWidget />

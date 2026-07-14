@@ -81,10 +81,7 @@ export function SharedProfilesView({ organisationSlug }: { organisationSlug: str
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Shared links"
-        description="Import consumer share links into this organisation before any assessed case or billable usage is created."
-      />
+      <PageHeader title="Shared links" />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card padding="lg">

@@ -16,10 +16,7 @@ export function AdminAudit() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Admin audit"
-        description="Audit trail for internal admin actions across partner setup and access management."
-      />
+      <PageHeader title="Admin audit" />
 
       <Card padding="lg">
         <Section title="Recent admin actions">

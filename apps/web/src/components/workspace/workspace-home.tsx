@@ -19,10 +19,7 @@ export function WorkspaceHome() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Company workspace"
-        description="Use partners.equiscore.app for invited company assessment workflows. Each organisation is an isolated workspace with its own cases, policies, usage and audit trail."
-      />
+      <PageHeader title="Company workspace" />
 
       <Card padding="lg">
         <Section

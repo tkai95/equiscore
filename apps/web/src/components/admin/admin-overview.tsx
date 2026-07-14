@@ -25,10 +25,7 @@ export function AdminOverview() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="EquiScore admin"
-        description="Create partner organisations, monitor usage and keep operational access separate from partner workspaces."
-      />
+      <PageHeader title="EquiScore admin" />
 
       {isError && (
         <Card padding="lg">

@@ -96,10 +96,7 @@ export function AssessmentRequestsView({ organisationSlug }: { organisationSlug:
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Assessment requests"
-        description="Create company-initiated requests, send the consent link to an applicant, and receive a delivered assessment case when they complete it."
-      />
+      <PageHeader title="Assessment requests" />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card padding="lg">

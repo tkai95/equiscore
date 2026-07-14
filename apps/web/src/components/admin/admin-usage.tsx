@@ -16,21 +16,29 @@ export function AdminUsage() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader title="Platform usage" description="Platform-wide usage event ledger across partner organisations." />
+      <PageHeader title="Platform usage" />
 
       <Card padding="lg">
         <Section title="Recent usage events">
           {isLoading ? (
-            <div className="h-40 animate-pulse rounded-xl bg-surface-hover" />
+            <div className="bg-surface-hover h-40 animate-pulse rounded-xl" />
           ) : events.length === 0 ? (
-            <EmptyAdminState title="No usage events yet" body="Delivered assessments and manual credits will appear here." />
+            <EmptyAdminState
+              title="No usage events yet"
+              body="Delivered assessments and manual credits will appear here."
+            />
           ) : (
-            <AdminTable columns={['Partner', 'Event', 'Applicant', 'Case', 'Quantity', 'Billing', 'Occurred']}>
+            <AdminTable
+              columns={['Partner', 'Event', 'Applicant', 'Case', 'Quantity', 'Billing', 'Occurred']}
+            >
               {events.map((event) => (
                 <tr key={event.id}>
                   <Cell>
                     {event.organisation ? (
-                      <Link className="font-medium text-brand hover:underline" href={`/admin/organisations/${event.organisation.slug}`}>
+                      <Link
+                        className="text-brand font-medium hover:underline"
+                        href={`/admin/organisations/${event.organisation.slug}`}
+                      >
                         {event.organisation.name}
                       </Link>
                     ) : (
@@ -39,10 +47,17 @@ export function AdminUsage() {
                   </Cell>
                   <Cell>{label(event.eventType)}</Cell>
                   <Cell muted>{event.applicant?.email ?? 'None'}</Cell>
-                  <Cell muted>{event.assessmentCase?.reference ?? event.assessmentCase?.assessmentType ?? 'None'}</Cell>
+                  <Cell muted>
+                    {event.assessmentCase?.reference ??
+                      event.assessmentCase?.assessmentType ??
+                      'None'}
+                  </Cell>
                   <Cell muted>{event.quantity}</Cell>
                   <Cell>
-                    <StatusPill status={event.includedOrOverage === 'overage' ? 'warning' : 'neutral'} label={label(event.includedOrOverage)} />
+                    <StatusPill
+                      status={event.includedOrOverage === 'overage' ? 'warning' : 'neutral'}
+                      label={label(event.includedOrOverage)}
+                    />
                   </Cell>
                   <Cell muted>{formatMaybeDate(event.occurredAt)}</Cell>
                 </tr>

@@ -21,7 +21,6 @@ import {
   Plus,
   Save,
   ShieldCheck,
-  Sparkles,
   UploadCloud,
 } from 'lucide-react'
 import {
@@ -1597,10 +1596,7 @@ export function GoalsView() {
 
   return (
     <PageLayout>
-      <PageHeader
-        title="Goals"
-        description="Set the outcomes you are working towards, understand readiness by goal, and turn your financial evidence into a practical plan."
-      />
+      <PageHeader title="Goals" />
 
       {isProfileLoading || isGoalsLoading ? (
         <div className="space-y-4">
@@ -1626,15 +1622,7 @@ export function GoalsView() {
           <Card padding="lg" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="text-content-muted mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
-                  <Sparkles className="h-4 w-4" />
-                  Goal portfolio
-                </div>
                 <h2 className="text-content text-2xl font-semibold">Your goals</h2>
-                <p className="text-content-secondary mt-2 max-w-3xl text-sm">
-                  Plan your financial outcomes, understand whether they work together and see the
-                  next action for each one.
-                </p>
               </div>
               <Button type="button" onClick={() => setAddGoalOpen(true)}>
                 <Plus className="h-4 w-4" />

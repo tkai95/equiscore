@@ -127,10 +127,7 @@ export function AdminInternalAdmins() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Internal admins"
-        description="Invite EquiScore team members into the admin portal without giving them partner workspace access."
-      />
+      <PageHeader title="Internal admins" />
 
       {isError && (
         <Card padding="lg">

@@ -48,10 +48,7 @@ export function AdminOrganisations() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Partner organisations"
-        description="Create partner tenants and invite the first owner/admin. Partner users then work inside their own workspace only."
-      />
+      <PageHeader title="Partner organisations" />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card padding="lg">

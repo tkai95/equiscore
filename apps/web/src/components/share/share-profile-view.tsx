@@ -618,30 +618,7 @@ export function ShareProfileView({
 
   return (
     <PageLayout>
-      <PageHeader
-        title={isRentalMode ? 'Rental share pack' : 'Sharing'}
-        description={
-          isRentalMode
-            ? 'Preview and create a landlord or letting-agent ready pack from your rental goal.'
-            : 'Create, control and track secure access to your Trust Profile.'
-        }
-      />
-
-      {/* How it works */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { step: '1', text: 'Create a share link tied to your current trust score.' },
-          { step: '2', text: 'Send the link to your landlord, lender, or agent.' },
-          { step: '3', text: 'They can view your verified profile — no account needed.' },
-        ].map(({ step, text }) => (
-          <Card key={step} padding="sm">
-            <div className="bg-brand text-cream-surface mb-3 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold">
-              {step}
-            </div>
-            <p className="text-content-secondary text-sm">{text}</p>
-          </Card>
-        ))}
-      </div>
+      <PageHeader title={isRentalMode ? 'Rental share pack' : 'Sharing'} />
 
       {/* Score required gate */}
       {!isLoading && !score && (

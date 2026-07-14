@@ -60,10 +60,7 @@ export function AdminConsumers() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Consumer support"
-        description="Monitor consumer sign-ups and support signals without granting access to the admin or partner workspaces."
-      />
+      <PageHeader title="Consumer support" />
 
       {isError && (
         <Card padding="lg">

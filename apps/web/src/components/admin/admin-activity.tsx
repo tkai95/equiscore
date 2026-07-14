@@ -16,10 +16,7 @@ export function AdminActivity() {
 
   return (
     <PageLayout width="wide">
-      <PageHeader
-        title="Partner activity"
-        description="Login/activity signals and invite status across partner organisations."
-      />
+      <PageHeader title="Partner activity" />
 
       {isLoading ? (
         <div className="rounded-card bg-surface-hover h-40 animate-pulse" />

@@ -155,7 +155,7 @@ export function TeamSettingsView({ organisationSlug }: { organisationSlug: strin
         description={
           data
             ? `${data.organisation.name} · partners.equiscore.app/o/${data.organisation.slug}`
-            : 'Manage company members, roles and organisation-level access.'
+            : undefined
         }
       />
 
