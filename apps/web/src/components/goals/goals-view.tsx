@@ -10,9 +10,13 @@ import {
   ArrowRight,
   Banknote,
   BriefcaseBusiness,
+  CalendarClock,
   CheckCircle2,
+  ChevronRight,
   CreditCard,
+  Flag,
   Home,
+  ListPlus,
   Phone,
   Plus,
   Save,
@@ -33,6 +37,7 @@ import {
   Button,
   buttonClasses,
   Card,
+  Drawer,
   InsetPanel,
   MetricCard,
   PageHeader,
@@ -135,6 +140,31 @@ type GoalPlanAction = GoalAction & {
   disclosure?: string
 }
 type ReadinessKey = 'ready' | 'ready_with_conditions' | 'action_required' | 'not_enough_information'
+type GoalPosition = {
+  title: string
+  meta: string
+  statusLabel: string
+  statusTone: 'success' | 'warning' | 'danger' | 'neutral'
+  monthlyRequirement: number
+  requirementLabel: string
+  progressLabel: string
+  progressPercent: number | null
+  mainIssue: string
+  nextAction: GoalAction | null
+  deadline: Date | null
+}
+type PortfolioAssessment = {
+  activeCount: number
+  onTrackCount: number
+  attentionCount: number
+  conflictCount: number
+  totalMonthlyRequirement: number
+  sustainableCapacity: number | null
+  shortfall: number
+  headline: string
+  summary: string
+  tone: 'success' | 'warning' | 'danger' | 'neutral'
+}
 type GoalReadiness = {
   key: ReadinessKey
   summary: string
@@ -147,10 +177,10 @@ const READINESS: Record<
   ReadinessKey,
   { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }
 > = {
-  ready: { label: 'Ready', tone: 'success' },
+  ready: { label: 'On track', tone: 'success' },
   ready_with_conditions: { label: 'Ready with conditions', tone: 'warning' },
-  action_required: { label: 'Action required', tone: 'danger' },
-  not_enough_information: { label: 'Needs evidence', tone: 'neutral' },
+  action_required: { label: 'At risk', tone: 'danger' },
+  not_enough_information: { label: 'Insufficient evidence', tone: 'neutral' },
 }
 
 const GOAL_TEMPLATES: GoalTemplate[] = [
@@ -259,6 +289,34 @@ function formatSavedDate(value: string | null | undefined) {
     month: 'short',
     year: 'numeric',
   }).format(new Date(value))
+}
+
+function formatMonthYear(value: string | null | undefined) {
+  if (!value) return null
+  return new Intl.DateTimeFormat('en-GB', {
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+function monthsUntil(value: string | null | undefined) {
+  if (!value) return null
+  const target = new Date(value)
+  if (Number.isNaN(target.getTime())) return null
+  const now = new Date()
+  const months =
+    (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth())
+  return Math.max(1, months)
+}
+
+function estimatedRentalCashNeeded(targetMonthlyRent: number | null | undefined) {
+  if (!targetMonthlyRent || targetMonthlyRent <= 0) return null
+  // Planning estimate: first month, deposit, and moving buffer. Not a quote.
+  return Math.round((targetMonthlyRent * 2.5) / 50) * 50
+}
+
+function goalTitle(template: GoalTemplate, goal: ConsumerGoal | null | undefined) {
+  return goal?.label?.trim() || template.title
 }
 
 function completeReadiness(
@@ -873,6 +931,180 @@ function buildGoalPlanActions(
   return actions.slice(0, 4)
 }
 
+function buildGoalPosition(
+  template: GoalTemplate,
+  profile: InsightProfile | null | undefined,
+  score: Score,
+  goal: ConsumerGoal | null | undefined
+): GoalPosition {
+  const readiness = buildGoalReadiness(template, profile, score, goal)
+  const status = READINESS[readiness.key]
+  const actions = buildGoalPlanActions(template.type, template, profile, score, goal, readiness)
+  const nextAction = readiness.actions[0] ?? actions[0] ?? null
+  const title = goalTitle(template, goal)
+
+  if (template.type === 'rental') {
+    const targetRent = goal?.targetMonthlyRent ?? null
+    const deadline = goal?.moveDate ? new Date(goal.moveDate) : null
+    const deadlineLabel = formatMonthYear(goal?.moveDate)
+    const cashNeeded = estimatedRentalCashNeeded(targetRent)
+    const depositAvailable = goal?.depositAvailable ?? 0
+    const remaining = cashNeeded != null ? Math.max(0, cashNeeded - depositAvailable) : 0
+    const months = monthsUntil(goal?.moveDate)
+    const monthlyRequirement =
+      remaining > 0 && months != null ? Math.ceil(remaining / months / 5) * 5 : 0
+    const progressPercent =
+      cashNeeded && cashNeeded > 0
+        ? Math.min(100, Math.round((depositAvailable / cashNeeded) * 100))
+        : null
+
+    return {
+      title,
+      meta: [
+        deadlineLabel ? `Move by ${deadlineLabel}` : 'Move date not set',
+        targetRent ? `${formatCurrency(targetRent)} rent` : 'Target rent not set',
+      ].join(' · '),
+      statusLabel: status.label,
+      statusTone: status.tone,
+      monthlyRequirement,
+      requirementLabel:
+        monthlyRequirement > 0
+          ? `${formatCurrency(monthlyRequirement)}/mo required`
+          : cashNeeded
+            ? 'Deposit target covered'
+            : 'Add rent and move date',
+      progressLabel:
+        cashNeeded != null
+          ? `${formatCurrency(depositAvailable)} / ${formatCurrency(cashNeeded)} upfront cash`
+          : 'Add a target rent to estimate upfront cash',
+      progressPercent,
+      mainIssue: readiness.friction[0] ?? 'No major blocker detected from the current evidence.',
+      nextAction,
+      deadline,
+    }
+  }
+
+  const deadline = goal?.moveDate ? new Date(goal.moveDate) : null
+  const confidence =
+    template.type === 'income_proof'
+      ? score?.verificationStrengthScore
+      : template.type === 'banking_access'
+        ? score?.identityConfidenceScore
+        : score?.overallScore
+
+  return {
+    title,
+    meta: formatMonthYear(goal?.moveDate)
+      ? `Target by ${formatMonthYear(goal?.moveDate)}`
+      : 'No deadline set',
+    statusLabel: status.label,
+    statusTone: status.tone,
+    monthlyRequirement: 0,
+    requirementLabel: 'No monthly target set',
+    progressLabel:
+      confidence != null
+        ? `${confidence}/100 current evidence signal`
+        : 'Connect evidence to calculate progress',
+    progressPercent: confidence ?? null,
+    mainIssue: readiness.friction[0] ?? 'No major blocker detected from the current evidence.',
+    nextAction,
+    deadline,
+  }
+}
+
+function sustainableGoalCapacity(profile: InsightProfile | null | undefined) {
+  if (!profile || profile.period.transactionCount === 0) return null
+  const surplus = profile.affordability.surplusAfterAll
+  if (!Number.isFinite(surplus) || surplus <= 0) return 0
+  const incomeReserve = Math.min(250, Math.max(75, profile.income.averageMonthlyIncome * 0.05))
+  return Math.max(0, Math.round(surplus - incomeReserve))
+}
+
+function buildPortfolioAssessment(
+  positions: GoalPosition[],
+  profile: InsightProfile | null | undefined
+): PortfolioAssessment {
+  const activeCount = positions.length
+  const totalMonthlyRequirement = positions.reduce(
+    (sum, position) => sum + position.monthlyRequirement,
+    0
+  )
+  const sustainableCapacity = sustainableGoalCapacity(profile)
+  const shortfall =
+    sustainableCapacity == null ? 0 : Math.max(0, totalMonthlyRequirement - sustainableCapacity)
+  const attentionCount = positions.filter((position) =>
+    ['warning', 'danger', 'neutral'].includes(position.statusTone)
+  ).length
+  const onTrackCount = positions.filter((position) => position.statusTone === 'success').length
+  const conflictCount = shortfall > 0 && activeCount > 1 ? 1 : 0
+
+  if (activeCount === 0) {
+    return {
+      activeCount,
+      onTrackCount,
+      attentionCount,
+      conflictCount,
+      totalMonthlyRequirement,
+      sustainableCapacity,
+      shortfall,
+      headline: 'Create your first goal',
+      summary:
+        'Add an outcome so EquiScore can turn your financial evidence into a practical plan.',
+      tone: 'neutral',
+    }
+  }
+
+  if (sustainableCapacity == null) {
+    return {
+      activeCount,
+      onTrackCount,
+      attentionCount,
+      conflictCount,
+      totalMonthlyRequirement,
+      sustainableCapacity,
+      shortfall,
+      headline: 'Connect evidence to assess your plan',
+      summary:
+        'Your goals are saved, but EquiScore needs financial evidence before it can estimate capacity and conflicts.',
+      tone: 'neutral',
+    }
+  }
+
+  if (shortfall > 0) {
+    return {
+      activeCount,
+      onTrackCount,
+      attentionCount,
+      conflictCount,
+      totalMonthlyRequirement,
+      sustainableCapacity,
+      shortfall,
+      headline: 'Your plan needs attention',
+      summary: `${activeCount} active goal${activeCount === 1 ? '' : 's'} require approximately ${formatCurrency(
+        totalMonthlyRequirement
+      )}/mo. Sustainable goal capacity is estimated at ${formatCurrency(
+        sustainableCapacity
+      )}/mo, leaving a ${formatCurrency(shortfall)}/mo shortfall.`,
+      tone: 'warning',
+    }
+  }
+
+  return {
+    activeCount,
+    onTrackCount,
+    attentionCount,
+    conflictCount,
+    totalMonthlyRequirement,
+    sustainableCapacity,
+    shortfall,
+    headline: attentionCount > 0 ? 'Your goals mostly work together' : 'Your goals work together',
+    summary: `${activeCount} active goal${activeCount === 1 ? '' : 's'} require approximately ${formatCurrency(
+      totalMonthlyRequirement
+    )}/mo. Sustainable goal capacity is estimated at ${formatCurrency(sustainableCapacity)}/mo.`,
+    tone: attentionCount > 0 ? 'warning' : 'success',
+  }
+}
+
 const PLAN_KIND_LABEL: Record<GoalPlanAction['kind'], string> = {
   evidence: 'Evidence',
   money: 'Money move',
@@ -887,6 +1119,7 @@ export function GoalsView() {
   const { items: actionItems } = useActionItems()
   const [selectedType, setSelectedType] = useState<ConsumerGoalType>('rental')
   const [selectedTouched, setSelectedTouched] = useState(false)
+  const [addGoalOpen, setAddGoalOpen] = useState(false)
   const [form, setForm] = useState<GoalForm>(EMPTY_GOAL_FORM)
   const [isDirty, setIsDirty] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -926,22 +1159,56 @@ export function GoalsView() {
     GOAL_TEMPLATES.find((template) => template.type === selectedType) ?? GOAL_TEMPLATES[0]!
   const SelectedIcon = selectedTemplate.icon
   const selectedGoal = savedByType.get(selectedType)
+  const selectedGoalForAssessment: ConsumerGoal = {
+    id: selectedGoal?.id ?? `draft-${selectedType}`,
+    type: selectedType,
+    status: selectedGoal?.status ?? 'active',
+    isPrimary: selectedGoal?.isPrimary ?? false,
+    label: selectedGoal?.label ?? selectedTemplate.title,
+    targetMonthlyRent: parseMoneyInput(form.targetMonthlyRent),
+    moveDate: inputDateToIso(form.moveDate),
+    applicationMode: form.applicationMode,
+    depositAvailable: parseMoneyInput(form.depositAvailable),
+    notes: form.notes.trim() || null,
+    createdAt: selectedGoal?.createdAt ?? new Date(0).toISOString(),
+    updatedAt: selectedGoal?.updatedAt ?? new Date(0).toISOString(),
+  }
   const selectedIsActive = selectedGoal?.status === 'active'
   const selectedReadiness = buildGoalReadiness(
     selectedTemplate,
     profile,
     score ?? null,
-    selectedGoal
+    selectedGoalForAssessment
   )
   const selectedStatus = READINESS[selectedReadiness.key]
-  const selectedMetrics = metricsForGoal(selectedType, profile, score ?? null, selectedGoal)
+  const selectedMetrics = metricsForGoal(
+    selectedType,
+    profile,
+    score ?? null,
+    selectedGoalForAssessment
+  )
   const goalPlanActions = buildGoalPlanActions(
     selectedType,
     selectedTemplate,
     profile,
     score ?? null,
-    selectedGoal,
+    selectedGoalForAssessment,
     selectedReadiness
+  )
+  const activeGoalPositions = activeGoals.map((goal) => {
+    const template =
+      GOAL_TEMPLATES.find((candidate) => candidate.type === goal.type) ?? GOAL_TEMPLATES[0]!
+    return { goal, template, position: buildGoalPosition(template, profile, score ?? null, goal) }
+  })
+  const portfolioAssessment = buildPortfolioAssessment(
+    activeGoalPositions.map((item) => item.position),
+    profile
+  )
+  const selectedPosition = buildGoalPosition(
+    selectedTemplate,
+    profile,
+    score ?? null,
+    selectedGoalForAssessment
   )
   const savedDate = formatSavedDate(selectedGoal?.updatedAt)
 
@@ -974,17 +1241,6 @@ export function GoalsView() {
     },
   })
 
-  const setFocus = useMutation({
-    mutationFn: async (type: ConsumerGoalType) => api.goals.setPrimary((await getToken())!, type),
-    onSuccess: () => {
-      invalidateGoals()
-      setSaveMessage('Focus goal updated')
-    },
-    onError: (error) => {
-      setFormError(error instanceof Error ? error.message : 'We could not update the focus goal.')
-    },
-  })
-
   const updateForm = <K extends keyof GoalForm>(key: K, value: GoalForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
     setIsDirty(true)
@@ -998,6 +1254,14 @@ export function GoalsView() {
     setIsDirty(false)
     setFormError(null)
     setSaveMessage(null)
+  }
+
+  const openGoalTemplate = (type: ConsumerGoalType) => {
+    selectGoal(type)
+    setAddGoalOpen(false)
+    window.setTimeout(() => {
+      document.getElementById('goal-workspace')?.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
   }
 
   const goalPayload = (status: 'active' | 'paused' = 'active'): UpdateConsumerGoalInput => {
@@ -1071,85 +1335,177 @@ export function GoalsView() {
         </Card>
       ) : (
         <>
-          <Card padding="lg" className="space-y-5">
+          <Card padding="lg" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="text-content-muted mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
                   <Sparkles className="h-4 w-4" />
                   Goal portfolio
                 </div>
-                <h2 className="text-content text-2xl font-semibold">
-                  Work towards more than one outcome
-                </h2>
+                <h2 className="text-content text-2xl font-semibold">Your goals</h2>
                 <p className="text-content-secondary mt-2 max-w-3xl text-sm">
-                  Each goal reads the same Trust Profile differently. Rental readiness cares about
-                  affordability and rent reliability; income proof cares about source clarity;
-                  future credit cares about surplus and resilience.
+                  Plan your financial outcomes, understand whether they work together and see the
+                  next action for each one.
                 </p>
               </div>
-              <StatusPill
-                status={activeGoals.length > 0 ? 'success' : 'neutral'}
-                label={`${activeGoals.length} active`}
-              />
+              <Button type="button" onClick={() => setAddGoalOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add a goal
+              </Button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {GOAL_TEMPLATES.map((template) => {
-                const saved = savedByType.get(template.type)
-                const readiness = buildGoalReadiness(template, profile, score ?? null, saved)
-                const status = READINESS[readiness.key]
-                const isSelected = template.type === selectedType
-                const isActive = saved?.status === 'active'
-                const Icon = template.icon
-                return (
-                  <button
-                    key={template.type}
-                    type="button"
-                    onClick={() => selectGoal(template.type)}
-                    className={`rounded-xl border p-4 text-left transition-colors ${
-                      isSelected
-                        ? 'border-brand-900 bg-brand-50'
-                        : 'border-line bg-surface-card hover:bg-surface-hover'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-panel bg-surface-inset flex h-10 w-10 shrink-0 items-center justify-center">
-                        <Icon className="text-brand-900 h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-content font-semibold">{template.shortTitle}</p>
-                          {saved?.isPrimary && isActive ? (
-                            <StatusPill status="success" label="Focus" />
-                          ) : null}
-                          {isActive ? (
-                            <StatusPill status={status.tone} label={status.label} />
-                          ) : (
-                            <StatusPill status="neutral" label="Available" />
-                          )}
+            <InsetPanel className="space-y-4" padding="md">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <StatusPill
+                    status={portfolioAssessment.tone}
+                    label={portfolioAssessment.headline}
+                  />
+                  <p className="text-content-secondary mt-3 max-w-3xl text-sm">
+                    {portfolioAssessment.summary}
+                  </p>
+                </div>
+                <div className="grid min-w-full gap-3 sm:min-w-[30rem] sm:grid-cols-3">
+                  <div>
+                    <p className="text-content-muted text-xs font-semibold uppercase">
+                      Monthly need
+                    </p>
+                    <p className="text-content mt-1 text-xl font-semibold">
+                      {formatCurrency(portfolioAssessment.totalMonthlyRequirement)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-content-muted text-xs font-semibold uppercase">Capacity</p>
+                    <p className="text-content mt-1 text-xl font-semibold">
+                      {portfolioAssessment.sustainableCapacity == null
+                        ? 'n/a'
+                        : formatCurrency(portfolioAssessment.sustainableCapacity)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-content-muted text-xs font-semibold uppercase">Conflicts</p>
+                    <p className="text-content mt-1 text-xl font-semibold">
+                      {portfolioAssessment.conflictCount}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="border-line-subtle grid gap-3 border-t pt-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-content text-lg font-semibold">
+                    {portfolioAssessment.activeCount}
+                  </p>
+                  <p className="text-content-muted text-xs">Active goals</p>
+                </div>
+                <div>
+                  <p className="text-content text-lg font-semibold">
+                    {portfolioAssessment.onTrackCount}
+                  </p>
+                  <p className="text-content-muted text-xs">On track</p>
+                </div>
+                <div>
+                  <p className="text-content text-lg font-semibold">
+                    {portfolioAssessment.attentionCount}
+                  </p>
+                  <p className="text-content-muted text-xs">Need attention</p>
+                </div>
+                <div>
+                  <p className="text-content text-lg font-semibold">
+                    {portfolioAssessment.shortfall > 0
+                      ? formatCurrency(portfolioAssessment.shortfall)
+                      : formatCurrency(0)}
+                  </p>
+                  <p className="text-content-muted text-xs">Estimated shortfall</p>
+                </div>
+              </div>
+            </InsetPanel>
+
+            <div className="space-y-3">
+              {activeGoalPositions.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setAddGoalOpen(true)}
+                  className="border-line-subtle bg-surface-card hover:bg-surface-hover flex w-full flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center transition-colors"
+                >
+                  <ListPlus className="text-brand-900 h-8 w-8" />
+                  <span className="text-content mt-3 text-base font-semibold">
+                    Add your first goal
+                  </span>
+                  <span className="text-content-secondary mt-1 max-w-md text-sm">
+                    Choose an outcome such as renting, proving income or preparing to borrow, then
+                    EquiScore will assess the plan against your current evidence.
+                  </span>
+                </button>
+              ) : (
+                activeGoalPositions.map(({ goal, template, position }) => {
+                  const Icon = template.icon
+                  const isSelected = goal.type === selectedType
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => selectGoal(goal.type)}
+                      className={`border-line-subtle grid w-full gap-4 rounded-xl border p-4 text-left transition-colors lg:grid-cols-[1fr_15rem_auto] lg:items-center ${
+                        isSelected
+                          ? 'bg-brand-50 ring-brand-900 ring-1'
+                          : 'bg-surface-card hover:bg-surface-hover'
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="rounded-panel bg-surface-inset flex h-10 w-10 shrink-0 items-center justify-center">
+                          <Icon className="text-brand-900 h-5 w-5" />
                         </div>
-                        <p className="text-content-secondary mt-1 text-sm">
-                          {template.description}
-                        </p>
-                        <p className="text-content-muted mt-2 text-xs">{template.evidenceFocus}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-content font-semibold">{position.title}</p>
+                            <StatusPill status={position.statusTone} label={position.statusLabel} />
+                          </div>
+                          <p className="text-content-secondary mt-1 text-sm">{position.meta}</p>
+                          <p className="text-content-muted mt-2 text-xs">{position.mainIssue}</p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                )
-              })}
+                      <div>
+                        <p className="text-content text-sm font-semibold">
+                          {position.requirementLabel}
+                        </p>
+                        <p className="text-content-secondary mt-1 text-xs">
+                          {position.progressLabel}
+                        </p>
+                        {position.progressPercent != null ? (
+                          <div className="bg-surface-inset mt-2 h-1.5 overflow-hidden rounded-full">
+                            <div
+                              className="bg-brand-900 h-full rounded-full"
+                              style={{ width: `${Math.min(100, position.progressPercent)}%` }}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between gap-3 lg:justify-end">
+                        <div className="min-w-0 lg:text-right">
+                          <p className="text-content-muted text-xs">Next action</p>
+                          <p className="text-content text-sm font-medium">
+                            {position.nextAction?.title ?? 'Keep evidence fresh'}
+                          </p>
+                        </div>
+                        <ChevronRight className="text-content-muted h-5 w-5 shrink-0" />
+                      </div>
+                    </button>
+                  )
+                })
+              )}
             </div>
           </Card>
 
-          <Card padding="lg" className="space-y-6">
+          <Card id="goal-workspace" padding="lg" className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-content-muted mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
                   <SelectedIcon className="h-4 w-4" />
-                  Selected goal
+                  Goal workspace
                 </div>
-                <h2 className="text-content text-2xl font-semibold">{selectedTemplate.title}</h2>
+                <h2 className="text-content text-2xl font-semibold">{selectedPosition.title}</h2>
                 <p className="text-content-secondary mt-2 max-w-2xl text-sm">
-                  {selectedTemplate.description}
+                  {selectedPosition.meta}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1164,22 +1520,42 @@ export function GoalsView() {
                 <p className="text-content-secondary mt-1 max-w-2xl text-sm">
                   {selectedReadiness.summary}
                 </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-content-muted flex items-center gap-1.5 text-xs font-semibold uppercase">
+                      <Flag className="h-3.5 w-3.5" />
+                      Monthly need
+                    </p>
+                    <p className="text-content mt-1 text-lg font-semibold">
+                      {selectedPosition.monthlyRequirement > 0
+                        ? formatCurrency(selectedPosition.monthlyRequirement)
+                        : 'n/a'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-content-muted flex items-center gap-1.5 text-xs font-semibold uppercase">
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      Progress
+                    </p>
+                    <p className="text-content mt-1 text-sm font-semibold">
+                      {selectedPosition.progressLabel}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-content-muted text-xs font-semibold uppercase">
+                      Current blocker
+                    </p>
+                    <p className="text-content mt-1 text-sm font-semibold">
+                      {selectedPosition.mainIssue}
+                    </p>
+                  </div>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {!selectedIsActive ? (
                   <Button type="button" onClick={handleSave} loading={saveGoal.isPending}>
                     <Plus className="h-4 w-4" />
                     Start goal
-                  </Button>
-                ) : null}
-                {selectedIsActive && !selectedGoal?.isPrimary ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setFocus.mutate(selectedType)}
-                    loading={setFocus.isPending}
-                  >
-                    Set as focus
                   </Button>
                 ) : null}
                 {selectedType === 'rental' ? (
@@ -1483,6 +1859,51 @@ export function GoalsView() {
           </div>
         </>
       )}
+
+      <Drawer
+        open={addGoalOpen}
+        onOpenChange={setAddGoalOpen}
+        title="Add a goal"
+        subtitle="Choose the outcome you want EquiScore to assess."
+      >
+        <div className="space-y-5">
+          <div>
+            <p className="text-content text-sm font-semibold">What are you working towards?</p>
+            <p className="text-content-secondary mt-1 text-sm">
+              Pick a template, then save the details that make it specific to you.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {GOAL_TEMPLATES.map((template) => {
+              const saved = savedByType.get(template.type)
+              const isActive = saved?.status === 'active'
+              const Icon = template.icon
+              return (
+                <button
+                  key={template.type}
+                  type="button"
+                  onClick={() => openGoalTemplate(template.type)}
+                  className="border-line-subtle hover:bg-surface-hover flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors"
+                >
+                  <div className="rounded-panel bg-surface-inset flex h-10 w-10 shrink-0 items-center justify-center">
+                    <Icon className="text-brand-900 h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-content text-sm font-semibold">{template.title}</p>
+                      {isActive ? <StatusPill status="success" label="Active" /> : null}
+                    </div>
+                    <p className="text-content-secondary mt-1 text-sm">{template.description}</p>
+                    <p className="text-content-muted mt-2 text-xs">{template.evidenceFocus}</p>
+                  </div>
+                  <ChevronRight className="text-content-muted mt-2 h-4 w-4 shrink-0" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </Drawer>
     </PageLayout>
   )
 }

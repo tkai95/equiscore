@@ -83,6 +83,35 @@ My Money, To do and Sharing.
   explainers without making the current product depend on marketplace data or
   regulated advice.
 
+## Built In Goals Portfolio Slice
+
+- Reworked the Goals landing experience from a permanent template grid into a
+  portfolio-first view.
+- Active saved goals now appear as individual rows with:
+  - goal title
+  - target and deadline metadata
+  - feasibility status
+  - progress or evidence signal
+  - estimated monthly requirement
+  - main blocker
+  - next action
+- Moved goal templates into an Add goal drawer so templates are creation inputs,
+  not the main navigation model.
+- Added first deterministic portfolio intelligence:
+  - estimated monthly requirement across active goals
+  - estimated sustainable monthly goal capacity
+  - estimated shortfall
+  - simple conflict count when monthly requirements exceed capacity
+- Rental goals now estimate upfront cash required, remaining gap and monthly
+  funding requirement based on the saved target rent, deposit available and move
+  date.
+- The selected goal workspace now shows monthly need, progress and current
+  blocker before the longer evidence and action sections.
+- Draft goal details now feed the readiness calculation immediately, so a typed
+  but unsaved target no longer contradicts the on-page guidance.
+- Removed visible Focus controls from the consumer UI. Primary goal support
+  remains in the backend for later prioritisation logic.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -108,7 +137,18 @@ history.
 
 ## Next Build Slices
 
-1. Build goal-specific depth:
+1. Add true goal instances:
+   - Migrate `consumer_goals` from one row per user/type to multiple rows per
+     user/template.
+   - Add goal instance fields: `title`, `priority`, `targetDate`,
+     `targetAmount`, `currentAmount`, `monthlyContribution`,
+     `reservedFunds`, `assumptions`, `completedAt`.
+   - Preserve existing saved goals through a migration that maps the current
+     type-based rows into first goal instances.
+   - Support two goals from the same template, such as two rental scenarios with
+     different dates or budgets.
+
+2. Build goal-specific depth:
    - Add clearer readiness explanations for each active goal.
    - Add required vs optional evidence checklists per goal.
    - Add "how the recipient may view this" summaries per goal type.
@@ -116,14 +156,14 @@ history.
    - Compare target rent against income, current commitments and detected headroom.
    - Add "how a letting agent may view this" summary.
 
-2. Connect Goals to Sharing:
+3. Connect Goals to Sharing:
    - Create a rental share-pack mode.
    - Create a generic goal share-pack structure that can later support banking,
      utilities, phone, income-proof and credit-readiness use cases.
    - Preview what the recipient sees.
    - Show limitations and evidence confidence before sharing.
 
-3. Add solution opportunities:
+4. Add solution opportunities:
    - Add a provider/comparison abstraction for non-regulated switching first:
      subscriptions, mobile, broadband and energy.
    - Keep affiliate/commercial disclosure visible on any monetised action.
@@ -131,17 +171,17 @@ history.
    - Add AI explanations on top of deterministic calculations, not instead of
      them.
 
-4. Add contextual supporting information:
+5. Add contextual supporting information:
    - Keep bank connections and documents as functional routes.
    - Surface them from Financial Profile, Goals and To do instead of top-level navigation.
 
-5. Refine Home:
+6. Refine Home:
    - Show current goal status.
    - Show one money insight.
    - Show only genuinely actionable To do items.
    - Show recent activity such as share created, recipient viewed, assessment updated.
 
-6. Later:
+7. Later:
    - Banking access readiness.
    - Utilities or phone contract readiness.
    - Future credit readiness.
