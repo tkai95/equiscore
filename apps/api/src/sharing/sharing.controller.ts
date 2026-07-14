@@ -26,10 +26,22 @@ export class SharingController {
   @ApiOperation({ summary: 'Create a shareable profile link' })
   async create(
     @CurrentUser() user: RequestUser,
-    @Body() body: { trustScoreId: string; targetType?: string; targetName?: string }
+    @Body()
+    body: {
+      trustScoreId: string
+      targetType?: string
+      targetName?: string
+      packType?: 'rental'
+      goalId?: string
+    }
   ) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
-    return this.sharingService.createShareLink(userId, body.trustScoreId, body.targetType, body.targetName)
+    return this.sharingService.createShareLink(userId, body.trustScoreId, {
+      targetType: body.targetType,
+      targetName: body.targetName,
+      packType: body.packType,
+      goalId: body.goalId,
+    })
   }
 
   @Get('share-links')

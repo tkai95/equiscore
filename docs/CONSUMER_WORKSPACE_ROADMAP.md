@@ -160,6 +160,21 @@ My Money, To do and Sharing.
 - Added explicit calculation assumptions so rental readiness is presented as a
   planning estimate, not a guarantee of acceptance.
 
+## Built In Rental Share Pack Slice
+
+- Connected Rental Readiness goals to Sharing with `/dashboard/share?mode=rental`.
+- Goals now link to Sharing with the selected rental goal id when available.
+- Sharing now shows a rental-pack preview before link creation, including:
+  - target rent, move date and application mode
+  - target rent-to-income
+  - estimated sustainable rent and affordability headroom
+  - estimated upfront cash, declared deposit/cash and any remaining gap
+  - supporting signals, watchouts and recipient limitations
+- Share links can now freeze optional rental-pack context into the existing
+  recipient `insightSnapshot` without a new table migration.
+- Public share pages render the rental readiness pack when the share link was
+  created from rental mode, so the preview and recipient view now match.
+
 ## Product Boundaries
 
 Assessment is the formal EquiScore conclusion.
@@ -185,12 +200,11 @@ history.
 
 ## Next Build Slices
 
-1. Connect Goals to Sharing:
-   - Create a rental share-pack mode.
+1. Generalise Goals to Sharing:
    - Create a generic goal share-pack structure that can later support banking,
      utilities, phone, income-proof and credit-readiness use cases.
-   - Preview what the recipient sees.
-   - Show limitations and evidence confidence before sharing.
+   - Add goal-specific share history, filters and revoke/audit labels.
+   - Add partner-requested consent links that route through the same pack model.
 
 2. Add solution opportunities:
    - Add a provider/comparison abstraction for non-regulated switching first:

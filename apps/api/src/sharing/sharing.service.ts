@@ -18,6 +18,13 @@ const STRENGTH_LABELS: Record<string, string> = {
   noRecurringFailedPayments: 'No recurring failed payments',
 }
 
+type ShareContext = {
+  targetType?: string
+  targetName?: string
+  packType?: 'rental'
+  goalId?: string
+}
+
 @Injectable()
 export class SharingService {
   constructor(
@@ -32,12 +39,133 @@ export class SharingService {
    * on. Deliberately excludes the spending breakdown, merchants, and raw
    * transactions — those stay private to the applicant.
    */
-  private async buildRecipientInsight(userId: string) {
+  private monthsUntil(date: Date | null | undefined) {
+    if (!date) return null
+    const today = new Date()
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const end = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    if (days <= 0) return 0
+    return Math.max(1, Math.ceil(days / 30))
+  }
+
+  private async buildRentalSharePack(
+    userId: string,
+    profile: Awaited<ReturnType<InsightsService['getProfileForUser']>>,
+    goalId?: string
+  ) {
+    const goal = goalId
+      ? await db.consumerGoal.findFirst({ where: { id: goalId, userId, type: 'rental' } })
+      : await db.consumerGoal.findFirst({
+          where: { userId, type: 'rental', status: 'active' },
+          orderBy: [{ isPrimary: 'desc' }, { updatedAt: 'desc' }],
+        })
+
+    if (!goal) return null
+
+    const targetRent = goal.targetMonthlyRent ?? null
+    const monthlyIncome = profile.income.averageMonthlyIncome
+    const targetRentToIncome = targetRent && monthlyIncome > 0 ? targetRent / monthlyIncome : null
+    const maxAffordableRent = profile.affordability.maxAffordableRent
+    const affordabilityHeadroom =
+      targetRent != null && maxAffordableRent > 0 ? maxAffordableRent - targetRent : null
+    const estimatedUpfrontCash = targetRent != null ? Math.round(targetRent * 2.5) : null
+    const depositAvailable = goal.depositAvailable ?? 0
+    const upfrontCashGap =
+      estimatedUpfrontCash != null ? Math.max(0, estimatedUpfrontCash - depositAvailable) : null
+    const monthsRemaining = this.monthsUntil(goal.moveDate)
+    const monthlyFundingRequired =
+      upfrontCashGap != null && monthsRemaining != null && monthsRemaining > 0
+        ? Math.ceil(upfrontCashGap / monthsRemaining)
+        : null
+
+    const missing: string[] = []
+    const watchouts: string[] = []
+    const strengths: string[] = []
+
+    if (targetRent == null) missing.push('Target monthly rent has not been supplied.')
+    if (!goal.moveDate) missing.push('Expected move date has not been supplied.')
+    if (monthlyIncome <= 0) missing.push('Verified income is not visible in the current evidence.')
+
+    if (targetRentToIncome != null && targetRentToIncome <= 0.35) {
+      strengths.push('Target rent appears within a typical rent-to-income range.')
+    } else if (targetRentToIncome != null) {
+      watchouts.push('Target rent may be high compared with verified monthly income.')
+    }
+
+    if (affordabilityHeadroom != null && affordabilityHeadroom >= 0) {
+      strengths.push('Target rent is within the current estimated sustainable rent range.')
+    } else if (affordabilityHeadroom != null) {
+      watchouts.push('Target rent is above the current estimated sustainable rent range.')
+    }
+
+    if (profile.paymentBehaviour.rentPaidConsistently || profile.stability.rentNeverMissed) {
+      strengths.push('Rent or rent-like payments appear consistent.')
+    } else {
+      watchouts.push('Direct rent-payment reliability evidence is limited or not detected.')
+    }
+
+    if (upfrontCashGap != null && upfrontCashGap === 0) {
+      strengths.push('Declared upfront cash appears to cover the planning estimate.')
+    } else if (upfrontCashGap != null) {
+      watchouts.push(
+        'Declared upfront cash may not yet cover deposit, first month and moving buffer.'
+      )
+    }
+
+    const status =
+      profile.period.transactionCount === 0 || missing.length > 0
+        ? 'needs_detail'
+        : watchouts.length > 0
+          ? 'ready_with_conditions'
+          : 'ready'
+
+    return {
+      type: 'rental' as const,
+      createdFromGoalId: goal.id,
+      goal: {
+        title: goal.title ?? goal.label ?? 'Rent a home',
+        targetMonthlyRent: targetRent,
+        moveDate: goal.moveDate?.toISOString() ?? null,
+        applicationMode: goal.applicationMode ?? 'unknown',
+        depositAvailable,
+        notes: goal.notes,
+      },
+      readiness: {
+        status,
+        headline:
+          status === 'ready'
+            ? 'Rental pack looks ready to review'
+            : status === 'ready_with_conditions'
+              ? 'Rental pack is reviewable with context'
+              : 'Rental pack needs more detail',
+        strengths,
+        watchouts,
+        missing,
+      },
+      metrics: {
+        targetRentToIncome,
+        maxAffordableRent,
+        affordabilityHeadroom,
+        estimatedUpfrontCash,
+        upfrontCashGap,
+        monthsRemaining,
+        monthlyFundingRequired,
+      },
+      assumptions: [
+        'Upfront cash is estimated as 2.5x monthly rent for planning only.',
+        'Sustainable rent is estimated from connected income, commitments and surplus.',
+        'This pack is evidence for review and is not a guarantee of tenancy acceptance.',
+      ],
+    }
+  }
+
+  private async buildRecipientInsight(userId: string, context?: ShareContext) {
     try {
       const p = await this.insights.getProfileForUser(userId)
       if (p.period.transactionCount === 0) return null
       const stability = p.stability as unknown as Record<string, boolean | number>
-      return {
+      const snapshot = {
         monthsOfHistory: p.period.months,
         income: {
           monthlyAverage: p.income.averageMonthlyIncome,
@@ -67,12 +195,21 @@ export class SharingService {
         contextClear: p.risk.level === 'low' && p.unusual.length === 0,
         clearedTypologies: p.risk.clearedTypologies,
       }
+
+      if (context?.packType === 'rental') {
+        return {
+          ...snapshot,
+          sharePack: await this.buildRentalSharePack(userId, p, context.goalId),
+        }
+      }
+
+      return snapshot
     } catch {
       return null
     }
   }
 
-  async createShareLink(userId: string, trustScoreId: string, targetType?: string, targetName?: string) {
+  async createShareLink(userId: string, trustScoreId: string, context: ShareContext = {}) {
     const score = await db.trustScore.findFirst({
       where: { id: trustScoreId, userId },
     })
@@ -86,7 +223,7 @@ export class SharingService {
     // snapshot: whatever the applicant's evidence shows NOW is what the recipient
     // sees for the life of this link, regardless of later changes. To share an
     // updated picture, the applicant creates a new link.
-    const insightSnapshot = await this.buildRecipientInsight(userId)
+    const insightSnapshot = await this.buildRecipientInsight(userId, context)
 
     const link = await db.sharedProfile.create({
       data: {
@@ -94,8 +231,8 @@ export class SharingService {
         trustScoreId,
         shareToken: token,
         expiresAt,
-        targetType,
-        targetName,
+        targetType: context.targetType,
+        targetName: context.targetName,
         insightSnapshot: insightSnapshot ?? undefined,
       },
     })
@@ -107,8 +244,10 @@ export class SharingService {
 
     this.audit.log(userId, 'share_link.created', {
       shareLinkId: link.id,
-      targetType,
-      targetName,
+      targetType: context.targetType,
+      targetName: context.targetName,
+      packType: context.packType,
+      goalId: context.goalId,
     })
 
     return link
@@ -118,7 +257,9 @@ export class SharingService {
     return db.sharedProfile.findMany({
       where: { userId, revokedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { trustScore: { select: { overallTier: true, overallScore: true, computedAt: true } } },
+      include: {
+        trustScore: { select: { overallTier: true, overallScore: true, computedAt: true } },
+      },
     })
   }
 
@@ -157,13 +298,16 @@ export class SharingService {
       where: { shareToken: token },
       include: {
         user: {
-          include: { profile: { select: { fullName: true, employmentType: true, nationality: true } } },
+          include: {
+            profile: { select: { fullName: true, employmentType: true, nationality: true } },
+          },
         },
       },
     })
 
     if (!shared) throw new NotFoundException('Profile not found')
-    if (shared.revokedAt) throw new ForbiddenException('The applicant has revoked access to this profile')
+    if (shared.revokedAt)
+      throw new ForbiddenException('The applicant has revoked access to this profile')
     if (shared.expiresAt < new Date()) throw new ForbiddenException('This share link has expired')
 
     // The score frozen at share time — the exact TrustScore the applicant chose

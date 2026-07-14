@@ -1463,6 +1463,12 @@ export function GoalsView() {
     selectedTemplate.type === 'rental'
       ? buildRentalDeepDive(profile, score ?? null, selectedGoalForAssessment)
       : null
+  const rentalShareHref =
+    selectedTemplate.type === 'rental'
+      ? `/dashboard/share?mode=rental${
+          selectedGoal?.id ? `&goalId=${encodeURIComponent(selectedGoal.id)}` : ''
+        }`
+      : '/dashboard/share'
   const savedDate = formatSavedDate(selectedGoal?.updatedAt)
 
   useEffect(() => {
@@ -1841,7 +1847,7 @@ export function GoalsView() {
                   </Button>
                 ) : null}
                 {selectedTemplate.type === 'rental' ? (
-                  <Link href="/dashboard/share" className={buttonClasses('primary', 'md')}>
+                  <Link href={rentalShareHref} className={buttonClasses('primary', 'md')}>
                     Preview share pack <ArrowRight className="h-4 w-4" />
                   </Link>
                 ) : null}

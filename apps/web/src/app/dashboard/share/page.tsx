@@ -4,9 +4,18 @@ import { ShareProfileView } from '@/components/share/share-profile-view'
 
 export const metadata = { title: 'Sharing' }
 
-export default async function SharePage() {
+export default async function SharePage({
+  searchParams,
+}: {
+  searchParams: { mode?: string; goalId?: string }
+}) {
   const { userId } = auth()
   if (!userId) redirect('/sign-in')
 
-  return <ShareProfileView />
+  return (
+    <ShareProfileView
+      mode={searchParams.mode === 'rental' ? 'rental' : 'generic'}
+      goalId={searchParams.goalId}
+    />
+  )
 }
