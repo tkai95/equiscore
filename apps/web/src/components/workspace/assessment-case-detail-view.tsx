@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
   FileText,
   MessageSquarePlus,
   RotateCcw,
@@ -105,6 +107,151 @@ function displayValue(value: unknown): string {
   return String(value)
 }
 
+function numberValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function daysSince(value: string | null | undefined): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return null
+  return Math.floor((Date.now() - timestamp) / 86_400_000)
+}
+
+function daysUntil(value: string | null | undefined): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return null
+  return Math.ceil((timestamp - Date.now()) / 86_400_000)
+}
+
+function isDecisionOverride(
+  decision: DecisionValue,
+  outcome: WorkspaceAssessmentCaseDetail['assessmentOutcome']
+): boolean {
+  if (!outcome) return false
+  if (decision === 'approved' || decision === 'approved_with_conditions') {
+    return outcome !== 'meets_criteria'
+  }
+  if (decision === 'declined') return outcome === 'meets_criteria'
+  if (decision === 'additional_information_required') return outcome !== 'information_required'
+  if (decision === 'referred_for_manual_review') return outcome === 'meets_criteria'
+  return false
+}
+
+function suggestedDecisionFor(
+  outcome: WorkspaceAssessmentCaseDetail['assessmentOutcome']
+): DecisionValue {
+  if (outcome === 'meets_criteria') return 'approved'
+  if (outcome === 'alternative_route_recommended') {
+    return 'guarantor_or_alternative_route_required'
+  }
+  if (outcome === 'information_required' || outcome === 'unable_to_assess') {
+    return 'additional_information_required'
+  }
+  return 'referred_for_manual_review'
+}
+
+function buildReviewReadiness(
+  data: WorkspaceAssessmentCaseDetail,
+  trustScore: Record<string, unknown>,
+  verification: Record<string, unknown>
+) {
+  const openRequests = data.informationRequests.filter((request) => request.status === 'open')
+  const applicantResponses = data.informationRequests.filter(
+    (request) => request.status === 'applicant_responded'
+  )
+  const evidenceAge = daysSince(data.snapshot.dataPeriodEnd ?? data.snapshot.createdAt)
+  const expiresIn = daysUntil(data.expiresAt ?? data.consent.expiresAt)
+  const activeBankConnections = numberValue(verification.activeBankConnections) ?? 0
+  const verifiedDocuments = numberValue(verification.verifiedDocuments) ?? 0
+  const trustScoreValue = numberValue(trustScore.score)
+
+  const flags: string[] = []
+  const strengths: string[] = []
+
+  if (openRequests.length > 0) flags.push(`${openRequests.length} open information request`)
+  if (applicantResponses.length > 0)
+    strengths.push(`${applicantResponses.length} applicant response ready`)
+  if (data.assessmentConfidence === 'low') flags.push('Low assessment confidence')
+  if (
+    data.assessmentOutcome === 'information_required' ||
+    data.assessmentOutcome === 'unable_to_assess'
+  ) {
+    flags.push('Assessment needs more evidence')
+  }
+  if (data.snapshot.sourceFreshness === 'profile_only') flags.push('Profile-only snapshot')
+  if (evidenceAge !== null && evidenceAge > 90) flags.push('Evidence is older than 90 days')
+  if (expiresIn !== null && expiresIn < 0) flags.push('Assessment has expired')
+  else if (expiresIn !== null && expiresIn <= 7) {
+    flags.push(
+      expiresIn === 0 ? 'Assessment expires today' : `Assessment expires in ${expiresIn} days`
+    )
+  }
+  if (!data.policy) flags.push('No active policy version attached')
+
+  if (trustScoreValue !== null) strengths.push(`Trust score ${trustScoreValue}`)
+  if (activeBankConnections > 0) strengths.push(`${activeBankConnections} active bank connection`)
+  if (verifiedDocuments > 0) strengths.push(`${verifiedDocuments} verified document`)
+  if (data.assessmentConfidence === 'high' || data.assessmentConfidence === 'medium') {
+    strengths.push(`${label(data.assessmentConfidence)} confidence`)
+  }
+  if (data.policy) strengths.push(`Policy ${data.policy.policy.name} v${data.policy.versionNumber}`)
+
+  if (data.companyDecision) {
+    return {
+      tone: 'success' as StatusTone,
+      title: 'Decision recorded',
+      body: 'This case has a company decision. Review the activity trail before changing direction.',
+      nextAction: 'Check the recorded rationale and audit trail.',
+      flags,
+      strengths,
+    }
+  }
+
+  if (applicantResponses.length > 0) {
+    return {
+      tone: 'info' as StatusTone,
+      title: 'Applicant response ready',
+      body: 'The applicant has responded to at least one information request.',
+      nextAction: 'Review the response, resolve the request, then record a decision.',
+      flags,
+      strengths,
+    }
+  }
+
+  if (openRequests.length > 0) {
+    return {
+      tone: 'warning' as StatusTone,
+      title: 'Waiting on applicant',
+      body: 'A decision can still be recorded, but there is an open information request.',
+      nextAction: 'Wait for the applicant or cancel/reopen the request if it is no longer needed.',
+      flags,
+      strengths,
+    }
+  }
+
+  if (flags.length > 0) {
+    return {
+      tone: 'warning' as StatusTone,
+      title: 'Review quality flags',
+      body: 'This case has signals that should be checked before a final decision.',
+      nextAction: 'Request information or record a decision with a clear rationale.',
+      flags,
+      strengths,
+    }
+  }
+
+  return {
+    tone: 'success' as StatusTone,
+    title: 'Ready to decide',
+    body: 'The current snapshot has enough supporting evidence for a standard review.',
+    nextAction: 'Record the company decision and rationale.',
+    flags,
+    strengths,
+  }
+}
+
 function FieldList({ rows }: { rows: Array<{ label: string; value: unknown }> }) {
   return (
     <dl className="divide-line-subtle divide-y text-sm">
@@ -115,6 +262,31 @@ function FieldList({ rows }: { rows: Array<{ label: string; value: unknown }> })
         </div>
       ))}
     </dl>
+  )
+}
+
+function SignalList({ title, items, tone }: { title: string; items: string[]; tone: StatusTone }) {
+  return (
+    <div className="bg-surface-inset rounded-lg p-4">
+      <p className="text-content-muted text-xs font-semibold uppercase tracking-wide">{title}</p>
+      {items.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {items.map((item) => (
+            <li key={item} className="flex items-start gap-2 text-sm">
+              <StatusPill
+                status={tone}
+                label=""
+                icon={tone === 'success' ? <CheckCircle2 /> : <AlertTriangle />}
+                className="mt-0.5 h-5 w-5 shrink-0 px-0"
+              />
+              <span className="text-content-secondary">{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-content-secondary mt-3 text-sm">None</p>
+      )}
+    </div>
   )
 }
 
@@ -229,7 +401,7 @@ export function AssessmentCaseDetailView({
 
   const submitDecision = (event: FormEvent) => {
     event.preventDefault()
-    if (decisionForm.rationale.trim()) recordDecision.mutate()
+    if (decisionForm.rationale.trim() && !missingOverrideReason) recordDecision.mutate()
   }
 
   const submitInformationRequest = (event: FormEvent) => {
@@ -276,6 +448,13 @@ export function AssessmentCaseDetailView({
   const income = asRecord(data.snapshot.incomeSummary)
   const affordability = asRecord(data.snapshot.affordabilitySummary)
   const verification = asRecord(data.snapshot.verificationSummary)
+  const readiness = buildReviewReadiness(data, trustScore, verification)
+  const suggestedDecision = suggestedDecisionFor(data.assessmentOutcome)
+  const selectedDecisionIsOverride = isDecisionOverride(
+    decisionForm.decision,
+    data.assessmentOutcome
+  )
+  const missingOverrideReason = selectedDecisionIsOverride && !decisionForm.overrideReason.trim()
 
   return (
     <PageLayout width="wide">
@@ -321,6 +500,76 @@ export function AssessmentCaseDetailView({
         </Section>
       </Card>
 
+      <Card padding="lg">
+        <Section
+          title={
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="text-brand h-4 w-4" />
+              Review readiness
+            </span>
+          }
+        >
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="bg-surface-inset rounded-lg p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill
+                  status={readiness.tone}
+                  label={readiness.title}
+                  icon={
+                    readiness.tone === 'success' ? (
+                      <CheckCircle2 />
+                    ) : readiness.tone === 'info' ? (
+                      <Clock3 />
+                    ) : (
+                      <AlertTriangle />
+                    )
+                  }
+                />
+                <StatusPill
+                  status={statusTone(data.assessmentConfidence)}
+                  label={`${label(data.assessmentConfidence)} confidence`}
+                />
+              </div>
+              <p className="text-content-secondary mt-3 text-sm">{readiness.body}</p>
+              <p className="text-content mt-3 text-sm font-medium">{readiness.nextAction}</p>
+            </div>
+
+            <div className="bg-surface-inset rounded-lg p-4">
+              <p className="text-content-muted text-xs font-semibold uppercase tracking-wide">
+                Suggested decision
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <StatusPill
+                  status={statusTone(suggestedDecision)}
+                  label={label(suggestedDecision)}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setDecisionForm((current) => ({
+                      ...current,
+                      decision: suggestedDecision,
+                    }))
+                  }
+                >
+                  Use suggested
+                </Button>
+              </div>
+              <p className="text-content-secondary mt-3 text-sm">
+                Suggestions follow the EquiScore outcome, but the company decision remains yours.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <SignalList title="Quality flags" items={readiness.flags} tone="warning" />
+            <SignalList title="Supporting signals" items={readiness.strengths} tone="success" />
+          </div>
+        </Section>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Card padding="lg">
           <Section
@@ -333,9 +582,14 @@ export function AssessmentCaseDetailView({
           >
             <form onSubmit={submitDecision} className="space-y-4">
               <div>
-                <label className="text-content block text-sm font-medium" htmlFor="case-decision">
-                  Decision
-                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-content block text-sm font-medium" htmlFor="case-decision">
+                    Decision
+                  </label>
+                  {selectedDecisionIsOverride && (
+                    <StatusPill status="warning" label="Override" icon={<AlertTriangle />} />
+                  )}
+                </div>
                 <select
                   id="case-decision"
                   value={decisionForm.decision}
@@ -414,6 +668,11 @@ export function AssessmentCaseDetailView({
                     className={`${inputClass} min-h-20 resize-y`}
                     rows={3}
                   />
+                  {selectedDecisionIsOverride && (
+                    <p className="text-content-muted mt-1 text-xs">
+                      Required because this decision differs from the EquiScore outcome.
+                    </p>
+                  )}
                 </div>
               </div>
               {recordDecision.isError && (
@@ -421,10 +680,15 @@ export function AssessmentCaseDetailView({
                   {(recordDecision.error as Error).message}
                 </p>
               )}
+              {missingOverrideReason && (
+                <p className="text-warning-strong text-sm">
+                  Add an override reason before saving this decision.
+                </p>
+              )}
               <Button
                 type="submit"
                 loading={recordDecision.isPending}
-                disabled={!decisionForm.rationale.trim()}
+                disabled={!decisionForm.rationale.trim() || missingOverrideReason}
               >
                 <Send className="h-4 w-4" />
                 Save decision

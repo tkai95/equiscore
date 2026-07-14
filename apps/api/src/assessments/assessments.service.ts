@@ -114,7 +114,13 @@ export class AssessmentsService {
           select: { id: true, versionNumber: true, policy: { select: { name: true } } },
         },
         assessmentSnapshot: {
-          select: { id: true, snapshotVersion: true, dataPeriodEnd: true, createdAt: true },
+          select: {
+            id: true,
+            snapshotVersion: true,
+            dataPeriodEnd: true,
+            sourceFreshness: true,
+            createdAt: true,
+          },
         },
         _count: { select: { criterionResults: true, notes: true, informationRequests: true } },
       },
@@ -139,6 +145,7 @@ export class AssessmentsService {
       assessedAt: item.assessedAt,
       expiresAt: item.expiresAt,
       createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
       reviewer: item.reviewer
         ? {
             id: item.reviewer.id,
@@ -157,6 +164,7 @@ export class AssessmentsService {
         id: item.assessmentSnapshot.id,
         version: item.assessmentSnapshot.snapshotVersion,
         dataPeriodEnd: item.assessmentSnapshot.dataPeriodEnd,
+        sourceFreshness: item.assessmentSnapshot.sourceFreshness,
         createdAt: item.assessmentSnapshot.createdAt,
       },
       counts: item._count,
@@ -397,6 +405,11 @@ export class AssessmentsService {
     const nextStatus = this.caseStatusForDecision(input.decision)
     const closesCase = this.decisionClosesCase(input.decision)
     const overrideFlag = this.isDecisionOverride(input.decision, assessmentCase.assessmentOutcome)
+    if (overrideFlag && !overrideReason) {
+      throw new BadRequestException(
+        'Override reason is required when the company decision differs from the EquiScore outcome'
+      )
+    }
 
     await db.$transaction(async (tx) => {
       await tx.caseDecision.create({

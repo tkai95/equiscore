@@ -111,9 +111,16 @@ export interface WorkspaceAssessmentCase {
   assessedAt: string | null
   expiresAt: string | null
   createdAt: string
+  updatedAt: string
   reviewer: PersonRef | null
   policy: { id: string; name: string; versionNumber: number } | null
-  snapshot: { id: string; version: number; dataPeriodEnd: string | null; createdAt: string }
+  snapshot: {
+    id: string
+    version: number
+    dataPeriodEnd: string | null
+    sourceFreshness: string | null
+    createdAt: string
+  }
   counts: { criterionResults: number; notes: number; informationRequests: number }
 }
 

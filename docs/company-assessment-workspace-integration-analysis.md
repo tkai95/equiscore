@@ -1213,6 +1213,7 @@ Immediate next slices, in order:
    - Done: added case detail reviewer actions for recording company decisions and requesting more information, with organisation audit events.
    - Done: added applicant response handling on the secure request link for open information requests, including partner-visible responses and audit events.
    - Done: added partner-side resolve, reopen, and cancel controls for information requests.
+   - Done: added assessment pipeline quality signals, review-readiness guidance, suggested decision prompts, stale/low-confidence flags, and mandatory override reasons when a company decision differs from the EquiScore outcome.
    - Keep company decisions separate from EquiScore outcome.
 
 5. **Policy builder foundation**

@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   CheckCircle2,
   ClipboardList,
+  Clock3,
   Eye,
   Inbox,
   LinkIcon,
@@ -162,6 +164,77 @@ function countForBucket(items: WorkspaceAssessmentCase[], bucket: PipelineBucket
   return items.filter((item) => matchesBucket(item, bucket)).length
 }
 
+function daysSince(value: string | null | undefined): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return null
+  return Math.floor((Date.now() - timestamp) / 86_400_000)
+}
+
+function daysUntil(value: string | null | undefined): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return null
+  return Math.ceil((timestamp - Date.now()) / 86_400_000)
+}
+
+function qualitySignals(item: WorkspaceAssessmentCase): string[] {
+  const signals: string[] = []
+  const evidenceAge = daysSince(item.snapshot.dataPeriodEnd ?? item.snapshot.createdAt)
+  const expiresIn = daysUntil(item.expiresAt)
+
+  if (item.status === 'applicant_responded') signals.push('Applicant responded')
+  if (item.status === 'information_requested') signals.push('Waiting on applicant')
+  if (item.assessmentConfidence === 'low') signals.push('Low confidence')
+  if (
+    item.assessmentOutcome === 'information_required' ||
+    item.assessmentOutcome === 'unable_to_assess'
+  ) {
+    signals.push('More evidence needed')
+  }
+  if (item.snapshot.sourceFreshness === 'profile_only') signals.push('Profile-only')
+  if (evidenceAge !== null && evidenceAge > 90) signals.push('Stale evidence')
+  if (expiresIn !== null && expiresIn < 0) signals.push('Expired')
+  else if (expiresIn !== null && expiresIn <= 7) {
+    signals.push(expiresIn === 0 ? 'Expires today' : `Expires in ${expiresIn}d`)
+  }
+  if (!item.policy) signals.push('No active policy')
+  if (signals.length === 0 && item.assessmentOutcome === 'meets_criteria')
+    signals.push('Strong profile')
+
+  return signals.slice(0, 3)
+}
+
+function qualityTone(item: WorkspaceAssessmentCase): StatusTone {
+  const signals = qualitySignals(item)
+  if (signals.some((signal) => signal === 'Expired')) return 'danger'
+  if (item.status === 'applicant_responded') return 'info'
+  if (
+    signals.some((signal) =>
+      [
+        'Low confidence',
+        'More evidence needed',
+        'Profile-only',
+        'Stale evidence',
+        'No active policy',
+      ].includes(signal)
+    )
+  ) {
+    return 'warning'
+  }
+  if (signals.includes('Strong profile')) return 'success'
+  return 'neutral'
+}
+
+function primaryAction(item: WorkspaceAssessmentCase): string {
+  const bucket = bucketForCase(item)
+  if (bucket === 'applicant_responded') return 'Review response'
+  if (bucket === 'information_requested') return 'Awaiting applicant'
+  if (bucket === 'decision_recorded') return 'View decision'
+  if (bucket === 'new') return 'Review now'
+  return 'Continue review'
+}
+
 export function AssessmentCasesView({ organisationSlug }: { organisationSlug: string }) {
   const { getToken } = useAuth()
   const [activeBucket, setActiveBucket] = useState<PipelineBucket>('all')
@@ -180,15 +253,19 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
       .sort((a, b) => {
         const rank = urgencyRank(a) - urgencyRank(b)
         if (rank !== 0) return rank
-        const aDate = new Date(a.assessedAt ?? a.createdAt).getTime()
-        const bDate = new Date(b.assessedAt ?? b.createdAt).getTime()
+        const aDate = new Date(a.updatedAt ?? a.assessedAt ?? a.createdAt).getTime()
+        const bDate = new Date(b.updatedAt ?? b.assessedAt ?? b.createdAt).getTime()
         return bDate - aDate
       })
   }, [activeBucket, cases, search])
 
   const needsReviewCount =
     countForBucket(cases, 'new') + countForBucket(cases, 'applicant_responded')
-  const waitingCount = countForBucket(cases, 'information_requested')
+  const qualityIssueCount = cases.filter((item) => qualityTone(item) === 'warning').length
+  const expiringSoonCount = cases.filter((item) => {
+    const expiresIn = daysUntil(item.expiresAt)
+    return expiresIn !== null && expiresIn >= 0 && expiresIn <= 7
+  }).length
   const decidedCount = countForBucket(cases, 'decision_recorded')
 
   return (
@@ -225,10 +302,11 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
           />
         ) : (
           <Section title="Assessment pipeline">
-            <MetricGroup className="mb-2 sm:grid-cols-4">
+            <MetricGroup className="mb-2 sm:grid-cols-5">
               <Metric label="Total cases" value={cases.length} />
               <Metric label="Needs review" value={needsReviewCount} tone="negative" />
-              <Metric label="Waiting on applicant" value={waitingCount} />
+              <Metric label="Quality flags" value={qualityIssueCount} />
+              <Metric label="Expiring soon" value={expiringSoonCount} />
               <Metric label="Decision recorded" value={decidedCount} tone="positive" />
             </MetricGroup>
 
@@ -289,10 +367,10 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
                 columns={[
                   'Applicant',
                   'Stage',
+                  'Quality',
                   'Outcome',
                   'Information',
                   'Decision',
-                  'Reviewer',
                   'Updated',
                   'Actions',
                 ]}
@@ -309,6 +387,26 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
                     </Cell>
                     <Cell>
                       <StatusPill status={statusTone(item.status)} label={label(item.status)} />
+                    </Cell>
+                    <Cell>
+                      <div className="flex max-w-56 flex-wrap gap-1.5">
+                        {qualitySignals(item).map((signal) => (
+                          <StatusPill
+                            key={signal}
+                            status={qualityTone(item)}
+                            label={signal}
+                            icon={
+                              signal === 'Strong profile' ? (
+                                <CheckCircle2 />
+                              ) : signal.startsWith('Expires') ? (
+                                <Clock3 />
+                              ) : (
+                                <AlertTriangle />
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
                     </Cell>
                     <Cell>
                       <div className="space-y-1">
@@ -339,8 +437,14 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
                         label={label(item.companyDecision)}
                       />
                     </Cell>
-                    <Cell muted>{item.reviewer?.name ?? 'Unassigned'}</Cell>
-                    <Cell muted>{formatMaybeDate(item.assessedAt ?? item.createdAt)}</Cell>
+                    <Cell>
+                      <p className="text-content-secondary text-sm">
+                        {formatMaybeDate(item.updatedAt ?? item.assessedAt ?? item.createdAt)}
+                      </p>
+                      <p className="text-content-muted text-xs">
+                        {item.reviewer?.name ?? 'Unassigned'}
+                      </p>
+                    </Cell>
                     <Cell>
                       <Link
                         href={`/workspace/o/${organisationSlug}/assessments/${item.id}`}
@@ -353,7 +457,7 @@ export function AssessmentCasesView({ organisationSlug }: { organisationSlug: st
                         )}
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Review
+                        {primaryAction(item)}
                       </Link>
                     </Cell>
                   </tr>
