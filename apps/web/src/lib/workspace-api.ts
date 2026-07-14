@@ -623,6 +623,18 @@ export const workspaceApi = {
       workspaceFetch<PublicAssessmentRequest>(
         `/assessment-requests/${encodeURIComponent(requestToken)}`
       ),
+    start: (token: string, requestToken: string) =>
+      workspaceFetch<PublicAssessmentRequest>(
+        `/assessment-requests/${encodeURIComponent(requestToken)}/start`,
+        { method: 'POST' },
+        token
+      ),
+    decline: (token: string, requestToken: string) =>
+      workspaceFetch<PublicAssessmentRequest>(
+        `/assessment-requests/${encodeURIComponent(requestToken)}/decline`,
+        { method: 'POST' },
+        token
+      ),
     complete: (token: string, requestToken: string) =>
       workspaceFetch<CompletedAssessmentRequest>(
         `/assessment-requests/${encodeURIComponent(requestToken)}/complete`,

@@ -730,6 +730,7 @@ enum AssessmentRequestStatus {
   awaiting_consent
   ready_for_assessment
   assessment_delivered
+  declined
   expired
   cancelled
 

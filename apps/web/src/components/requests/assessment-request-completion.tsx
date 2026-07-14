@@ -2,9 +2,20 @@
 
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
-import { UserButton, useAuth, useUser } from '@clerk/nextjs'
+import { UserButton, useAuth, useClerk, useUser } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Clock, FileCheck2, MessageSquareReply, ShieldCheck } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  FileCheck2,
+  LockKeyhole,
+  MessageSquareReply,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react'
+import { api } from '@/lib/api'
 import { workspaceApi } from '@/lib/workspace-api'
 import { absoluteConsumerUrl } from '@/lib/app-urls'
 import {
@@ -14,6 +25,7 @@ import {
   PageLayout,
   Section,
   StatusPill,
+  type StatusTone,
   buttonClasses,
 } from '@/components/ui'
 import { EquiScoreLogo } from '@/components/brand/logo'
@@ -30,8 +42,21 @@ function requestedFieldsLabel(value: unknown): string {
   return fields.map(String).join(', ')
 }
 
+function requestStatusTone(status: string): StatusTone {
+  if (status === 'assessment_delivered') return 'success'
+  if (status === 'declined' || status === 'cancelled') return 'danger'
+  if (status === 'expired' || status === 'information_incomplete') return 'warning'
+  if (status === 'awaiting_consent' || status === 'ready_for_assessment') return 'info'
+  return 'neutral'
+}
+
+function isProfileStarted(stage: string | null | undefined): boolean {
+  return Boolean(stage && !['created', 'onboarding'].includes(stage))
+}
+
 export function AssessmentRequestCompletion({ requestToken }: { requestToken: string }) {
   const { getToken, isSignedIn } = useAuth()
+  const { signOut } = useClerk()
   const { user } = useUser()
   const queryClient = useQueryClient()
   const requestPath = `/requests/${encodeURIComponent(requestToken)}`
@@ -42,6 +67,7 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
   )
   const requestQueryKey = ['public-assessment-request', requestToken] as const
   const [responses, setResponses] = useState<Record<string, string>>({})
+  const [syncedStartKey, setSyncedStartKey] = useState<string | null>(null)
 
   useEffect(() => {
     window.localStorage.setItem('equiscore:pending-assessment-request', requestToken)
@@ -55,6 +81,32 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
   } = useQuery({
     queryKey: requestQueryKey,
     queryFn: async () => workspaceApi.assessmentRequests.get(requestToken),
+  })
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    enabled: Boolean(isSignedIn),
+    queryFn: async () => api.auth.me((await getToken())!),
+  })
+
+  const start = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      return workspaceApi.assessmentRequests.start(token!, requestToken)
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(requestQueryKey, updated)
+    },
+  })
+
+  const decline = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      return workspaceApi.assessmentRequests.decline(token!, requestToken)
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(requestQueryKey, updated)
+    },
   })
 
   const complete = useMutation({
@@ -83,6 +135,35 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
     if (!response) return
     respondToInformationRequest.mutate({ id, response })
   }
+
+  const signedInEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null
+  const requestedEmail = request?.applicant.email.toLowerCase() ?? null
+  const emailMatches = Boolean(signedInEmail && requestedEmail && signedInEmail === requestedEmail)
+  const profileStarted = isProfileStarted(me?.profile?.profileStage)
+  const trustScoreCount = me?._count?.trustScores ?? 0
+  const bankConnectionCount = me?._count?.bankConnections ?? 0
+  const documentCount = me?._count?.documents ?? 0
+  const hasEvidence = trustScoreCount > 0 || bankConnectionCount > 0 || documentCount > 0
+  const shouldSyncStart = Boolean(
+    request &&
+    isSignedIn &&
+    emailMatches &&
+    request.isCompletable &&
+    (request.status === 'invitation_sent' ||
+      request.status === 'applicant_opened' ||
+      (request.status === 'applicant_started' && profileStarted))
+  )
+  const startSyncKey = request
+    ? `${request.id}:${request.status}:${profileStarted ? 'ready' : 'building'}`
+    : null
+
+  useEffect(() => {
+    if (!shouldSyncStart || !startSyncKey || syncedStartKey === startSyncKey || start.isPending) {
+      return
+    }
+    setSyncedStartKey(startSyncKey)
+    start.mutate()
+  }, [shouldSyncStart, startSyncKey, syncedStartKey, start])
 
   return (
     <div className="bg-surface-page min-h-screen">
@@ -151,7 +232,7 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
                   }
                   action={
                     <StatusPill
-                      status={request.isCompletable ? 'neutral' : 'warning'}
+                      status={requestStatusTone(request.status)}
                       label={label(request.status)}
                     />
                   }
@@ -320,11 +401,22 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
                     title={
                       <span className="flex items-center gap-2">
                         <ShieldCheck className="text-brand h-5 w-5" />
-                        Consent to assessment
+                        Authorise partner access
                       </span>
                     }
                   >
-                    {!request.isCompletable ? (
+                    {request.status === 'declined' ? (
+                      <div className="bg-danger-soft text-danger-strong flex items-start gap-3 rounded-lg p-4">
+                        <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                        <div>
+                          <p className="font-medium">Request declined</p>
+                          <p className="mt-1 text-sm">
+                            {request.organisation.name} has not received an EquiScore assessment for
+                            this request.
+                          </p>
+                        </div>
+                      </div>
+                    ) : !request.isCompletable ? (
                       <div className="bg-surface-inset flex items-start gap-3 rounded-lg p-4">
                         <Clock className="text-content-muted mt-0.5 h-5 w-5 shrink-0" />
                         <p className="text-content-secondary text-sm">
@@ -334,10 +426,34 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
                     ) : (
                       <div className="space-y-4">
                         <p className="text-content-secondary text-sm">
-                          By continuing, EquiScore will create a point-in-time assessment snapshot
-                          for {request.organisation.name}. The snapshot excludes raw transactions,
-                          merchant-level spending, bank account numbers, and document files.
+                          {request.organisation.name} is asking you to share a point-in-time
+                          EquiScore assessment for this {label(request.assessmentType)} request.
                         </p>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="bg-surface-inset rounded-lg p-4">
+                            <p className="text-content text-sm font-medium">They receive</p>
+                            <ul className="text-content-secondary mt-2 space-y-1.5 text-sm">
+                              <li>Trust score summary and confidence level</li>
+                              <li>Income, affordability and verification summaries</li>
+                              <li>Assessment outcome against their policy</li>
+                            </ul>
+                          </div>
+                          <div className="bg-surface-inset rounded-lg p-4">
+                            <p className="text-content text-sm font-medium">They do not receive</p>
+                            <ul className="text-content-secondary mt-2 space-y-1.5 text-sm">
+                              <li>Raw bank transactions or merchant spending</li>
+                              <li>Bank account numbers</li>
+                              <li>Document files you uploaded</li>
+                            </ul>
+                          </div>
+                        </div>
+
+                        {start.isError && (
+                          <p className="text-danger-strong text-sm">
+                            {(start.error as Error).message}
+                          </p>
+                        )}
 
                         {isSignedIn ? (
                           <div className="space-y-3">
@@ -347,16 +463,92 @@ export function AssessmentRequestCompletion({ requestToken }: { requestToken: st
                                 {user?.primaryEmailAddress?.emailAddress ?? 'your account'}
                               </span>
                             </div>
-                            {complete.isError && (
-                              <p className="text-danger-strong text-sm">
-                                {(complete.error as Error).message}
-                              </p>
+
+                            {!emailMatches ? (
+                              <div className="bg-warning-soft text-warning-strong flex items-start gap-3 rounded-lg p-4">
+                                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                                <div className="space-y-3">
+                                  <div>
+                                    <p className="font-medium">Sign in with the invited email</p>
+                                    <p className="mt-1 text-sm">
+                                      This request was sent to {request.applicant.email}. You are
+                                      currently signed in as{' '}
+                                      {user?.primaryEmailAddress?.emailAddress ?? 'another account'}
+                                      .
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => void signOut({ redirectUrl: signInUrl })}
+                                  >
+                                    Switch account
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : !profileStarted ? (
+                              <div className="bg-surface-inset rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                  <LockKeyhole className="text-brand mt-0.5 h-5 w-5 shrink-0" />
+                                  <div>
+                                    <p className="text-content font-medium">
+                                      Finish your EquiScore profile first
+                                    </p>
+                                    <p className="text-content-secondary mt-1 text-sm">
+                                      We need your basic profile before you can authorise a partner
+                                      assessment. You will return here before anything is shared.
+                                    </p>
+                                  </div>
+                                </div>
+                                <Link
+                                  href={onboardingPath}
+                                  className={buttonClasses('primary', 'md', 'mt-4')}
+                                >
+                                  Continue profile
+                                  <ArrowRight className="h-4 w-4" />
+                                </Link>
+                              </div>
+                            ) : (
+                              <>
+                                {!hasEvidence && (
+                                  <div className="bg-warning-soft text-warning-strong rounded-lg p-4 text-sm">
+                                    You can authorise now, but this snapshot will be based on your
+                                    profile only. Connecting bank evidence or documents can improve
+                                    assessment confidence.
+                                  </div>
+                                )}
+                                {complete.isError && (
+                                  <p className="text-danger-strong text-sm">
+                                    {(complete.error as Error).message}
+                                  </p>
+                                )}
+                                {decline.isError && (
+                                  <p className="text-danger-strong text-sm">
+                                    {(decline.error as Error).message}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <Button
+                                    loading={complete.isPending}
+                                    disabled={decline.isPending}
+                                    onClick={() => complete.mutate()}
+                                  >
+                                    {complete.isPending
+                                      ? 'Delivering assessment...'
+                                      : 'Authorise and deliver assessment'}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    loading={decline.isPending}
+                                    disabled={complete.isPending}
+                                    onClick={() => decline.mutate()}
+                                  >
+                                    Decline request
+                                  </Button>
+                                </div>
+                              </>
                             )}
-                            <Button loading={complete.isPending} onClick={() => complete.mutate()}>
-                              {complete.isPending
-                                ? 'Delivering assessment...'
-                                : 'Grant consent and deliver assessment'}
-                            </Button>
                           </div>
                         ) : (
                           <div className="flex flex-wrap items-center gap-3">

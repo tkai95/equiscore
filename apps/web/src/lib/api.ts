@@ -10,6 +10,11 @@ export interface Me {
   compassEnabled: boolean
   status: string
   profile: { fullName: string | null; profileStage: string } | null
+  _count?: {
+    bankConnections: number
+    documents: number
+    trustScores: number
+  }
 }
 
 export type ConsumerGoalType =

@@ -34,6 +34,32 @@ export class AssessmentRequestsController {
     return this.assessments.completeRequest(token, dbUser.id, req.ip)
   }
 
+  @Post(':token/start')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Applicant starts a company assessment request' })
+  async startRequest(
+    @Param('token') token: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request
+  ) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.assessments.startRequest(token, dbUser.id, req.ip)
+  }
+
+  @Post(':token/decline')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Applicant declines a company assessment request' })
+  async declineRequest(
+    @Param('token') token: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request
+  ) {
+    const dbUser = await this.authService.syncUser(user.clerkId, user.email)
+    return this.assessments.declineRequest(token, dbUser.id, req.ip)
+  }
+
   @Post(':token/information-requests/:informationRequestId/respond')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()

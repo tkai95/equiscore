@@ -772,6 +772,12 @@ export class AssessmentsService {
     if (request.cancelledAt || request.status === 'cancelled') {
       throw new ForbiddenException('This assessment request has been cancelled')
     }
+    if (request.status === 'declined') {
+      throw new ForbiddenException('This assessment request was declined')
+    }
+    if (request.status === 'expired') {
+      throw new ForbiddenException('This assessment request has expired')
+    }
 
     const applicant = await db.user.findUnique({
       where: { id: applicantUserId },
@@ -843,6 +849,118 @@ export class AssessmentsService {
     return this.getPublicRequest(token, ipAddress)
   }
 
+  async startRequest(token: string, applicantUserId: string, ipAddress?: string) {
+    const request = await db.assessmentRequest.findUnique({
+      where: { requestToken: token },
+      select: {
+        id: true,
+        organisationId: true,
+        applicantEmail: true,
+        applicantId: true,
+        status: true,
+        deadline: true,
+        cancelledAt: true,
+      },
+    })
+
+    if (!request) throw new NotFoundException('Assessment request not found')
+    if (request.status === 'assessment_delivered') return this.getPublicRequest(token, ipAddress)
+    this.assertRequestNotClosed(request)
+
+    const applicant = await this.assertRequestApplicant(request.applicantEmail, applicantUserId)
+    await this.expireRequestIfPastDeadline(request, ipAddress)
+
+    const nextStatus = this.isApplicantProfileStarted(applicant.profile?.profileStage)
+      ? 'awaiting_consent'
+      : 'applicant_started'
+    const shouldUpdate =
+      this.isPendingRequestStatus(request.status) &&
+      (request.status !== nextStatus || request.applicantId !== applicantUserId)
+
+    if (shouldUpdate) {
+      await db.$transaction(async (tx) => {
+        await tx.assessmentRequest.update({
+          where: { id: request.id },
+          data: {
+            applicantId: applicantUserId,
+            status: nextStatus,
+          },
+        })
+
+        await tx.organisationAuditEvent.create({
+          data: {
+            organisationId: request.organisationId,
+            actorType: 'applicant',
+            actorId: applicantUserId,
+            action: 'assessment_request_started',
+            targetType: 'assessment_request',
+            targetId: request.id,
+            beforeStateReference: this.hashPayload({ status: request.status }),
+            afterStateReference: this.hashPayload({ status: nextStatus }),
+            ipAddress,
+          },
+        })
+      })
+    }
+
+    return this.getPublicRequest(token, ipAddress)
+  }
+
+  async declineRequest(token: string, applicantUserId: string, ipAddress?: string) {
+    const request = await db.assessmentRequest.findUnique({
+      where: { requestToken: token },
+      select: {
+        id: true,
+        organisationId: true,
+        applicantEmail: true,
+        applicantId: true,
+        status: true,
+        deadline: true,
+        cancelledAt: true,
+      },
+    })
+
+    if (!request) throw new NotFoundException('Assessment request not found')
+    if (request.status === 'assessment_delivered') {
+      throw new BadRequestException('This assessment request has already been delivered')
+    }
+    this.assertRequestNotClosed(request)
+    await this.assertRequestApplicant(request.applicantEmail, applicantUserId)
+    await this.expireRequestIfPastDeadline(request, ipAddress)
+
+    const declined = await db.$transaction(async (tx) => {
+      const updated = await tx.assessmentRequest.update({
+        where: { id: request.id },
+        data: {
+          applicantId: applicantUserId,
+          status: 'declined',
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: request.organisationId,
+          actorType: 'applicant',
+          actorId: applicantUserId,
+          action: 'assessment_request_declined',
+          targetType: 'assessment_request',
+          targetId: request.id,
+          beforeStateReference: this.hashPayload({ status: request.status }),
+          afterStateReference: this.hashPayload({ status: updated.status }),
+          ipAddress,
+        },
+      })
+
+      return updated
+    })
+
+    if (declined.status !== 'declined') {
+      throw new BadRequestException('This assessment request could not be declined')
+    }
+
+    return this.getPublicRequest(token, ipAddress)
+  }
+
   async completeRequest(token: string, applicantUserId: string, ipAddress?: string) {
     const request = await db.assessmentRequest.findUnique({
       where: { requestToken: token },
@@ -854,6 +972,12 @@ export class AssessmentsService {
     if (!request) throw new NotFoundException('Assessment request not found')
     if (request.cancelledAt || request.status === 'cancelled') {
       throw new ForbiddenException('This assessment request has been cancelled')
+    }
+    if (request.status === 'declined') {
+      throw new ForbiddenException('This assessment request was declined')
+    }
+    if (request.status === 'expired') {
+      throw new ForbiddenException('This assessment request has expired')
     }
 
     const applicant = await db.user.findUnique({
@@ -886,6 +1010,9 @@ export class AssessmentsService {
     if (request.deadline && request.deadline < now && this.isPendingRequestStatus(request.status)) {
       await db.assessmentRequest.update({ where: { id: request.id }, data: { status: 'expired' } })
       throw new ForbiddenException('This assessment request has expired')
+    }
+    if (request.status !== 'assessment_delivered' && !this.isPendingRequestStatus(request.status)) {
+      throw new ForbiddenException('This assessment request is no longer open')
     }
 
     const latestScore = await db.trustScore.findFirst({
@@ -1430,6 +1557,75 @@ export class AssessmentsService {
     if (activeBankConnections > 0 && verifiedDocuments > 0 && score >= 75) return 'high'
     if (activeBankConnections > 0 || verifiedDocuments > 0) return 'medium'
     return 'low'
+  }
+
+  private async assertRequestApplicant(requestedApplicantEmail: string, applicantUserId: string) {
+    const applicant = await db.user.findUnique({
+      where: { id: applicantUserId },
+      select: {
+        id: true,
+        email: true,
+        profile: { select: { profileStage: true } },
+      },
+    })
+    if (!applicant) throw new NotFoundException('Applicant not found')
+
+    const requestedEmail = this.normaliseEmail(requestedApplicantEmail)
+    const signedInEmail = this.normaliseEmail(applicant.email)
+    if (requestedEmail !== signedInEmail) {
+      throw new ForbiddenException(
+        `This request was sent to ${requestedEmail}. Please sign in with that email.`
+      )
+    }
+
+    return applicant
+  }
+
+  private assertRequestNotClosed(request: { cancelledAt: Date | null; status: string }) {
+    if (request.cancelledAt || request.status === 'cancelled') {
+      throw new ForbiddenException('This assessment request has been cancelled')
+    }
+    if (request.status === 'declined') {
+      throw new ForbiddenException('This assessment request was declined')
+    }
+    if (request.status === 'expired') {
+      throw new ForbiddenException('This assessment request has expired')
+    }
+  }
+
+  private async expireRequestIfPastDeadline(
+    request: {
+      id: string
+      organisationId: string
+      deadline: Date | null
+      status: string
+    },
+    ipAddress?: string
+  ) {
+    if (!request.deadline || request.deadline >= new Date()) return
+    if (!this.isPendingRequestStatus(request.status)) return
+
+    await db.$transaction(async (tx) => {
+      await tx.assessmentRequest.update({
+        where: { id: request.id },
+        data: { status: 'expired' },
+      })
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: request.organisationId,
+          actorType: 'system',
+          action: 'assessment_request_expired',
+          targetType: 'assessment_request',
+          targetId: request.id,
+          ipAddress,
+        },
+      })
+    })
+    throw new ForbiddenException('This assessment request has expired')
+  }
+
+  private isApplicantProfileStarted(stage: string | null | undefined): boolean {
+    return Boolean(stage && !['created', 'onboarding'].includes(stage))
   }
 
   private normaliseEmail(value: string): string {

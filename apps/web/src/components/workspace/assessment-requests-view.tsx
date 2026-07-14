@@ -25,6 +25,14 @@ const ASSESSMENT_TYPES: Array<{ value: AssessmentType; label: string }> = [
   { value: 'other', label: 'Other' },
 ]
 
+function requestStatusTone(status: string) {
+  if (status === 'assessment_delivered') return 'success' as const
+  if (status === 'declined' || status === 'cancelled') return 'danger' as const
+  if (status === 'expired' || status === 'information_incomplete') return 'warning' as const
+  if (status === 'awaiting_consent' || status === 'ready_for_assessment') return 'info' as const
+  return 'neutral' as const
+}
+
 function absoluteRequestUrl(path: string | null | undefined): string | null {
   if (!path) return null
   return absoluteConsumerUrl(path)
@@ -128,7 +136,12 @@ export function AssessmentRequestsView({ organisationSlug }: { organisationSlug:
                 ]}
               >
                 {requests.map((request) => {
-                  const canCopy = Boolean(request.requestUrl && request.status !== 'cancelled')
+                  const canCopy = Boolean(
+                    request.requestUrl &&
+                    !['assessment_delivered', 'cancelled', 'declined', 'expired'].includes(
+                      request.status
+                    )
+                  )
                   return (
                     <tr key={request.id}>
                       <Cell>
@@ -138,7 +151,7 @@ export function AssessmentRequestsView({ organisationSlug }: { organisationSlug:
                       <Cell>{label(request.assessmentType)}</Cell>
                       <Cell>
                         <StatusPill
-                          status={request.status === 'assessment_delivered' ? 'success' : 'neutral'}
+                          status={requestStatusTone(request.status)}
                           label={label(request.status)}
                         />
                       </Cell>
