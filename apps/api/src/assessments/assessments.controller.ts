@@ -8,9 +8,11 @@ import {
 } from '../organisations/organisation-context'
 import { OrganisationAccessGuard } from '../organisations/organisation-access.guard'
 import {
+  CreatePolicyDto,
   CreateAssessmentRequestDto,
   RecordCaseDecisionDto,
   RequestCaseInformationDto,
+  UpdatePolicyVersionDto,
   UpdateInformationRequestStatusDto,
 } from './assessment-requests.dto'
 import { AssessmentsService } from './assessments.service'
@@ -97,6 +99,86 @@ export class AssessmentsController {
   @ApiOperation({ summary: 'List organisation policies' })
   async policies(@CurrentOrganisation() organisation: OrganisationContext) {
     return this.assessments.listPolicies(organisation)
+  }
+
+  @Post('policies')
+  @ApiOperation({ summary: 'Create a draft organisation policy' })
+  async createPolicy(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: CreatePolicyDto
+  ) {
+    return this.assessments.createPolicy(organisation, user.dbUserId!, body)
+  }
+
+  @Get('policies/:policyId')
+  @ApiOperation({ summary: 'Get an organisation policy detail' })
+  async policyDetail(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @Param('policyId') policyId: string
+  ) {
+    return this.assessments.getPolicy(organisation, policyId)
+  }
+
+  @Post('policies/:policyId/versions/:versionId')
+  @ApiOperation({ summary: 'Update a draft policy version' })
+  async updatePolicyVersion(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string,
+    @Body() body: UpdatePolicyVersionDto
+  ) {
+    return this.assessments.updatePolicyVersion(
+      organisation,
+      policyId,
+      versionId,
+      user.dbUserId!,
+      body
+    )
+  }
+
+  @Post('policies/:policyId/versions/:versionId/submit')
+  @ApiOperation({ summary: 'Submit a policy version for approval' })
+  async submitPolicyVersion(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.assessments.submitPolicyVersion(organisation, policyId, versionId, user.dbUserId!)
+  }
+
+  @Post('policies/:policyId/versions/:versionId/approve')
+  @ApiOperation({ summary: 'Approve and activate a policy version' })
+  async approvePolicyVersion(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.assessments.approvePolicyVersion(organisation, policyId, versionId, user.dbUserId!)
+  }
+
+  @Post('policies/:policyId/retire')
+  @ApiOperation({ summary: 'Retire an organisation policy' })
+  async retirePolicy(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('policyId') policyId: string
+  ) {
+    return this.assessments.retirePolicy(organisation, policyId, user.dbUserId!)
+  }
+
+  @Post('policies/:policyId/versions/:versionId/preview')
+  @ApiOperation({ summary: 'Preview a policy version against recent cases' })
+  async previewPolicyVersion(
+    @CurrentOrganisation() organisation: OrganisationContext,
+    @CurrentUser() user: RequestUser,
+    @Param('policyId') policyId: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.assessments.previewPolicyVersion(organisation, policyId, versionId, user.dbUserId!)
   }
 
   @Get('usage-events')

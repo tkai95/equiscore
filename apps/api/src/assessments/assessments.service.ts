@@ -14,10 +14,13 @@ import type {
 } from '@equiscore/database'
 import type { OrganisationContext } from '../organisations/organisation-context'
 import type {
+  CreatePolicyDto,
   CreateAssessmentRequestDto,
+  PolicyRuleInputDto,
   RecordCaseDecisionDto,
   RespondToInformationRequestDto,
   RequestCaseInformationDto,
+  UpdatePolicyVersionDto,
   UpdateInformationRequestStatusDto,
 } from './assessment-requests.dto'
 
@@ -34,6 +37,80 @@ const PENDING_REQUEST_STATUSES = [
   'awaiting_consent',
   'ready_for_assessment',
 ] as const
+
+const POLICY_INPUT_FIELDS = [
+  {
+    value: 'trustScoreSummary.score',
+    label: 'Trust score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'affordabilitySummary.latestAffordabilityScore',
+    label: 'Affordability score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'incomeSummary.latestIncomeStabilityScore',
+    label: 'Income stability score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'commitmentsSummary.latestRentalReliabilityScore',
+    label: 'Rental reliability score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'verificationSummary.activeBankConnections',
+    label: 'Active bank connections',
+    thresholdType: 'number',
+  },
+  {
+    value: 'verificationSummary.verifiedDocuments',
+    label: 'Verified documents',
+    thresholdType: 'number',
+  },
+  {
+    value: 'verificationSummary.verificationStrengthScore',
+    label: 'Verification strength score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'verificationSummary.identityConfidenceScore',
+    label: 'Identity confidence score',
+    thresholdType: 'number',
+  },
+  {
+    value: 'incomeSummary.declaredMonthlyIncome',
+    label: 'Declared monthly income',
+    thresholdType: 'currency',
+  },
+  {
+    value: 'affordabilitySummary.proposedCommitment',
+    label: 'Proposed commitment',
+    thresholdType: 'currency',
+  },
+] as const
+
+const POLICY_FIELD_VALUES = new Set(POLICY_INPUT_FIELDS.map((field) => field.value))
+
+type NormalisedPolicyRule = {
+  name: string
+  description?: string
+  inputField: string
+  operator: string
+  threshold?: unknown
+  thresholdType?: string
+  evidencePeriodMonths?: number
+  missingDataBehaviour: string
+  confidenceRequirement?: string
+  passOutcome: string
+  failOutcome: string
+  alternativePathway?: string
+  humanReviewRequired: boolean
+  priority: number
+}
+
+type PolicyEvaluationStatus = 'pass' | 'fail' | 'review' | 'missing' | 'not_applicable'
 
 @Injectable()
 export class AssessmentsService {
@@ -1285,36 +1362,382 @@ export class AssessmentsService {
         createdBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
         versions: {
           orderBy: { versionNumber: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            versionNumber: true,
-            status: true,
-            effectiveFrom: true,
-            approvedAt: true,
-          },
+          include: this.policyVersionInclude(),
         },
         _count: { select: { versions: true } },
       },
     })
 
-    return policies.map((policy) => ({
-      id: policy.id,
-      name: policy.name,
-      assessmentType: policy.assessmentType,
-      status: policy.status,
-      createdAt: policy.createdAt,
-      updatedAt: policy.updatedAt,
-      createdBy: policy.createdBy
-        ? {
-            id: policy.createdBy.id,
-            name: policy.createdBy.profile?.fullName ?? policy.createdBy.email,
-            email: policy.createdBy.email,
-          }
-        : null,
-      latestVersion: policy.versions[0] ?? null,
-      versionCount: policy._count.versions,
-    }))
+    return policies.map((policy) => this.mapPolicy(policy))
+  }
+
+  async getPolicy(context: OrganisationContext, policyId: string) {
+    const policy = await db.policy.findFirst({
+      where: { id: policyId, organisationId: context.organisationId },
+      include: {
+        createdBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          include: this.policyVersionInclude(),
+        },
+        _count: { select: { versions: true } },
+      },
+    })
+
+    if (!policy) throw new NotFoundException('Policy not found')
+    return this.mapPolicy(policy)
+  }
+
+  async createPolicy(context: OrganisationContext, createdById: string, input: CreatePolicyDto) {
+    const name = this.cleanString(input.name)
+    if (!name) throw new BadRequestException('Policy name is required')
+
+    const rules = this.normalisePolicyRules(
+      input.rules,
+      input.assessmentType,
+      this.cleanString(input.aiPrompt)
+    )
+    const workflowMetadata = this.buildPolicyWorkflowMetadata({
+      assessmentType: input.assessmentType,
+      aiPrompt: input.aiPrompt,
+      rules,
+      action: 'draft_created',
+    })
+    const changeSummary =
+      this.cleanString(input.changeSummary) ??
+      (input.aiPrompt ? 'Starter policy drafted from AI workflow guidance.' : 'Initial draft.')
+
+    const policy = await db.$transaction(async (tx) => {
+      const created = await tx.policy.create({
+        data: {
+          organisationId: context.organisationId,
+          name,
+          assessmentType: input.assessmentType,
+          status: 'draft',
+          createdById,
+          versions: {
+            create: {
+              organisationId: context.organisationId,
+              versionNumber: 1,
+              status: 'draft',
+              createdById,
+              sourceDocumentReference: input.aiPrompt ? 'ai_workflow:draft_assist' : null,
+              changeSummary,
+              testResults: this.asJson({ workflow: workflowMetadata, lastPreview: null }),
+              rules: { create: this.toPolicyRuleCreates(rules) },
+            },
+          },
+        },
+        include: {
+          createdBy: {
+            select: { id: true, email: true, profile: { select: { fullName: true } } },
+          },
+          versions: {
+            orderBy: { versionNumber: 'desc' },
+            include: this.policyVersionInclude(),
+          },
+          _count: { select: { versions: true } },
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: createdById,
+          action: 'policy_created',
+          targetType: 'policy',
+          targetId: created.id,
+          metadata: this.asJson({
+            policyName: name,
+            assessmentType: input.assessmentType,
+            ruleCount: rules.length,
+            workflow: workflowMetadata,
+          }),
+        },
+      })
+
+      return created
+    })
+
+    return this.mapPolicy(policy)
+  }
+
+  async updatePolicyVersion(
+    context: OrganisationContext,
+    policyId: string,
+    versionId: string,
+    updatedById: string,
+    input: UpdatePolicyVersionDto
+  ) {
+    const version = await this.findPolicyVersion(context, policyId, versionId)
+    if (version.status !== 'draft') {
+      throw new BadRequestException('Only draft policy versions can be edited')
+    }
+
+    const rules = this.normalisePolicyRules(
+      input.rules,
+      version.policy.assessmentType,
+      this.cleanString(input.aiPrompt)
+    )
+    const workflowMetadata = this.buildPolicyWorkflowMetadata({
+      assessmentType: version.policy.assessmentType,
+      aiPrompt: input.aiPrompt,
+      rules,
+      action: 'draft_updated',
+    })
+    const changeSummary =
+      this.cleanString(input.changeSummary) ??
+      (input.aiPrompt ? 'Draft updated from AI workflow guidance.' : version.changeSummary)
+
+    await db.$transaction(async (tx) => {
+      await tx.policyRule.deleteMany({ where: { policyVersionId: version.id } })
+      await tx.policyVersion.update({
+        where: { id: version.id },
+        data: {
+          changeSummary,
+          sourceDocumentReference: input.aiPrompt
+            ? 'ai_workflow:draft_assist'
+            : version.sourceDocumentReference,
+          testResults: this.asJson({ workflow: workflowMetadata, lastPreview: null }),
+          rules: { create: this.toPolicyRuleCreates(rules) },
+        },
+      })
+
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: updatedById,
+          action: 'policy_version_updated',
+          targetType: 'policy_version',
+          targetId: version.id,
+          beforeStateReference: this.hashPayload({
+            status: version.status,
+            ruleCount: version.rules.length,
+          }),
+          afterStateReference: this.hashPayload({ status: 'draft', ruleCount: rules.length }),
+          metadata: this.asJson({
+            policyId,
+            versionNumber: version.versionNumber,
+            ruleCount: rules.length,
+            workflow: workflowMetadata,
+          }),
+        },
+      })
+    })
+
+    return this.getPolicy(context, policyId)
+  }
+
+  async submitPolicyVersion(
+    context: OrganisationContext,
+    policyId: string,
+    versionId: string,
+    submittedById: string
+  ) {
+    const version = await this.findPolicyVersion(context, policyId, versionId)
+    if (version.status !== 'draft') {
+      throw new BadRequestException('Only draft policy versions can be submitted')
+    }
+    if (version.rules.length === 0) {
+      throw new BadRequestException('Add at least one rule before submitting a policy')
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.policyVersion.update({
+        where: { id: version.id },
+        data: { status: 'awaiting_approval' },
+      })
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: submittedById,
+          action: 'policy_version_submitted',
+          targetType: 'policy_version',
+          targetId: version.id,
+          beforeStateReference: this.hashPayload({ status: version.status }),
+          afterStateReference: this.hashPayload({ status: 'awaiting_approval' }),
+          metadata: this.asJson({ policyId, versionNumber: version.versionNumber }),
+        },
+      })
+    })
+
+    return this.getPolicy(context, policyId)
+  }
+
+  async approvePolicyVersion(
+    context: OrganisationContext,
+    policyId: string,
+    versionId: string,
+    approvedById: string
+  ) {
+    const version = await this.findPolicyVersion(context, policyId, versionId)
+    if (!['awaiting_approval', 'approved'].includes(version.status)) {
+      throw new BadRequestException('Only submitted policy versions can be approved')
+    }
+
+    const now = new Date()
+    await db.$transaction(async (tx) => {
+      await tx.policyVersion.updateMany({
+        where: {
+          organisationId: context.organisationId,
+          policyId,
+          status: 'active',
+          id: { not: version.id },
+        },
+        data: { status: 'retired', effectiveTo: now },
+      })
+      await tx.policyVersion.update({
+        where: { id: version.id },
+        data: {
+          status: 'active',
+          approvedById,
+          approvedAt: now,
+          effectiveFrom: now,
+          effectiveTo: null,
+        },
+      })
+      await tx.policy.update({
+        where: { id: policyId },
+        data: { status: 'active' },
+      })
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: approvedById,
+          action: 'policy_version_approved',
+          targetType: 'policy_version',
+          targetId: version.id,
+          beforeStateReference: this.hashPayload({ status: version.status }),
+          afterStateReference: this.hashPayload({ status: 'active' }),
+          metadata: this.asJson({ policyId, versionNumber: version.versionNumber }),
+        },
+      })
+    })
+
+    return this.getPolicy(context, policyId)
+  }
+
+  async retirePolicy(context: OrganisationContext, policyId: string, retiredById: string) {
+    const policy = await db.policy.findFirst({
+      where: { id: policyId, organisationId: context.organisationId },
+      select: { id: true, status: true },
+    })
+    if (!policy) throw new NotFoundException('Policy not found')
+
+    const now = new Date()
+    await db.$transaction(async (tx) => {
+      await tx.policy.update({ where: { id: policyId }, data: { status: 'retired' } })
+      await tx.policyVersion.updateMany({
+        where: {
+          organisationId: context.organisationId,
+          policyId,
+          status: { in: ['draft', 'awaiting_approval', 'approved', 'active'] },
+        },
+        data: { status: 'retired', effectiveTo: now },
+      })
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: retiredById,
+          action: 'policy_retired',
+          targetType: 'policy',
+          targetId: policyId,
+          beforeStateReference: this.hashPayload({ status: policy.status }),
+          afterStateReference: this.hashPayload({ status: 'retired' }),
+        },
+      })
+    })
+
+    return this.getPolicy(context, policyId)
+  }
+
+  async previewPolicyVersion(
+    context: OrganisationContext,
+    policyId: string,
+    versionId: string,
+    previewedById: string
+  ) {
+    const version = await this.findPolicyVersion(context, policyId, versionId)
+    const cases = await db.assessmentCase.findMany({
+      where: {
+        organisationId: context.organisationId,
+        assessmentType: version.policy.assessmentType,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 25,
+      include: {
+        applicant: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        assessmentSnapshot: {
+          select: {
+            id: true,
+            trustScoreSummary: true,
+            incomeSummary: true,
+            affordabilitySummary: true,
+            commitmentsSummary: true,
+            verificationSummary: true,
+            createdAt: true,
+          },
+        },
+      },
+    })
+
+    const rows = cases.map((assessmentCase) =>
+      this.evaluatePolicyAgainstCase(version.rules, assessmentCase)
+    )
+    const summary = {
+      casesEvaluated: rows.length,
+      pass: rows.filter((row) => row.outcome === 'pass').length,
+      fail: rows.filter((row) => row.outcome === 'fail').length,
+      review: rows.filter((row) => row.outcome === 'review').length,
+      missing: rows.filter((row) => row.ruleResults.some((result) => result.result === 'missing'))
+        .length,
+    }
+    const preview = {
+      policyId,
+      versionId,
+      versionNumber: version.versionNumber,
+      generatedAt: new Date().toISOString(),
+      inputFields: POLICY_INPUT_FIELDS,
+      summary,
+      rows,
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.policyVersion.update({
+        where: { id: version.id },
+        data: {
+          testResults: this.asJson({
+            ...(this.jsonObject(version.testResults) ?? {}),
+            lastPreview: {
+              generatedAt: preview.generatedAt,
+              summary,
+            },
+          }),
+        },
+      })
+      await tx.organisationAuditEvent.create({
+        data: {
+          organisationId: context.organisationId,
+          actorType: 'partner_user',
+          actorId: previewedById,
+          action: 'policy_version_previewed',
+          targetType: 'policy_version',
+          targetId: version.id,
+          metadata: this.asJson({
+            policyId,
+            versionNumber: version.versionNumber,
+            summary,
+          }),
+        },
+      })
+    })
+
+    return preview
   }
 
   async listUsageEvents(context: OrganisationContext) {
@@ -1376,6 +1799,468 @@ export class AssessmentsService {
         createdAt: true,
       },
     })
+  }
+
+  private policyVersionInclude() {
+    return {
+      createdBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      approvedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      rules: { orderBy: [{ priority: 'asc' }, { id: 'asc' }] },
+    } satisfies Prisma.PolicyVersionInclude
+  }
+
+  private mapPolicy(policy: {
+    id: string
+    name: string
+    assessmentType: CompanyAssessmentType
+    status: string
+    createdAt: Date
+    updatedAt: Date
+    createdBy: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+    versions: Array<{
+      id: string
+      versionNumber: number
+      status: string
+      effectiveFrom: Date | null
+      effectiveTo: Date | null
+      sourceDocumentReference: string | null
+      changeSummary: string | null
+      testResults: unknown
+      createdAt: Date
+      approvedAt: Date | null
+      createdBy: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+      approvedBy: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+      rules: Array<{
+        id: string
+        name: string
+        description: string | null
+        inputField: string
+        operator: string
+        threshold: unknown
+        thresholdType: string | null
+        evidencePeriodMonths: number | null
+        missingDataBehaviour: string
+        confidenceRequirement: string | null
+        passOutcome: string
+        failOutcome: string
+        alternativePathway: string | null
+        humanReviewRequired: boolean
+        priority: number
+        effectiveFrom: Date | null
+        effectiveTo: Date | null
+      }>
+    }>
+    _count: { versions: number }
+  }) {
+    const versions = policy.versions.map((version) => ({
+      id: version.id,
+      versionNumber: version.versionNumber,
+      status: version.status,
+      effectiveFrom: version.effectiveFrom,
+      effectiveTo: version.effectiveTo,
+      sourceDocumentReference: version.sourceDocumentReference,
+      changeSummary: version.changeSummary,
+      testResults: version.testResults,
+      createdAt: version.createdAt,
+      approvedAt: version.approvedAt,
+      createdBy: version.createdBy ? this.mapPerson(version.createdBy) : null,
+      approvedBy: version.approvedBy ? this.mapPerson(version.approvedBy) : null,
+      rules: version.rules.map((rule) => ({
+        id: rule.id,
+        name: rule.name,
+        description: rule.description,
+        inputField: rule.inputField,
+        operator: rule.operator,
+        threshold: rule.threshold,
+        thresholdType: rule.thresholdType,
+        evidencePeriodMonths: rule.evidencePeriodMonths,
+        missingDataBehaviour: rule.missingDataBehaviour,
+        confidenceRequirement: rule.confidenceRequirement,
+        passOutcome: rule.passOutcome,
+        failOutcome: rule.failOutcome,
+        alternativePathway: rule.alternativePathway,
+        humanReviewRequired: rule.humanReviewRequired,
+        priority: rule.priority,
+        effectiveFrom: rule.effectiveFrom,
+        effectiveTo: rule.effectiveTo,
+      })),
+    }))
+
+    return {
+      id: policy.id,
+      name: policy.name,
+      assessmentType: policy.assessmentType,
+      status: policy.status,
+      createdAt: policy.createdAt,
+      updatedAt: policy.updatedAt,
+      createdBy: policy.createdBy ? this.mapPerson(policy.createdBy) : null,
+      latestVersion: versions[0] ?? null,
+      versions,
+      versionCount: policy._count.versions,
+      inputFields: POLICY_INPUT_FIELDS,
+    }
+  }
+
+  private async findPolicyVersion(
+    context: OrganisationContext,
+    policyId: string,
+    versionId: string
+  ) {
+    const version = await db.policyVersion.findFirst({
+      where: {
+        id: versionId,
+        policyId,
+        organisationId: context.organisationId,
+      },
+      include: {
+        policy: { select: { id: true, name: true, assessmentType: true, status: true } },
+        rules: { orderBy: [{ priority: 'asc' }, { id: 'asc' }] },
+      },
+    })
+
+    if (!version) throw new NotFoundException('Policy version not found')
+    return version
+  }
+
+  private normalisePolicyRules(
+    inputRules: PolicyRuleInputDto[] | undefined,
+    assessmentType: CompanyAssessmentType | CreatePolicyDto['assessmentType'],
+    aiPrompt?: string
+  ): NormalisedPolicyRule[] {
+    const sourceRules =
+      inputRules && inputRules.length > 0
+        ? inputRules
+        : this.starterPolicyRulesFor(assessmentType, aiPrompt)
+
+    return sourceRules.slice(0, 20).map((rule, index) => {
+      const name = this.cleanString(rule.name)
+      if (!name) throw new BadRequestException('Policy rule name is required')
+      if (
+        !POLICY_FIELD_VALUES.has(rule.inputField as (typeof POLICY_INPUT_FIELDS)[number]['value'])
+      ) {
+        throw new BadRequestException(`Unsupported policy input field: ${rule.inputField}`)
+      }
+
+      const operator = rule.operator
+      const threshold = this.normalisePolicyThreshold(rule.threshold)
+      if (!['exists', 'not_empty'].includes(operator) && threshold === undefined) {
+        throw new BadRequestException(`Rule "${name}" needs a threshold`)
+      }
+
+      const field = POLICY_INPUT_FIELDS.find((item) => item.value === rule.inputField)
+      return {
+        name,
+        description: this.cleanString(rule.description),
+        inputField: rule.inputField,
+        operator,
+        threshold,
+        thresholdType: rule.thresholdType ?? field?.thresholdType,
+        evidencePeriodMonths: rule.evidencePeriodMonths,
+        missingDataBehaviour: rule.missingDataBehaviour ?? 'review',
+        confidenceRequirement: rule.confidenceRequirement,
+        passOutcome: this.cleanString(rule.passOutcome) ?? 'Criteria met',
+        failOutcome: this.cleanString(rule.failOutcome) ?? 'Criteria not met',
+        alternativePathway: this.cleanString(rule.alternativePathway),
+        humanReviewRequired: Boolean(rule.humanReviewRequired),
+        priority: rule.priority ?? index + 1,
+      }
+    })
+  }
+
+  private starterPolicyRulesFor(
+    assessmentType: CompanyAssessmentType | CreatePolicyDto['assessmentType'],
+    aiPrompt?: string
+  ): PolicyRuleInputDto[] {
+    const commonVerification: PolicyRuleInputDto = {
+      name: 'Bank evidence available',
+      description: 'At least one active bank connection supports the assessment snapshot.',
+      inputField: 'verificationSummary.activeBankConnections',
+      operator: 'gte',
+      threshold: 1,
+      thresholdType: 'number',
+      missingDataBehaviour: 'review',
+      passOutcome: 'Connected financial evidence is available',
+      failOutcome: 'No connected financial evidence',
+      priority: 30,
+    }
+
+    if (assessmentType === 'rental') {
+      return [
+        {
+          name: 'Trust score meets rental floor',
+          description: 'Starter rental readiness floor for automated pass consideration.',
+          inputField: 'trustScoreSummary.score',
+          operator: 'gte',
+          threshold: 70,
+          thresholdType: 'number',
+          missingDataBehaviour: 'review',
+          passOutcome: 'Trust score supports rental readiness',
+          failOutcome: 'Trust score needs review',
+          priority: 10,
+        },
+        {
+          name: 'Affordability signal is acceptable',
+          description: 'Uses the current affordability score in the assessment snapshot.',
+          inputField: 'affordabilitySummary.latestAffordabilityScore',
+          operator: 'gte',
+          threshold: 60,
+          thresholdType: 'number',
+          missingDataBehaviour: 'review',
+          passOutcome: 'Affordability signal is acceptable',
+          failOutcome: 'Affordability requires review',
+          humanReviewRequired: true,
+          priority: 20,
+        },
+        commonVerification,
+      ]
+    }
+
+    if (assessmentType === 'lending') {
+      return [
+        {
+          name: 'Trust score meets credit review floor',
+          description:
+            'Starter lending floor; final affordability and credit policy remains with the partner.',
+          inputField: 'trustScoreSummary.score',
+          operator: 'gte',
+          threshold: 75,
+          thresholdType: 'number',
+          missingDataBehaviour: 'review',
+          passOutcome: 'Trust score supports credit review',
+          failOutcome: 'Trust score needs credit review',
+          humanReviewRequired: true,
+          priority: 10,
+        },
+        {
+          name: 'Income stability supports application',
+          inputField: 'incomeSummary.latestIncomeStabilityScore',
+          operator: 'gte',
+          threshold: 60,
+          thresholdType: 'number',
+          missingDataBehaviour: 'review',
+          passOutcome: 'Income stability supports application',
+          failOutcome: 'Income stability needs review',
+          priority: 20,
+        },
+        commonVerification,
+      ]
+    }
+
+    return [
+      {
+        name: 'Trust score meets review floor',
+        description: aiPrompt
+          ? 'Starter rule created from the requested policy workflow guidance.'
+          : 'Starter rule for partner review.',
+        inputField: 'trustScoreSummary.score',
+        operator: 'gte',
+        threshold: 65,
+        thresholdType: 'number',
+        missingDataBehaviour: 'review',
+        passOutcome: 'Trust score supports the assessment',
+        failOutcome: 'Trust score needs review',
+        priority: 10,
+      },
+      commonVerification,
+    ]
+  }
+
+  private toPolicyRuleCreates(
+    rules: NormalisedPolicyRule[]
+  ): Prisma.PolicyRuleCreateWithoutPolicyVersionInput[] {
+    return rules.map((rule) => ({
+      name: rule.name,
+      description: rule.description,
+      inputField: rule.inputField,
+      operator: rule.operator,
+      threshold: rule.threshold === undefined ? undefined : this.asJson(rule.threshold),
+      thresholdType: rule.thresholdType,
+      evidencePeriodMonths: rule.evidencePeriodMonths,
+      missingDataBehaviour: rule.missingDataBehaviour,
+      confidenceRequirement: rule.confidenceRequirement,
+      passOutcome: rule.passOutcome,
+      failOutcome: rule.failOutcome,
+      alternativePathway: rule.alternativePathway,
+      humanReviewRequired: rule.humanReviewRequired,
+      priority: rule.priority,
+    }))
+  }
+
+  private buildPolicyWorkflowMetadata({
+    assessmentType,
+    aiPrompt,
+    rules,
+    action,
+  }: {
+    assessmentType: CompanyAssessmentType | CreatePolicyDto['assessmentType']
+    aiPrompt?: string
+    rules: NormalisedPolicyRule[]
+    action: string
+  }) {
+    return {
+      action,
+      generatedBy: aiPrompt ? 'policy_builder_ai_workflow_stub' : 'policy_builder_starter_rules',
+      generatedAt: new Date().toISOString(),
+      assessmentType,
+      prompt: this.cleanString(aiPrompt),
+      ruleCount: rules.length,
+      allowedFields: POLICY_INPUT_FIELDS.map((field) => field.value),
+      nextStep: 'Human review, preview against cases, then approval.',
+    }
+  }
+
+  private normalisePolicyThreshold(value: unknown): unknown {
+    const raw =
+      typeof value === 'object' && value !== null && 'value' in value
+        ? (value as { value?: unknown }).value
+        : value
+
+    if (raw === undefined || raw === null) return undefined
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      if (!trimmed) return undefined
+      if (trimmed === 'true') return true
+      if (trimmed === 'false') return false
+      const numeric = Number(trimmed.replace(/,/g, ''))
+      return Number.isFinite(numeric) ? numeric : trimmed
+    }
+    return raw
+  }
+
+  private evaluatePolicyAgainstCase(
+    rules: Array<{
+      id: string
+      name: string
+      inputField: string
+      operator: string
+      threshold: unknown
+      missingDataBehaviour: string
+      humanReviewRequired: boolean
+    }>,
+    assessmentCase: {
+      id: string
+      reference: string | null
+      status: string
+      assessmentOutcome: string | null
+      assessmentConfidence: string | null
+      applicant: { id: string; email: string; profile?: { fullName: string | null } | null }
+      assessmentSnapshot: {
+        id: string
+        trustScoreSummary: unknown
+        incomeSummary: unknown
+        affordabilitySummary: unknown
+        commitmentsSummary: unknown
+        verificationSummary: unknown
+        createdAt: Date
+      }
+    }
+  ) {
+    const snapshot = {
+      trustScoreSummary: assessmentCase.assessmentSnapshot.trustScoreSummary,
+      incomeSummary: assessmentCase.assessmentSnapshot.incomeSummary,
+      affordabilitySummary: assessmentCase.assessmentSnapshot.affordabilitySummary,
+      commitmentsSummary: assessmentCase.assessmentSnapshot.commitmentsSummary,
+      verificationSummary: assessmentCase.assessmentSnapshot.verificationSummary,
+    }
+    const ruleResults = rules.map((rule) => this.evaluatePolicyRule(rule, snapshot))
+    const outcome = this.policyOutcomeFor(ruleResults)
+
+    return {
+      caseId: assessmentCase.id,
+      applicant: this.mapPerson(assessmentCase.applicant),
+      reference: assessmentCase.reference,
+      currentStatus: assessmentCase.status,
+      currentOutcome: assessmentCase.assessmentOutcome,
+      currentConfidence: assessmentCase.assessmentConfidence,
+      snapshotId: assessmentCase.assessmentSnapshot.id,
+      snapshotCreatedAt: assessmentCase.assessmentSnapshot.createdAt,
+      outcome,
+      ruleResults,
+    }
+  }
+
+  private evaluatePolicyRule(
+    rule: {
+      id: string
+      name: string
+      inputField: string
+      operator: string
+      threshold: unknown
+      missingDataBehaviour: string
+      humanReviewRequired: boolean
+    },
+    snapshot: Record<string, unknown>
+  ) {
+    const observedValue = this.readSnapshotField(snapshot, rule.inputField)
+    const missing = this.isMissingValue(observedValue)
+    let result: PolicyEvaluationStatus = 'review'
+
+    if (missing) {
+      if (rule.missingDataBehaviour === 'ignore') result = 'not_applicable'
+      else if (rule.missingDataBehaviour === 'fail') result = 'fail'
+      else result = 'missing'
+    } else if (rule.operator === 'exists' || rule.operator === 'not_empty') {
+      result = rule.humanReviewRequired ? 'review' : 'pass'
+    } else {
+      const passed = this.comparePolicyValues(observedValue, rule.operator, rule.threshold)
+      result = passed ? (rule.humanReviewRequired ? 'review' : 'pass') : 'fail'
+    }
+
+    return {
+      ruleId: rule.id,
+      name: rule.name,
+      inputField: rule.inputField,
+      operator: rule.operator,
+      observedValue,
+      thresholdValue: rule.threshold,
+      missingDataBehaviour: rule.missingDataBehaviour,
+      result,
+    }
+  }
+
+  private policyOutcomeFor(
+    results: Array<{ result: PolicyEvaluationStatus }>
+  ): 'pass' | 'fail' | 'review' {
+    if (results.length === 0) return 'review'
+    if (results.some((result) => result.result === 'fail')) return 'fail'
+    if (results.some((result) => ['review', 'missing'].includes(result.result))) return 'review'
+    return 'pass'
+  }
+
+  private readSnapshotField(snapshot: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce<unknown>((current, key) => {
+      if (current === null || typeof current !== 'object') return undefined
+      return (current as Record<string, unknown>)[key]
+    }, snapshot)
+  }
+
+  private isMissingValue(value: unknown): boolean {
+    return (
+      value === undefined ||
+      value === null ||
+      (typeof value === 'string' && value.trim().length === 0)
+    )
+  }
+
+  private comparePolicyValues(observed: unknown, operator: string, threshold: unknown): boolean {
+    if (operator === 'eq') return String(observed).toLowerCase() === String(threshold).toLowerCase()
+    if (operator === 'neq')
+      return String(observed).toLowerCase() !== String(threshold).toLowerCase()
+
+    const observedNumber = Number(observed)
+    const thresholdNumber = Number(threshold)
+    if (!Number.isFinite(observedNumber) || !Number.isFinite(thresholdNumber)) return false
+
+    if (operator === 'gte') return observedNumber >= thresholdNumber
+    if (operator === 'lte') return observedNumber <= thresholdNumber
+    if (operator === 'gt') return observedNumber > thresholdNumber
+    if (operator === 'lt') return observedNumber < thresholdNumber
+    return false
+  }
+
+  private jsonObject(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
   }
 
   private requestInclude() {

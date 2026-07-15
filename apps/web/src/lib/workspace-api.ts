@@ -420,14 +420,120 @@ export interface WorkspacePolicy {
   createdAt: string
   updatedAt: string
   createdBy: PersonRef | null
-  latestVersion: {
-    id: string
-    versionNumber: number
-    status: string
-    effectiveFrom: string | null
-    approvedAt: string | null
-  } | null
+  latestVersion: WorkspacePolicyVersion | null
+  versions: WorkspacePolicyVersion[]
   versionCount: number
+  inputFields: WorkspacePolicyInputField[]
+}
+
+export interface WorkspacePolicyInputField {
+  value: string
+  label: string
+  thresholdType: string
+}
+
+export interface WorkspacePolicyRule {
+  id: string
+  name: string
+  description: string | null
+  inputField: string
+  operator: string
+  threshold: unknown
+  thresholdType: string | null
+  evidencePeriodMonths: number | null
+  missingDataBehaviour: string
+  confidenceRequirement: string | null
+  passOutcome: string
+  failOutcome: string
+  alternativePathway: string | null
+  humanReviewRequired: boolean
+  priority: number
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  createdAt: string
+}
+
+export interface WorkspacePolicyVersion {
+  id: string
+  versionNumber: number
+  status: string
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  sourceDocumentReference: string | null
+  changeSummary: string | null
+  testResults: unknown
+  createdAt: string
+  approvedAt: string | null
+  createdBy: PersonRef | null
+  approvedBy: PersonRef | null
+  rules: WorkspacePolicyRule[]
+}
+
+export interface WorkspacePolicyPreview {
+  policyId: string
+  versionId: string
+  versionNumber: number
+  generatedAt: string
+  summary: {
+    casesEvaluated: number
+    pass: number
+    fail: number
+    review: number
+    missing: number
+  }
+  rows: Array<{
+    caseId: string
+    applicant: PersonRef
+    reference: string | null
+    currentStatus: string
+    currentOutcome: string | null
+    currentConfidence: string | null
+    snapshotId: string
+    snapshotCreatedAt: string
+    outcome: 'pass' | 'fail' | 'review'
+    ruleResults: Array<{
+      ruleId: string
+      name: string
+      inputField: string
+      operator: string
+      observedValue: unknown
+      thresholdValue: unknown
+      missingDataBehaviour: string
+      result: string
+    }>
+  }>
+}
+
+export interface WorkspacePolicyRuleInput {
+  id?: string
+  name: string
+  description?: string
+  inputField: string
+  operator: 'gte' | 'lte' | 'gt' | 'lt' | 'eq' | 'neq' | 'exists' | 'not_empty'
+  threshold?: unknown
+  thresholdType?: 'number' | 'currency' | 'percent' | 'text' | 'boolean'
+  evidencePeriodMonths?: number
+  missingDataBehaviour?: 'review' | 'fail' | 'ignore'
+  confidenceRequirement?: 'high' | 'medium' | 'low'
+  passOutcome?: string
+  failOutcome?: string
+  alternativePathway?: string
+  humanReviewRequired?: boolean
+  priority?: number
+}
+
+export interface CreateWorkspacePolicyInput {
+  name: string
+  assessmentType: 'rental' | 'telecom' | 'utilities' | 'lending' | 'other'
+  rules?: WorkspacePolicyRuleInput[]
+  aiPrompt?: string
+  changeSummary?: string
+}
+
+export interface UpdateWorkspacePolicyVersionInput {
+  rules?: WorkspacePolicyRuleInput[]
+  aiPrompt?: string
+  changeSummary?: string
 }
 
 export interface WorkspaceUsageEvent {
@@ -610,6 +716,81 @@ export const workspaceApi = {
       workspaceFetch<WorkspacePolicy[]>(
         `/organisations/${encodeURIComponent(organisationSlug)}/policies`,
         {},
+        token
+      ),
+    createPolicy: (token: string, organisationSlug: string, data: CreateWorkspacePolicyInput) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    policyDetail: (token: string, organisationSlug: string, policyId: string) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}`,
+        {},
+        token
+      ),
+    updatePolicyVersion: (
+      token: string,
+      organisationSlug: string,
+      policyId: string,
+      versionId: string,
+      data: UpdateWorkspacePolicyVersionInput
+    ) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}/versions/${encodeURIComponent(versionId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    submitPolicyVersion: (
+      token: string,
+      organisationSlug: string,
+      policyId: string,
+      versionId: string
+    ) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}/versions/${encodeURIComponent(versionId)}/submit`,
+        { method: 'POST' },
+        token
+      ),
+    approvePolicyVersion: (
+      token: string,
+      organisationSlug: string,
+      policyId: string,
+      versionId: string
+    ) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}/versions/${encodeURIComponent(versionId)}/approve`,
+        { method: 'POST' },
+        token
+      ),
+    retirePolicy: (token: string, organisationSlug: string, policyId: string) =>
+      workspaceFetch<WorkspacePolicy>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}/retire`,
+        { method: 'POST' },
+        token
+      ),
+    previewPolicyVersion: (
+      token: string,
+      organisationSlug: string,
+      policyId: string,
+      versionId: string
+    ) =>
+      workspaceFetch<WorkspacePolicyPreview>(
+        `/organisations/${encodeURIComponent(organisationSlug)}/policies/${encodeURIComponent(
+          policyId
+        )}/versions/${encodeURIComponent(versionId)}/preview`,
+        { method: 'POST' },
         token
       ),
     usage: (token: string, organisationSlug: string) =>

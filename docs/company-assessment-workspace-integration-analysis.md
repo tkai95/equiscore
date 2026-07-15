@@ -1217,8 +1217,10 @@ Immediate next slices, in order:
    - Keep company decisions separate from EquiScore outcome.
 
 5. **Policy builder foundation**
-   - Draft, approve, activate, and retire policy versions.
-   - Add criteria editor and policy preview against existing snapshots.
+   - Done: added organisation-scoped policy builder routes for draft creation, rule editing, submit-for-approval, approve/activate, retire, and preview.
+   - Done: added an AI-workflow-ready starter rule flow that stores prompt/change metadata and generates auditable draft criteria without giving AI final authority.
+   - Done: replaced the placeholder partner policy page with a policy library, criteria editor, governance actions, and preview results against recent assessment cases.
+   - Remaining: add policy-version cloning, reviewer role permissions, recalculation of historical cases against alternate versions, and test coverage for rule evaluation.
 
 6. **Tests and CI hardening**
    - Add tenant-isolation tests.
