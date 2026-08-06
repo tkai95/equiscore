@@ -471,6 +471,11 @@ export function TrustScoreView() {
               <li className="text-sm text-content-secondary">
                 An assessment is valid for up to three months from the latest date its evidence covers.
               </li>
+              <li className="text-sm text-content-secondary">
+                <span className="font-medium text-content">Open Banking is coming soon</span> —
+                live, read-only bank connections will offer the strongest verified evidence in a
+                future release. Until then, statements are the primary evidence source.
+              </li>
             </ul>
           </Accordion>
         </div>

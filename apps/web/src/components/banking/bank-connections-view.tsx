@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   Loader2,
   X,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button, Card, PageTitle, StatusPill } from '@/components/ui'
@@ -382,6 +383,17 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Open Banking — a future product, not yet available. Surfaced so users
+          who expect live bank connect know it's coming rather than missing. */}
+      <div className="flex items-start gap-3 rounded-card border border-line bg-surface-card px-5 py-4 text-sm">
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-900" aria-hidden />
+        <p className="text-content-secondary">
+          <span className="font-medium text-content">Open Banking is coming soon.</span>{' '}
+          Live, read-only bank connections will be available in a future release. For now,
+          upload a statement above to build your Trust Profile.
+        </p>
       </div>
 
       {/* Existing data sources — only shown when the user already has accounts */}
