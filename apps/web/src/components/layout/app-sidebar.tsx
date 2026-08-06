@@ -13,7 +13,6 @@ import {
   User,
   Settings,
   ChevronDown,
-  Target,
   Wallet,
   LifeBuoy,
   Lock,
@@ -81,14 +80,6 @@ function SidebarNav({
       ))}
 
       <div className="pt-2" />
-      <NavLink
-        href="/dashboard/goals"
-        label="Goals"
-        icon={Target}
-        pathname={pathname}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
       <NavLink
         href="/dashboard/my-money"
         label="My Money"

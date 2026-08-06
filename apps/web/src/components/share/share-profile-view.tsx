@@ -2,25 +2,18 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { api } from '@/lib/api'
-import type { ConsumerGoal } from '@/lib/api'
 import {
-  AlertTriangle,
-  Banknote,
-  CalendarClock,
   Check,
-  CheckCircle2,
   Copy,
   ExternalLink,
-  Home,
-  Info,
   Plus,
   Share2,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { TierBadge } from '@/components/trust-score/tier-badge'
 import {
@@ -35,7 +28,7 @@ import {
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
   landlord: 'Landlord',
-  letting_agent: 'Letting agent',
+  letting_agent: 'Letting Agent',
   lender: 'Lender',
   employer: 'Employer',
   other: 'Other',
@@ -64,181 +57,6 @@ interface TrustScoreBasic {
   computedAt: string
 }
 
-type ShareMode = 'generic' | 'rental'
-
-type InsightProfile = {
-  period: { transactionCount: number; months: number }
-  income: {
-    averageMonthlyIncome: number
-    consistency: string
-  }
-  affordability: {
-    rating: 'comfortable' | 'manageable' | 'stretched' | 'at_risk'
-    currentRent: number | null
-    maxAffordableRent: number
-    surplusAfterAll: number
-    ratios: {
-      rentToIncome: number | null
-    }
-  }
-  paymentBehaviour: {
-    rentPaidConsistently: boolean
-    returnedPayments: number
-    missedPayments: number
-  }
-  stability: {
-    rentNeverMissed: boolean
-    positiveMonthlySurplus: boolean
-  }
-}
-
-type RentalSharePackPreview = {
-  headline: string
-  statusTone: 'success' | 'warning' | 'danger' | 'neutral'
-  statusLabel: string
-  targetRent: number | null
-  monthlyIncome: number
-  targetRentToIncome: number | null
-  maxAffordableRent: number | null
-  affordabilityHeadroom: number | null
-  estimatedUpfrontCash: number | null
-  depositAvailable: number
-  upfrontCashGap: number | null
-  monthsRemaining: number | null
-  monthlyFundingRequired: number | null
-  strengths: string[]
-  watchouts: string[]
-  missing: string[]
-  assumptions: string[]
-}
-
-function monthsUntil(date: string | null | undefined) {
-  if (!date) return null
-  const target = new Date(date)
-  if (Number.isNaN(target.getTime())) return null
-  const today = new Date()
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const end = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  if (days <= 0) return 0
-  return Math.max(1, Math.ceil(days / 30))
-}
-
-function formatPercent(value: number | null) {
-  if (value == null || !Number.isFinite(value)) return 'Not available'
-  return `${Math.round(value * 100)}%`
-}
-
-function formatMoneyOrDash(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return 'Not available'
-  return formatCurrency(value)
-}
-
-function buildRentalSharePackPreview(
-  goal: ConsumerGoal | null | undefined,
-  profile: InsightProfile | null | undefined
-): RentalSharePackPreview | null {
-  if (!goal || goal.type !== 'rental') return null
-
-  const targetRent = goal.targetMonthlyRent ?? profile?.affordability.currentRent ?? null
-  const monthlyIncome = profile?.income.averageMonthlyIncome ?? 0
-  const targetRentToIncome =
-    targetRent != null && monthlyIncome > 0 ? targetRent / monthlyIncome : null
-  const maxAffordableRent = profile?.affordability.maxAffordableRent ?? null
-  const affordabilityHeadroom =
-    targetRent != null && maxAffordableRent != null ? maxAffordableRent - targetRent : null
-  const estimatedUpfrontCash = targetRent != null ? Math.round(targetRent * 2.5) : null
-  const depositAvailable = goal.depositAvailable ?? 0
-  const upfrontCashGap =
-    estimatedUpfrontCash != null ? Math.max(0, estimatedUpfrontCash - depositAvailable) : null
-  const remainingMonths = monthsUntil(goal.moveDate)
-  const monthlyFundingRequired =
-    upfrontCashGap != null && remainingMonths != null && remainingMonths > 0
-      ? Math.ceil(upfrontCashGap / remainingMonths)
-      : null
-
-  const strengths: string[] = []
-  const watchouts: string[] = []
-  const missing: string[] = []
-
-  if (targetRent == null) missing.push('Add the target monthly rent before sharing.')
-  if (!goal.moveDate) missing.push('Add the expected move date before sharing.')
-  if (monthlyIncome <= 0) missing.push('Connect income evidence so affordability can be reviewed.')
-
-  if (targetRentToIncome != null && targetRentToIncome <= 0.35) {
-    strengths.push('Target rent appears within a typical rent-to-income range.')
-  } else if (targetRentToIncome != null) {
-    watchouts.push('Target rent may be high compared with verified monthly income.')
-  }
-
-  if (affordabilityHeadroom != null && affordabilityHeadroom >= 0) {
-    strengths.push('Target rent is within the current estimated sustainable rent range.')
-  } else if (affordabilityHeadroom != null) {
-    watchouts.push('Target rent is above the current estimated sustainable rent range.')
-  }
-
-  if (profile?.paymentBehaviour.rentPaidConsistently || profile?.stability.rentNeverMissed) {
-    strengths.push('Rent or rent-like payments appear consistent.')
-  } else if (profile) {
-    watchouts.push('Direct rent-payment reliability evidence is limited or not detected.')
-  }
-
-  if (upfrontCashGap != null && upfrontCashGap === 0) {
-    strengths.push('Declared upfront cash appears to cover the planning estimate.')
-  } else if (upfrontCashGap != null) {
-    watchouts.push(
-      'Declared upfront cash may not yet cover deposit, first month and moving buffer.'
-    )
-  }
-
-  const hasEvidence = (profile?.period.transactionCount ?? 0) > 0
-  const statusKey =
-    !hasEvidence || missing.length > 0
-      ? 'needs_detail'
-      : watchouts.length > 0
-        ? 'ready_with_conditions'
-        : 'ready'
-
-  return {
-    headline:
-      statusKey === 'ready'
-        ? 'Rental pack looks ready to review'
-        : statusKey === 'ready_with_conditions'
-          ? 'Rental pack is reviewable with context'
-          : 'Rental pack needs more detail',
-    statusTone:
-      statusKey === 'ready'
-        ? 'success'
-        : statusKey === 'ready_with_conditions'
-          ? 'warning'
-          : 'neutral',
-    statusLabel:
-      statusKey === 'ready'
-        ? 'Ready'
-        : statusKey === 'ready_with_conditions'
-          ? 'Context needed'
-          : 'Needs detail',
-    targetRent,
-    monthlyIncome,
-    targetRentToIncome,
-    maxAffordableRent,
-    affordabilityHeadroom,
-    estimatedUpfrontCash,
-    depositAvailable,
-    upfrontCashGap,
-    monthsRemaining: remainingMonths,
-    monthlyFundingRequired,
-    strengths,
-    watchouts,
-    missing,
-    assumptions: [
-      'The upfront cash estimate uses 2.5x monthly rent for planning only.',
-      'The share link freezes this evidence snapshot when the link is created.',
-      'The pack supports a review; it does not guarantee a landlord or letting agent will accept the application.',
-    ],
-  }
-}
-
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -265,8 +83,6 @@ function CreateLinkForm({
   onCreate,
   onCancel,
   isPending,
-  packType,
-  goalId,
   initialTargetType = '',
   title = 'New share link',
   description,
@@ -277,13 +93,9 @@ function CreateLinkForm({
     trustScoreId: string
     targetType?: string
     targetName?: string
-    packType?: ShareMode
-    goalId?: string
   }) => void
   onCancel: () => void
   isPending: boolean
-  packType?: ShareMode
-  goalId?: string
   initialTargetType?: string
   title?: string
   description?: string
@@ -337,8 +149,6 @@ function CreateLinkForm({
               trustScoreId: score.id,
               targetType: targetType || undefined,
               targetName: targetName || undefined,
-              packType,
-              goalId,
             })
           }
           loading={isPending}
@@ -351,186 +161,13 @@ function CreateLinkForm({
   )
 }
 
-function RentalSharePackPreviewCard({
-  goal,
-  preview,
-  onCreate,
-}: {
-  goal: ConsumerGoal
-  preview: RentalSharePackPreview
-  onCreate: () => void
-}) {
-  const moveDate = goal.moveDate ? formatDate(goal.moveDate) : 'Not set'
-  const applicationMode =
-    goal.applicationMode === 'joint'
-      ? 'Joint application'
-      : goal.applicationMode === 'alone'
-        ? 'Applying alone'
-        : 'Not sure yet'
-
-  return (
-    <Card className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <Home className="text-brand-900 h-4 w-4" />
-            <p className="text-brand-900 text-xs font-semibold uppercase tracking-wide">
-              Rental readiness pack
-            </p>
-          </div>
-          <h2 className="text-content text-xl font-semibold">{preview.headline}</h2>
-          <p className="text-content-secondary mt-1 max-w-3xl text-sm">
-            This is the goal-specific view a landlord or letting agent will see when this share link
-            is opened. It uses the saved rental goal and freezes the evidence snapshot when the link
-            is created.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status={preview.statusTone} label={preview.statusLabel} />
-          <Button onClick={onCreate}>
-            <Share2 className="h-4 w-4" />
-            Create rental pack link
-          </Button>
-        </div>
-      </div>
-
-      <InsetPanel padding="md" className="rounded-panel">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="text-content-muted flex items-center gap-1.5 text-xs font-semibold uppercase">
-              <Banknote className="h-3.5 w-3.5" />
-              Target rent
-            </p>
-            <p className="text-content mt-1 text-lg font-semibold">
-              {formatMoneyOrDash(preview.targetRent)}
-            </p>
-          </div>
-          <div>
-            <p className="text-content-muted flex items-center gap-1.5 text-xs font-semibold uppercase">
-              <CalendarClock className="h-3.5 w-3.5" />
-              Move date
-            </p>
-            <p className="text-content mt-1 text-lg font-semibold">{moveDate}</p>
-          </div>
-          <div>
-            <p className="text-content-muted text-xs font-semibold uppercase">Application</p>
-            <p className="text-content mt-1 text-lg font-semibold">{applicationMode}</p>
-          </div>
-          <div>
-            <p className="text-content-muted text-xs font-semibold uppercase">Link type</p>
-            <p className="text-content mt-1 text-lg font-semibold">Recipient review</p>
-          </div>
-        </div>
-      </InsetPanel>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-surface-inset rounded-xl px-4 py-3">
-          <p className="text-content-muted text-xs">Rent to verified income</p>
-          <p className="text-content mt-1 text-xl font-semibold tabular-nums">
-            {formatPercent(preview.targetRentToIncome)}
-          </p>
-          <p className="text-content-muted mt-0.5 text-[11px]">
-            Based on {formatMoneyOrDash(preview.monthlyIncome)}/mo income
-          </p>
-        </div>
-        <div className="bg-surface-inset rounded-xl px-4 py-3">
-          <p className="text-content-muted text-xs">Estimated sustainable rent</p>
-          <p className="text-content mt-1 text-xl font-semibold tabular-nums">
-            {formatMoneyOrDash(preview.maxAffordableRent)}
-          </p>
-          <p className="text-content-muted mt-0.5 text-[11px]">
-            Headroom {formatMoneyOrDash(preview.affordabilityHeadroom)}
-          </p>
-        </div>
-        <div className="bg-surface-inset rounded-xl px-4 py-3">
-          <p className="text-content-muted text-xs">Estimated upfront cash</p>
-          <p className="text-content mt-1 text-xl font-semibold tabular-nums">
-            {formatMoneyOrDash(preview.estimatedUpfrontCash)}
-          </p>
-          <p className="text-content-muted mt-0.5 text-[11px]">
-            Declared {formatMoneyOrDash(preview.depositAvailable)}
-          </p>
-        </div>
-        <div className="bg-surface-inset rounded-xl px-4 py-3">
-          <p className="text-content-muted text-xs">Cash gap</p>
-          <p className="text-content mt-1 text-xl font-semibold tabular-nums">
-            {formatMoneyOrDash(preview.upfrontCashGap)}
-          </p>
-          <p className="text-content-muted mt-0.5 text-[11px]">
-            {preview.monthlyFundingRequired != null
-              ? `${formatCurrency(preview.monthlyFundingRequired)}/mo to close`
-              : 'Add move date for monthly need'}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div>
-          <h3 className="text-content mb-3 flex items-center gap-2 text-sm font-semibold">
-            <CheckCircle2 className="text-success-strong h-4 w-4" />
-            What supports this pack
-          </h3>
-          {preview.strengths.length > 0 ? (
-            <div className="space-y-2">
-              {preview.strengths.map((item) => (
-                <div key={item} className="text-content-secondary flex items-start gap-2 text-sm">
-                  <CheckCircle2 className="text-success-strong mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-content-muted text-sm">No strong rental-specific signals yet.</p>
-          )}
-        </div>
-        <div>
-          <h3 className="text-content mb-3 flex items-center gap-2 text-sm font-semibold">
-            <AlertTriangle className="text-warning-strong h-4 w-4" />
-            What needs context
-          </h3>
-          {[...preview.missing, ...preview.watchouts].length > 0 ? (
-            <div className="space-y-2">
-              {[...preview.missing, ...preview.watchouts].map((item) => (
-                <div key={item} className="text-content-secondary flex items-start gap-2 text-sm">
-                  <AlertTriangle className="text-warning-strong mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-content-muted text-sm">
-              No major watchouts from the current evidence.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <InsetPanel className="rounded-panel flex items-start gap-3">
-        <Info className="text-brand-900 mt-0.5 h-4 w-4 shrink-0" />
-        <div>
-          <p className="text-content text-sm font-semibold">Recipient limitations</p>
-          <ul className="text-content-secondary mt-2 space-y-1 text-sm">
-            {preview.assumptions.map((assumption) => (
-              <li key={assumption}>{assumption}</li>
-            ))}
-          </ul>
-        </div>
-      </InsetPanel>
-    </Card>
-  )
-}
-
-export function ShareProfileView({
-  mode = 'generic',
-  goalId,
-}: {
-  mode?: ShareMode
-  goalId?: string
-}) {
+export function ShareProfileView(_props?: { mode?: string; goalId?: string }) {
+  // Goals (which drove the rental share-pack mode) have been removed. The
+  // `mode`/`goalId` props are accepted but ignored so the route can keep
+  // passing legacy query params without erroring; only generic sharing is used.
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const isRentalMode = mode === 'rental'
 
   const appUrl =
     typeof window !== 'undefined'
@@ -545,24 +182,6 @@ export function ShareProfileView({
     },
   })
 
-  const { data: goals = [], isLoading: goalsLoading } = useQuery({
-    queryKey: ['goals'],
-    queryFn: async () => {
-      const token = await getToken()
-      return api.goals.list(token!)
-    },
-    enabled: isRentalMode,
-  })
-
-  const { data: insightProfile = null, isLoading: insightLoading } = useQuery({
-    queryKey: ['insight-profile'],
-    queryFn: async () => {
-      const token = await getToken()
-      return api.insights.getProfile(token!) as Promise<InsightProfile | null>
-    },
-    enabled: isRentalMode,
-  })
-
   const { data: links = [], isLoading: linksLoading } = useQuery({
     queryKey: ['share-links'],
     queryFn: async () => {
@@ -571,28 +190,11 @@ export function ShareProfileView({
     },
   })
 
-  const selectedRentalGoal = useMemo(() => {
-    if (!isRentalMode) return null
-    return (
-      goals.find((goal) => goal.id === goalId && goal.type === 'rental') ??
-      goals.find((goal) => goal.type === 'rental' && goal.status === 'active' && goal.isPrimary) ??
-      goals.find((goal) => goal.type === 'rental' && goal.status === 'active') ??
-      null
-    )
-  }, [goalId, goals, isRentalMode])
-
-  const rentalPackPreview = useMemo(
-    () => buildRentalSharePackPreview(selectedRentalGoal, insightProfile),
-    [insightProfile, selectedRentalGoal]
-  )
-
   const createMutation = useMutation({
     mutationFn: async (data: {
       trustScoreId: string
       targetType?: string
       targetName?: string
-      packType?: ShareMode
-      goalId?: string
     }) => {
       const token = await getToken()
       return api.sharing.create(token!, data)
@@ -613,12 +215,11 @@ export function ShareProfileView({
     },
   })
 
-  const isLoading =
-    scoreLoading || linksLoading || (isRentalMode && (goalsLoading || insightLoading))
+  const isLoading = scoreLoading || linksLoading
 
   return (
     <PageLayout>
-      <PageHeader title={isRentalMode ? 'Rental share pack' : 'Sharing'} />
+      <PageHeader title="Sharing" />
 
       {/* Score required gate */}
       {!isLoading && !score && (
@@ -637,49 +238,18 @@ export function ShareProfileView({
         </Card>
       )}
 
-      {!isLoading && score && isRentalMode && !selectedRentalGoal && (
-        <Card className="text-center" padding="lg">
-          <Home className="text-brand-900 mx-auto mb-3 h-8 w-8" />
-          <p className="text-content font-semibold">Create a rental goal first</p>
-          <p className="text-content-secondary mx-auto mt-1 max-w-md text-sm">
-            Rental share packs use your saved target rent, move date and deposit context.
-          </p>
-          <a href="/dashboard/goals" className={buttonClasses('primary', 'md', 'mt-4')}>
-            Open Goals
-          </a>
-        </Card>
-      )}
-
-      {score && selectedRentalGoal && rentalPackPreview && (
-        <RentalSharePackPreviewCard
-          goal={selectedRentalGoal}
-          preview={rentalPackPreview}
-          onCreate={() => setShowForm(true)}
-        />
-      )}
-
       {/* Create link button + form */}
       {score && (
         <Card>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-content font-semibold">
-                {isRentalMode ? 'Create the rental pack link' : 'Create a new link'}
-              </h2>
-              <p className="text-content-muted mt-0.5 text-sm">
-                {isRentalMode
-                  ? 'The link will include the rental pack context above and expire after 30 days.'
-                  : 'Links expire after 30 days.'}
-              </p>
+              <h2 className="text-content font-semibold">Create a new link</h2>
+              <p className="text-content-muted mt-0.5 text-sm">Links expire after 30 days.</p>
             </div>
             {!showForm && (
-              <Button
-                onClick={() => setShowForm(true)}
-                className="shrink-0"
-                disabled={isRentalMode && !selectedRentalGoal}
-              >
+              <Button onClick={() => setShowForm(true)} className="shrink-0">
                 <Plus className="h-4 w-4" />
-                {isRentalMode ? 'Pack link' : 'New link'}
+                New link
               </Button>
             )}
           </div>
@@ -690,16 +260,6 @@ export function ShareProfileView({
               onCreate={(data) => createMutation.mutate(data)}
               onCancel={() => setShowForm(false)}
               isPending={createMutation.isPending}
-              packType={isRentalMode ? 'rental' : undefined}
-              goalId={isRentalMode ? selectedRentalGoal?.id : undefined}
-              initialTargetType={isRentalMode ? 'letting_agent' : ''}
-              title={isRentalMode ? 'Rental pack recipient' : 'New share link'}
-              description={
-                isRentalMode
-                  ? 'Use the recipient fields to label who this rental pack is intended for.'
-                  : undefined
-              }
-              submitLabel={isRentalMode ? 'Create rental pack link' : 'Create link'}
             />
           )}
           {createMutation.isError && (

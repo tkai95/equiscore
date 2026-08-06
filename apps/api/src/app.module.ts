@@ -13,7 +13,6 @@ import { AuditModule } from './audit/audit.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { InsightsModule } from './insights/insights.module'
 import { CompassModule } from './compass/compass.module'
-import { GoalsModule } from './goals/goals.module'
 import { OrganisationsModule } from './organisations/organisations.module'
 import { AssessmentsModule } from './assessments/assessments.module'
 import { AdminModule } from './admin/admin.module'
@@ -33,7 +32,6 @@ import { AdminModule } from './admin/admin.module'
     AnalyticsModule,
     InsightsModule,
     CompassModule,
-    GoalsModule,
     OrganisationsModule,
     AssessmentsModule,
     AdminModule,
