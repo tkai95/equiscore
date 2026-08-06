@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   X,
@@ -12,6 +13,7 @@ import {
   Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isOpenSite } from '@/lib/site'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -327,10 +329,12 @@ interface RegisterInterestModalProps {
 }
 
 export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestModalProps) {
+  const router = useRouter()
   const [profileType, setProfileType] = useState<ProfileType | null>(null)
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [submittedEmail, setSubmittedEmail] = useState('')
   const [indData, setIndData] = useState<IndividualData>(INITIAL_IND)
   const [bizData, setBizData] = useState<BusinessData>(INITIAL_BIZ)
 
@@ -341,6 +345,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
     setStep(0)
     setSubmitError('')
     setSubmitting(false)
+    setSubmittedEmail('')
     setIndData(INITIAL_IND)
     setBizData(INITIAL_BIZ)
   }
@@ -386,6 +391,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
       })
 
       if (!res.ok) throw new Error('Failed')
+      setSubmittedEmail((profileType === 'individual' ? indData.email : bizData.email).trim().toLowerCase())
       setStep(TOTAL_STEPS + 1)
     } catch {
       setSubmitError('Something went wrong. Please try again.')
@@ -441,6 +447,10 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
 
     // ── Success ───────────────────────────────────────────────────────────
     if (isSuccess) {
+      function createProfile() {
+        const emailParam = submittedEmail ? `?email=${encodeURIComponent(submittedEmail)}` : ''
+        router.push(`/sign-up${emailParam}`)
+      }
       return (
         <div className="flex flex-col items-center py-6 text-center">
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-teal/20 bg-teal/10">
@@ -451,12 +461,33 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
             We&apos;ll let you know when EquiScore is live. We may also invite selected users to
             early access based on their use case and country corridor.
           </p>
-          <button
-            onClick={handleClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-teal px-8 py-3 text-sm font-semibold text-ink shadow-[0_0_24px_rgba(0,200,150,0.3)] transition-all hover:bg-teal-dark"
-          >
-            Done
-          </button>
+
+          {/* On the open site, let individuals jump straight into building their
+              profile with their email pre-filled. Businesses are B2B — they stay
+              on the waitlist for a pilot conversation. */}
+          {isOpenSite && profileType === 'individual' ? (
+            <>
+              <button
+                onClick={createProfile}
+                className="inline-flex items-center gap-2 rounded-xl bg-teal px-8 py-3 text-sm font-semibold text-ink shadow-[0_0_24px_rgba(0,200,150,0.3)] transition-all hover:bg-teal-dark"
+              >
+                Create my profile now <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleClose}
+                className="mt-3 text-sm text-cream/50 transition-colors hover:text-cream"
+              >
+                Maybe later
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleClose}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal px-8 py-3 text-sm font-semibold text-ink shadow-[0_0_24px_rgba(0,200,150,0.3)] transition-all hover:bg-teal-dark"
+            >
+              Done
+            </button>
+          )}
         </div>
       )
     }
