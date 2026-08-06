@@ -33,3 +33,13 @@ export const isInvitationSite = siteMode === 'invitation'
 export const hasAuth = hasClerkPublishableKey
 /** Waitlist surfaces render on public + open, never on dev (invitation). */
 export const showWaitlist = !isInvitationSite
+
+// ─── Dev-only features ───────────────────────────────────────────────────────
+// Some features are not yet ready for the public main site and are surfaced
+// only on the invitation (dev) site while they're refined. The API + data
+// layers stay always-on; gating is purely in the UI.
+/**
+ * Goals — hidden on the main/open site, shown only on dev (invitation) while
+ * being refined. Do not delete the feature; flip this when ready for launch.
+ */
+export const showGoals = isInvitationSite

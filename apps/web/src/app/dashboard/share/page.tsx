@@ -4,11 +4,18 @@ import { ShareProfileView } from '@/components/share/share-profile-view'
 
 export const metadata = { title: 'Sharing' }
 
-export default async function SharePage() {
+export default async function SharePage({
+  searchParams,
+}: {
+  searchParams: { mode?: string; goalId?: string }
+}) {
   const { userId } = auth()
   if (!userId) redirect('/sign-in')
 
-  // Goals (which drove the rental share-pack mode) have been removed. Any
-  // legacy ?mode=rental&goalId=... links now fall through to generic sharing.
-  return <ShareProfileView mode="generic" />
+  return (
+    <ShareProfileView
+      mode={searchParams.mode === 'rental' ? 'rental' : 'generic'}
+      goalId={searchParams.goalId}
+    />
+  )
 }
