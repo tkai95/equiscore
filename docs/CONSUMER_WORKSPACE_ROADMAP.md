@@ -8,20 +8,23 @@ Date: 2026-07-13
 > below were written. **This banner supersedes anything below that contradicts
 > it.**
 >
-> 1. **Goals (consumer) are removed.** The Goals feature, its UI, and its API
->    module have been taken out of the product. The navigation is now
->    **Home, Trust Profile, My Money, To do, Sharing**. The `ConsumerGoal`
->    table and migrations are intentionally retained so existing rental share
->    links keep rendering — do not drop them. Do not re-add the Goals UI
->    without a fresh product decision. (Compass `SavingsGoal` under My Money is
->    a separate premium feature and is unaffected.)
+> 1. **Goals is dev-only for now.** Goals is **not** deleted — it's hidden on the
+>    main/open site and shown only on the invitation (dev) site while being
+>    refined. The API module, `ConsumerGoal` table, the goals UI, and the rental
+>    share-pack branches are all present and always-on at the data layer. Gating
+>    is UI-only, via `showGoals` (`apps/web/src/lib/site.ts`). On the main site
+>    the consumer navigation is **Home, Trust Profile, My Money, To do, Sharing**;
+>    on dev, **Goals** is added back. Flip `showGoals` when Goals is ready for
+>    the main site. (Compass `SavingsGoal` under My Money is a separate premium
+>    feature and is unaffected.)
 >
-> 2. **Bank statements are the primary evidence path.** Live open-banking
->    connection (TrueLayer / Enable Banking) has been removed from the consumer
->    UI. Consumers build a Trust Profile by **uploading a bank statement**
->    (PDF/CSV) at `/dashboard/connections` (now titled "Bank statements"). The
->    live-connect API code is left dormant. Existing connected accounts remain
->    manageable.
+> 2. **Bank statements are the primary evidence path; Open Banking is coming
+>    soon.** Consumers build a Trust Profile by **uploading a bank statement**
+>    (PDF/CSV) at `/dashboard/connections` ("Bank statements"). Live open-banking
+>    connection (TrueLayer / Enable Banking) is a **planned future product** —
+>    where it was removed, the UI now says "Open Banking is coming soon". The
+>    live-connect API code is present but not wired into consumer CTAs. Existing
+>    connected accounts remain manageable.
 >
 > Architecture, site modes (main vs dev), and the dev access gate are documented
 > in [ARCHITECTURE.md](./ARCHITECTURE.md). Deployment is in
@@ -33,8 +36,8 @@ The consumer app should organise around plain-language user jobs:
 
 1. Home - what is happening now, and what should the user care about.
 2. Trust Profile - what EquiScore says about the user, and why.
-3. ~~Goals - what the user is trying to do, and whether they are ready.~~
-   *(removed 2026-08 — see banner above)*
+3. Goals - what the user is trying to do, and whether they are ready.
+   *(dev-only as of 2026-08 — hidden on the main site, shown on dev; see banner)*
 4. My Money - how the user manages money over time.
 5. To do - what needs completing, fixing or responding to.
 6. Sharing - how the user creates, controls and tracks access.

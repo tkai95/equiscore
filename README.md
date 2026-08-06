@@ -73,6 +73,7 @@ One build, multiple hosts. The host's `NEXT_PUBLIC_SITE_MODE` selects behaviour:
 | Host | Mode | Auth | Who can sign up |
 |---|---|---|---|
 | `equiscore.app` | `open` | Clerk (prod instance) | Anyone |
+| `staged.equiscore.app` | `open` | Clerk (prod instance) | Anyone — preview of production |
 | `dev.equiscore.app` | `invitation` | Clerk (dev instance) | Invited emails only |
 | `admin.equiscore.app` | (host-routed to `/admin`) | Clerk + InternalAdmin | Internal admins |
 | `partners.equiscore.app` | (host-routed to `/workspace`) | Clerk + org membership | Org members |

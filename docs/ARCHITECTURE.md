@@ -161,21 +161,23 @@ add appearance/verification props to "fix" it; fix it in the Dashboard.
 
 ---
 
-## 6. The evidence path: statements, not live bank connect
+## 6. The evidence path: statements now, Open Banking coming
 
 The consumer builds a Trust Profile by **uploading bank statements** (PDF or
-CSV). Live open-banking connection (TrueLayer / Enable Banking) has been removed
-from the **consumer-facing UI**; the API code is left dormant, not deleted.
+CSV). **Open Banking (live, read-only bank connection) is a planned future
+product, not yet launched.** Where it used to appear in the UI, surfaces now say
+"Open Banking is coming soon" so users and reviewers know it's planned, not
+missing.
 
 **How statement ingestion works:**
-- Web uploads to `/dashboard/connections` (now titled **"Bank statements"**) via
+- Web uploads to `/dashboard/connections` (titled **"Bank statements"**) via
   `api.insights.importPdf` / `api.insights.importCsv`.
 - CSV parses synchronously; PDF runs as a **background job** read by Claude
   (30–90s). `import-jobs-chip` announces completion globally; the user may leave
   the page.
 - Ingestion lives in the API **insights** module (`apps/api/src/insights/`),
-  *not* `banking/`. The `banking/` module is the (dormant) live-OB provider
-  integration.
+  *not* `banking/`. The `banking/` module is the live-OB provider integration,
+  present but not wired into consumer CTAs until Open Banking launches.
 
 **INVARIANTS:**
 - The primary "get started" CTA everywhere points at **statement upload**, not
@@ -183,25 +185,29 @@ from the **consumer-facing UI**; the API code is left dormant, not deleted.
 - Do **not** delete `/dashboard/connections/[accountId]` or
   `account-transactions-view` — they browse transactions for accounts the user
   already has. Removing them orphans data.
-- Do **not** reintroduce live connect UI to consumers without a product
-  decision; if you do, gate it explicitly and keep statement upload primary.
+- Until Open Banking launches, keep the **"coming soon"** framing wherever it
+  was removed — don't silently omit it. When it launches, wire the existing
+  `banking/` module into a connect UI and replace the coming-soon notes; do not
+  build a second live-connect path.
 
 ---
 
-## 7. Features removed or dormant (do not resurrect silently)
+## 7. Features dev-gated or upcoming (do not silently change visibility)
 
-- **Goals** (consumer feature) — **removed** (UI + API module deleted). The
-  `ConsumerGoal` table, enums, and the two migrations are **intentionally kept**
-  so existing rental share links keep rendering (`SharingService` reads
-  `consumer_goals` directly, and the public `/share/[token]` page renders frozen
-  rental snapshots). Do not drop the table. Do not re-add the Goals UI without a
-  product decision and a fresh design pass.
+- **Goals** (consumer feature) — **hidden on the main/open site, shown only on
+  the invitation (dev) site** while being refined. It is **not** deleted: the
+  API module, the `ConsumerGoal` table + enums, the two migrations, the goals UI,
+  and the rental share-pack branches are all present and always-on at the data
+  layer. Gating is purely UI, via `showGoals` (`apps/web/src/lib/site.ts`) = true
+  only on the invitation site. The `/dashboard/goals` route redirects to
+  `/dashboard` when hidden. **Flip `showGoals` when Goals is ready for the main
+  site; do not delete it.**
 - **Compass `SavingsGoal`** is a **different, separate** premium feature
   (`My Money`, gated behind `User.compassEnabled`). Do not confuse it with the
-  removed consumer Goals.
-- **Live open banking** — dormant in `apps/api/src/banking/` and the schema
-    (`BankConnection`, `BankAccount`, `TrueLayer`/`Enable Banking` services). Not
-  wired into any consumer CTA.
+  dev-gated consumer Goals.
+- **Open Banking** — see §6. Coming-soon; live-connect API code is present in
+  `apps/api/src/banking/` and the schema (`BankConnection`, `BankAccount`,
+  `TrueLayer`/`Enable Banking` services) but not wired into consumer CTAs.
 
 ---
 

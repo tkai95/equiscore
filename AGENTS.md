@@ -16,13 +16,15 @@ short version of the rules that matter most:
 3. **Dev (`invitation`) is invite-only.** `/sign-up` and the dashboard gate only
    on the invitation site; they are no-ops on `open`/`public`. The dev gate
    checks access **client-side after auth**, not in edge middleware.
-4. **Statements, not live bank connect, are the consumer evidence path.** "Get
-   started" CTAs say "upload a statement". Live open-banking API code is dormant
-   — do not rewire it into consumer UI without a product decision.
-5. **Goals (consumer) are removed.** The `ConsumerGoal` table + migrations are
-   intentionally kept (existing rental share links render from them). Don't drop
-   the table; don't re-add the UI without a decision. (Compass `SavingsGoal` is a
-   *different* feature — leave it alone.)
+4. **Statements are the consumer evidence path; Open Banking is coming soon.**
+   "Get started" CTAs say "upload a statement". Where Open Banking connect was
+   removed, show the "coming soon" framing — don't silently omit it. The
+   live-connect API code is present but not wired into consumer CTAs; when Open
+   Banking launches, wire the existing `banking/` module in, don't rebuild it.
+5. **Goals (consumer) is dev-gated, not deleted.** Hidden on the main/open site,
+   shown only on dev via `showGoals` (`lib/site.ts`). The API module + table + UI
+   + rental share-pack are all present. Flip `showGoals` when ready; don't delete
+   it. (Compass `SavingsGoal` is a *different* feature — leave it alone.)
 
 ## Things that are NOT code (fix in the relevant console, not here)
 
