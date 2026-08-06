@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import {
   ArrowRight,
   CheckCircle2,
@@ -137,7 +137,7 @@ export default function LandlordsPage() {
           </p>
 
           <div className="flex flex-col gap-4 sm:flex-row">
-            {isPublicSite ? (
+            {showWaitlist ? (
               <RegisterInterestButton label="Partner with us" variant="outline-light" />
             ) : (
               <Link
@@ -378,7 +378,7 @@ export default function LandlordsPage() {
             </p>
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Partner with us" variant="outline-light" />
               ) : (
                 <Link

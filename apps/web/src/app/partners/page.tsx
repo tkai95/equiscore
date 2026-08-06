@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import {
   ArrowRight,
   Building2,
@@ -113,7 +113,7 @@ export default function PartnersPage() {
             Equiscore is an additional evidence layer for cases your standard process cannot resolve. We are building our partner network ahead of full launch and working with a select group of organisations now.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row">
-            {isPublicSite ? (
+            {showWaitlist ? (
               <RegisterInterestButton label="Request partner access" variant="primary" />
             ) : (
               <Link
@@ -278,7 +278,7 @@ export default function PartnersPage() {
               or use the button below and we will come back to you within two business days.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Request partner access" variant="primary" />
               ) : (
                 <Link

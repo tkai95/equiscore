@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { ArrowRight } from 'lucide-react'
 
+// Auth-gated CTAs (Sign in / Build my profile / dashboard) used on the open
+// (main) and invitation (dev) builds. Named `Dev*` for back-compat with
+// existing imports; the neutral aliases below are preferred for new code.
+
 export function DevNavCTAs() {
   return (
     <>
@@ -118,3 +122,10 @@ export function DevBottomCTA() {
     </>
   )
 }
+
+// ── Neutral aliases (preferred for new call sites) ───────────────────────────
+
+export const NavAuthCTAs = DevNavCTAs
+export const NavAuthMobileCTAs = DevNavMobileCTAs
+export const HeroAuthCTAs = DevHeroCTAs
+export const BottomAuthCTA = DevBottomCTA
