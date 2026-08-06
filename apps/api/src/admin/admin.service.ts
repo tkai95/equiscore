@@ -497,6 +497,346 @@ export class AdminService {
     return this.mapInternalAdminInvitation(invitation)
   }
 
+  // ─── Dev access (invite-only dev.equiscore.app) ──────────────────────────
+
+  async listDevAccess() {
+    const [accesses, invitations] = await Promise.all([
+      db.devAccess.findMany({
+        orderBy: [{ status: 'asc' }, { grantedAt: 'desc' }],
+        include: {
+          user: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          grantedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+        },
+      }),
+      db.devAccessInvite.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          acceptedBy: {
+            select: { id: true, email: true, profile: { select: { fullName: true } } },
+          },
+        },
+      }),
+    ])
+
+    return {
+      access: accesses.map((access) => ({
+        id: access.id,
+        user: this.mapMemberPerson(access.user),
+        status: access.status,
+        grantedBy: access.grantedBy ? this.mapMemberPerson(access.grantedBy) : null,
+        grantedAt: access.grantedAt,
+        revokedAt: access.revokedAt,
+        createdAt: access.createdAt,
+        updatedAt: access.updatedAt,
+      })),
+      invitations: invitations.map((invitation) => this.mapDevAccessInvite(invitation)),
+    }
+  }
+
+  async inviteDevAccess(admin: InternalAdminContext, input: { email: string; note?: string }) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const email = this.normaliseEmail(input.email)
+    if (!email) throw new ConflictException('Invite email is required')
+
+    const existingUser = await db.user.findUnique({
+      where: { email },
+      include: { devAccesses: true },
+    })
+    const activeAccess = existingUser?.devAccesses.find((access) => access.status === 'active')
+    if (activeAccess) throw new ConflictException('That user already has active dev access')
+
+    const now = new Date()
+    const token = this.makeToken()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    await db.devAccessInvite.updateMany({
+      where: { email, status: 'pending', expiresAt: { lte: now } },
+      data: { status: 'expired' },
+    })
+
+    try {
+      const invitation = await db.$transaction(async (tx) => {
+        const existingPending = await tx.devAccessInvite.findFirst({
+          where: { email, status: 'pending' },
+        })
+
+        const include = {
+          invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+          acceptedBy: {
+            select: { id: true, email: true, profile: { select: { fullName: true } } },
+          },
+        } satisfies Prisma.DevAccessInviteInclude
+
+        const saved = existingPending
+          ? await tx.devAccessInvite.update({
+              where: { id: existingPending.id },
+              data: {
+                token,
+                invitedById: admin.userId,
+                expiresAt,
+                note: input.note ?? existingPending.note,
+              },
+              include,
+            })
+          : await tx.devAccessInvite.create({
+              data: {
+                email,
+                token,
+                invitedById: admin.userId,
+                expiresAt,
+                note: input.note,
+              },
+              include,
+            })
+
+        await tx.internalAdminAuditEvent.create({
+          data: {
+            actorUserId: admin.userId,
+            actorEmail: admin.email,
+            actorRole: admin.role,
+            action: existingPending ? 'dev_access_invite_resent' : 'dev_access_invite_created',
+            targetType: 'dev_access_invite',
+            targetId: saved.id,
+            metadata: { email },
+          },
+        })
+
+        return saved
+      })
+
+      const mappedInvitation = this.mapDevAccessInvite(invitation)
+      const emailDelivery = await this.sendDevAccessInvitationEmail(mappedInvitation)
+      return { ...mappedInvitation, emailDelivery }
+    } catch (error) {
+      this.logger.error(
+        `Failed to create dev access invite for ${email}`,
+        error instanceof Error ? error.stack : String(error)
+      )
+      throw error
+    }
+  }
+
+  async resendDevAccessInvite(admin: InternalAdminContext, invitationId: string) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const existing = await db.devAccessInvite.findUnique({ where: { id: invitationId } })
+    if (!existing) throw new NotFoundException('Dev access invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+
+    const token = this.makeToken()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const include = {
+      invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      acceptedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+    } satisfies Prisma.DevAccessInviteInclude
+
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.devAccessInvite.update({
+        where: { id: existing.id },
+        data: { token, status: 'pending', expiresAt, revokedAt: null },
+        include,
+      })
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'dev_access_invite_resent',
+          targetType: 'dev_access_invite',
+          targetId: saved.id,
+          metadata: { email: saved.email },
+        },
+      })
+      return saved
+    })
+
+    const mappedInvitation = this.mapDevAccessInvite(invitation)
+    const emailDelivery = await this.sendDevAccessInvitationEmail(mappedInvitation)
+    return { ...mappedInvitation, emailDelivery }
+  }
+
+  async revokeDevAccessInvite(admin: InternalAdminContext, invitationId: string) {
+    this.requirePermission(admin, 'admin:manage_access')
+
+    const existing = await db.devAccessInvite.findUnique({ where: { id: invitationId } })
+    if (!existing) throw new NotFoundException('Dev access invitation not found')
+    if (existing.status === 'accepted') {
+      throw new ConflictException('That invitation has already been accepted')
+    }
+    if (existing.status === 'revoked') {
+      throw new ConflictException('That invitation has already been revoked')
+    }
+
+    const now = new Date()
+    const include = {
+      invitedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      acceptedBy: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+    } satisfies Prisma.DevAccessInviteInclude
+
+    const invitation = await db.$transaction(async (tx) => {
+      const saved = await tx.devAccessInvite.update({
+        where: { id: existing.id },
+        data: { status: 'revoked', revokedAt: now },
+        include,
+      })
+      await tx.internalAdminAuditEvent.create({
+        data: {
+          actorUserId: admin.userId,
+          actorEmail: admin.email,
+          actorRole: admin.role,
+          action: 'dev_access_invite_revoked',
+          targetType: 'dev_access_invite',
+          targetId: saved.id,
+          metadata: { email: saved.email, previousStatus: existing.status },
+        },
+      })
+      return saved
+    })
+
+    return this.mapDevAccessInvite(invitation)
+  }
+
+  /**
+   * Validate a dev-access sign-up invite token (called from the dev sign-up
+   * route). Returns the invite if valid and still pending; expires any
+   * past-due invites for the same email first. Throws 404/409 on invalid input.
+   */
+  async validateDevAccessInvite(token: string) {
+    await db.devAccessInvite.updateMany({
+      where: { status: 'pending', expiresAt: { lte: new Date() } },
+      data: { status: 'expired' },
+    })
+
+    const invitation = await db.devAccessInvite.findUnique({ where: { token } })
+    if (!invitation) throw new NotFoundException('Dev access invitation not found')
+    if (invitation.status === 'accepted') {
+      throw new ConflictException('That invitation has already been used')
+    }
+    if (invitation.status === 'revoked') {
+      throw new ConflictException('That invitation has been revoked')
+    }
+    if (invitation.status === 'expired' || invitation.expiresAt <= new Date()) {
+      throw new ConflictException('That invitation has expired')
+    }
+    return { id: invitation.id, email: invitation.email, expiresAt: invitation.expiresAt }
+  }
+
+  /**
+   * Claim a dev-access invite for an authenticated user: create the DevAccess
+   * row and mark the invite accepted. Idempotent — safe to call on every dev
+   * sign-in. Matched by email + token (the token was bound at sign-up time).
+   */
+  async claimDevAccess(userId: string, email: string, token?: string) {
+    const normalisedEmail = this.normaliseEmail(email)
+    const existing = await db.devAccess.findUnique({ where: { userId } })
+    if (existing?.status === 'active') return existing
+
+    const invitation = await db.devAccessInvite.findFirst({
+      where: {
+        email: normalisedEmail,
+        status: 'pending',
+        expiresAt: { gt: new Date() },
+        ...(token ? { token } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!invitation) return null
+
+    return db.$transaction(async (tx) => {
+      const access = await tx.devAccess.upsert({
+        where: { userId },
+        update: { status: 'active', revokedAt: null, grantedById: invitation.invitedById },
+        create: { userId, status: 'active', grantedById: invitation.invitedById },
+      })
+      await tx.devAccessInvite.update({
+        where: { id: invitation.id },
+        data: { status: 'accepted', acceptedById: userId, acceptedAt: new Date() },
+      })
+      return access
+    })
+  }
+
+  /**
+   * Does this user have active dev access? Used by the dev access gate.
+   */
+  async hasActiveDevAccess(userId: string): Promise<boolean> {
+    const access = await db.devAccess.findUnique({ where: { userId } })
+    return access?.status === 'active'
+  }
+
+  private mapDevAccessInvite(invitation: {
+    id: string
+    email: string
+    token: string
+    status: string
+    note: string | null
+    expiresAt: Date
+    acceptedAt: Date | null
+    revokedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    invitedBy?: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+    acceptedBy?: { id: string; email: string; profile?: { fullName: string | null } | null } | null
+  }) {
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      status: invitation.status,
+      note: invitation.note,
+      expiresAt: invitation.expiresAt,
+      acceptedAt: invitation.acceptedAt,
+      revokedAt: invitation.revokedAt,
+      createdAt: invitation.createdAt,
+      updatedAt: invitation.updatedAt,
+      // The full sign-up URL the invitee uses. Includes the token so the dev
+      // sign-up page knows which invite this is.
+      inviteUrl: this.absoluteDevUrl(`/sign-up?invite=${invitation.token}`),
+      invitedBy: invitation.invitedBy ? this.mapMemberPerson(invitation.invitedBy) : null,
+      acceptedBy: invitation.acceptedBy ? this.mapMemberPerson(invitation.acceptedBy) : null,
+    }
+  }
+
+  private async sendDevAccessInvitationEmail(invitation: {
+    email: string
+    inviteUrl: string
+    expiresAt: Date
+  }): Promise<InvitationEmailDelivery> {
+    return this.invitationEmail.sendInvitation({
+      to: invitation.email,
+      subject: 'You are invited to the EquiScore dev site',
+      eyebrow: 'Dev access invitation',
+      heading: 'Access the EquiScore dev site',
+      preview: 'Use this invite link to create your profile on the dev site.',
+      intro:
+        'You have been invited to use the EquiScore dev site (dev.equiscore.app). This is a pre-release environment for testing before features reach the public site.',
+      body: 'Use the link below to create your profile. The link is unique to you and expires after 30 days.',
+      ctaLabel: 'Create my profile',
+      ctaUrl: invitation.inviteUrl,
+      surfaceLabel: 'Dev access',
+      details: [
+        { label: 'Site', value: 'dev.equiscore.app' },
+        { label: 'Expires', value: this.formatInviteDate(invitation.expiresAt) },
+      ],
+      footerNote:
+        'Only use this link if you expected an EquiScore dev access invitation. If you were not expecting this, you can ignore this email.',
+    })
+  }
+
+  private absoluteDevUrl(path: string): string {
+    return this.absoluteSurfaceUrl(
+      process.env.DEV_APP_URL ?? process.env.NEXT_PUBLIC_CONSUMER_APP_URL,
+      'https://dev.equiscore.app',
+      path
+    )
+  }
+
   async getOverview() {
     const start = this.startOfMonth()
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

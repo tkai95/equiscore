@@ -180,6 +180,39 @@ export interface InternalAdmins {
   invitations: InternalAdminInvitation[]
 }
 
+export interface DevAccessGrant {
+  id: string
+  user: AdminPerson
+  status: string
+  grantedBy: AdminPerson | null
+  grantedAt: string
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DevAccessInvitation {
+  id: string
+  email: string
+  status: string
+  note: string | null
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
+  /** Full sign-up URL the invitee uses (includes the invite token). */
+  inviteUrl: string
+  invitedBy: AdminPerson | null
+  acceptedBy: AdminPerson | null
+  emailDelivery?: InvitationEmailDelivery
+}
+
+export interface DevAccess {
+  access: DevAccessGrant[]
+  invitations: DevAccessInvitation[]
+}
+
 export interface AdminUsageEvent {
   id: string
   organisation?: { id: string; name: string; slug: string }
@@ -269,6 +302,27 @@ export const adminApi = {
     revoke: (token: string, invitationId: string) =>
       adminFetch<InternalAdminInvitation>(
         `/admin/internal-admins/invitations/${encodeURIComponent(invitationId)}/revoke`,
+        { method: 'POST' },
+        token
+      ),
+  },
+  devAccess: {
+    list: (token: string) => adminFetch<DevAccess>('/admin/dev-access', {}, token),
+    invite: (token: string, data: { email: string; note?: string }) =>
+      adminFetch<DevAccessInvitation>(
+        '/admin/dev-access/invitations',
+        { method: 'POST', body: JSON.stringify(data) },
+        token
+      ),
+    resend: (token: string, invitationId: string) =>
+      adminFetch<DevAccessInvitation>(
+        `/admin/dev-access/invitations/${encodeURIComponent(invitationId)}/resend`,
+        { method: 'POST' },
+        token
+      ),
+    revoke: (token: string, invitationId: string) =>
+      adminFetch<DevAccessInvitation>(
+        `/admin/dev-access/invitations/${encodeURIComponent(invitationId)}/revoke`,
         { method: 'POST' },
         token
       ),

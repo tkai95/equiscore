@@ -166,6 +166,14 @@ export const api = {
   auth: {
     sync: (token: string) => apiFetch('/auth/sync', { method: 'POST' }, token),
     me: (token: string) => apiFetch<Me>('/auth/me', {}, token),
+    devAccess: (token: string) =>
+      apiFetch<{ hasAccess: boolean; claimed: boolean }>('/auth/dev-access', {}, token),
+    validateDevInvite: (token: string) =>
+      apiFetch<{ status: string; email?: string } | null>(
+        `/auth/dev-invite?token=${encodeURIComponent(token)}`,
+        {},
+        undefined
+      ),
   },
   profile: {
     get: (token: string) => apiFetch('/profile', {}, token),

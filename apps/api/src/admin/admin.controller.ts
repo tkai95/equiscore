@@ -69,6 +69,39 @@ export class AdminController {
     return this.admin.revokeInternalAdminInvitation(admin, invitationId)
   }
 
+  @Get('dev-access')
+  @ApiOperation({ summary: 'List dev access grants and invitations' })
+  devAccess() {
+    return this.admin.listDevAccess()
+  }
+
+  @Post('dev-access/invitations')
+  @ApiOperation({ summary: 'Invite an email to the dev site' })
+  inviteDevAccess(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Body() body: { email: string; note?: string }
+  ) {
+    return this.admin.inviteDevAccess(admin, body)
+  }
+
+  @Post('dev-access/invitations/:invitationId/resend')
+  @ApiOperation({ summary: 'Refresh a dev access invitation' })
+  resendDevAccessInvite(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.resendDevAccessInvite(admin, invitationId)
+  }
+
+  @Post('dev-access/invitations/:invitationId/revoke')
+  @ApiOperation({ summary: 'Revoke a dev access invitation' })
+  revokeDevAccessInvite(
+    @CurrentAdmin() admin: InternalAdminContext,
+    @Param('invitationId') invitationId: string
+  ) {
+    return this.admin.revokeDevAccessInvite(admin, invitationId)
+  }
+
   @Post('organisations')
   @ApiOperation({ summary: 'Create a partner organisation' })
   createOrganisation(
