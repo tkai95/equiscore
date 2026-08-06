@@ -246,7 +246,7 @@ export function DocumentsView() {
           Identity and supporting documents. Uploading a{' '}
           <strong>bank statement</strong>?{' '}
           <Link href="/dashboard/connections" className="font-medium text-brand-900 hover:underline">
-            Add it on Bank connections
+            Add it on Bank statements
           </Link>{' '}
           instead — we&apos;ll read it and build your profile.
         </p>

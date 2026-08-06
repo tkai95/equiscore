@@ -78,11 +78,12 @@ export function useActionItems() {
 
   if (!hasAnyBank) {
     items.push({
-      id: 'connect-bank',
-      title: 'Connect a bank account',
-      detail: 'Verify your income and rent automatically through Open Banking.',
+      id: 'upload-statement',
+      title: 'Upload a bank statement',
+      detail:
+        'Upload a PDF or CSV bank statement so we can read your income, rent and spending and build your Trust Profile.',
       href: '/dashboard/connections',
-      cta: 'Connect bank account',
+      cta: 'Upload statement',
       priority: 1,
     })
   }
@@ -104,9 +105,9 @@ export function useActionItems() {
   if (score?.reasonCodes.some((r) => r.code === 'NAME_MISMATCH')) {
     items.push({
       id: 'name-mismatch',
-      title: 'Explain a bank-account name mismatch',
+      title: 'Explain an account name mismatch',
       detail:
-        'The name on a connected account does not fully match your profile. Review it so it does not limit your confidence.',
+        'The name on an account does not fully match your profile. Review it so it does not limit your confidence.',
       href: '/dashboard/connections',
       cta: 'Review mismatch',
       priority: 3,
@@ -138,12 +139,12 @@ export function useActionItems() {
     })
   }
 
-  // Stale banking data.
+  // Stale financial data.
   if (score?.status && score.status !== 'current') {
     items.push({
-      id: 'refresh-banking',
-      title: 'Refresh your banking data',
-      detail: 'This assessment is based on evidence that is no longer current. Refresh to update it.',
+      id: 'refresh-data',
+      title: 'Refresh your financial data',
+      detail: 'This assessment is based on evidence that is no longer current. Upload a more recent statement to update it.',
       href: '/dashboard/connections',
       cta: 'Refresh data',
       priority: 6,

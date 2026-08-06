@@ -179,7 +179,7 @@ export function AnalyticsOverview() {
           <TrendingUp className="mx-auto h-8 w-8 text-content-muted" />
           <p className="mt-3 text-sm font-medium text-content">No transaction data yet</p>
           <p className="mt-1 text-xs text-content-muted">
-            Connect a bank account or upload a statement to see your trends.
+            Upload a bank statement to see your trends.
           </p>
         </Card>
       )}
