@@ -2,13 +2,39 @@
 
 Date: 2026-07-13
 
+> ## Current state (2026-08) — read this first
+>
+> Two product decisions have changed the consumer workspace since the slices
+> below were written. **This banner supersedes anything below that contradicts
+> it.**
+>
+> 1. **Goals (consumer) are removed.** The Goals feature, its UI, and its API
+>    module have been taken out of the product. The navigation is now
+>    **Home, Trust Profile, My Money, To do, Sharing**. The `ConsumerGoal`
+>    table and migrations are intentionally retained so existing rental share
+>    links keep rendering — do not drop them. Do not re-add the Goals UI
+>    without a fresh product decision. (Compass `SavingsGoal` under My Money is
+>    a separate premium feature and is unaffected.)
+>
+> 2. **Bank statements are the primary evidence path.** Live open-banking
+>    connection (TrueLayer / Enable Banking) has been removed from the consumer
+>    UI. Consumers build a Trust Profile by **uploading a bank statement**
+>    (PDF/CSV) at `/dashboard/connections` (now titled "Bank statements"). The
+>    live-connect API code is left dormant. Existing connected accounts remain
+>    manageable.
+>
+> Architecture, site modes (main vs dev), and the dev access gate are documented
+> in [ARCHITECTURE.md](./ARCHITECTURE.md). Deployment is in
+> [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Direction
 
 The consumer app should organise around plain-language user jobs:
 
 1. Home - what is happening now, and what should the user care about.
 2. Trust Profile - what EquiScore says about the user, and why.
-3. Goals - what the user is trying to do, and whether they are ready.
+3. ~~Goals - what the user is trying to do, and whether they are ready.~~
+   *(removed 2026-08 — see banner above)*
 4. My Money - how the user manages money over time.
 5. To do - what needs completing, fixing or responding to.
 6. Sharing - how the user creates, controls and tracks access.
