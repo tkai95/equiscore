@@ -2,6 +2,14 @@
 
 Date: 2026-07-13
 
+> ## Active redesign (2026-08)
+>
+> A full **Profile, Account Menu & Settings redesign** is underway — see
+> [PROFILE_ACCOUNT_SETTINGS_REDESIGN.md](./PROFILE_ACCOUNT_SETTINGS_REDESIGN.md)
+> for the complete PRD, resolved architecture decisions, phased implementation
+> plan, and acceptance criteria. It supersedes anything below that conflicts
+> with the Profile/Settings/account-menu structure it defines.
+
 > ## Current state (2026-08) — read this first
 >
 > Two product decisions have changed the consumer workspace since the slices
