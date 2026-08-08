@@ -153,12 +153,12 @@ function SidebarFooter({ collapsed = false }: { collapsed?: boolean }) {
           <UserButton.Link
             label="Help & support"
             labelIcon={<LifeBuoy className="h-4 w-4" />}
-            href="/faq"
+            href="/dashboard/support"
           />
           <UserButton.Link
-            label="Privacy & permissions"
+            label="Privacy & security"
             labelIcon={<Lock className="h-4 w-4" />}
-            href="/security"
+            href="/dashboard/privacy"
           />
         </UserButton.MenuItems>
       </UserButton>
