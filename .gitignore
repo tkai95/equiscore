@@ -45,3 +45,4 @@ prisma/migrations
 # Local scratch files
 rwlogs.json
 ce.json
+envlogs.json
