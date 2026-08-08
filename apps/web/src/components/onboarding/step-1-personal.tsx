@@ -18,16 +18,30 @@ export function Step1Personal({ form }: Props) {
         <p className="text-sm text-content-secondary">Basic personal details to start your profile.</p>
       </div>
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-content">Full legal name</label>
-        <input
-          {...register('fullName')}
-          placeholder="e.g. Amara Johnson"
-          className={inputClass}
-        />
-        {errors.fullName && (
-          <p className="mt-1 text-xs text-danger-strong">{errors.fullName.message}</p>
-        )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-content">First name</label>
+          <input
+            {...register('firstName')}
+            placeholder="e.g. Amara"
+            className={inputClass}
+          />
+          {errors.firstName && (
+            <p className="mt-1 text-xs text-danger-strong">{errors.firstName.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-content">Last name</label>
+          <input
+            {...register('lastName')}
+            placeholder="e.g. Johnson"
+            className={inputClass}
+          />
+          {errors.lastName && (
+            <p className="mt-1 text-xs text-danger-strong">{errors.lastName.message}</p>
+          )}
+        </div>
       </div>
 
       <div>
@@ -39,18 +53,6 @@ export function Step1Personal({ form }: Props) {
         />
         {errors.dob && (
           <p className="mt-1 text-xs text-danger-strong">{errors.dob.message}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-content">Nationality</label>
-        <input
-          {...register('nationality')}
-          placeholder="e.g. Nigerian, Indian, French"
-          className={inputClass}
-        />
-        {errors.nationality && (
-          <p className="mt-1 text-xs text-danger-strong">{errors.nationality.message}</p>
         )}
       </div>
     </div>

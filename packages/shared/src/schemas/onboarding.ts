@@ -4,9 +4,9 @@ const emptyToUndefined = (value: unknown) =>
   value === '' || (typeof value === 'number' && Number.isNaN(value)) ? undefined : value
 
 export const step1Schema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
+  firstName: z.string().min(1, 'Please enter your first name').max(80),
+  lastName: z.string().min(1, 'Please enter your last name').max(80),
   dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
-  nationality: z.string().min(2, 'Please enter your nationality'),
 })
 
 export const step2Schema = z.object({

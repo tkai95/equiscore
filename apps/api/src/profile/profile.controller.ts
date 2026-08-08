@@ -4,6 +4,7 @@ import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { ProfileService } from './profile.service'
 import { AuthService } from '../auth/auth.service'
+import { OnboardingDto } from './onboarding.dto'
 
 @ApiTags('profile')
 @Controller('profile')
@@ -36,9 +37,9 @@ export class ProfileController {
 
   @Put('onboarding')
   @ApiOperation({ summary: 'Complete onboarding and save full profile' })
-  async completeOnboarding(@CurrentUser() user: RequestUser, @Body() body: Record<string, unknown>) {
+  async completeOnboarding(@CurrentUser() user: RequestUser, @Body() body: OnboardingDto) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
-    return this.profileService.completeOnboarding(userId, body as never)
+    return this.profileService.completeOnboarding(userId, body)
   }
 
   @Get('addresses')

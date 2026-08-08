@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
-import type { OnboardingData, UpdateProfileData } from '@equiscore/shared'
+import type { UpdateProfileData } from '@equiscore/shared'
 import { AuditService } from '../audit/audit.service'
+import { OnboardingDto } from './onboarding.dto'
 
 @Injectable()
 export class ProfileService {
@@ -22,34 +23,40 @@ export class ProfileService {
     })
   }
 
-  async completeOnboarding(userId: string, data: OnboardingData) {
+  async completeOnboarding(userId: string, data: OnboardingDto) {
     const user = await db.user.findUnique({ where: { id: userId } })
     if (!user) throw new NotFoundException('User not found')
 
     const monthlyIncomeDeclared = this.finiteNumber(data.monthlyIncomeDeclared)
     const monthlyRentDeclared = this.finiteNumber(data.monthlyRentDeclared)
-    const employmentType = data.employmentType
+    const employmentType = data.employmentType as never | undefined
+
+    // Derive a full name from the two components for backcompat with anything
+    // still reading the legacy fullName column.
+    const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ').trim()
 
     return db.$transaction(async (tx) => {
       const profile = await tx.userProfile.upsert({
         where: { userId },
         update: {
-          fullName: data.fullName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fullName,
           dob: new Date(data.dob),
-          nationality: data.nationality,
-          residencyStatus: data.residencyStatus,
+          residencyStatus: data.residencyStatus as never,
           ukMoveDate: data.ukMoveDate ? new Date(data.ukMoveDate) : undefined,
-          employmentType: data.employmentType,
+          employmentType: data.employmentType as never,
           monthlyIncomeDeclared,
           monthlyRentDeclared,
           profileStage: 'profile_building',
         },
         create: {
           userId,
-          fullName: data.fullName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fullName,
           dob: new Date(data.dob),
-          nationality: data.nationality,
-          residencyStatus: data.residencyStatus,
+          residencyStatus: data.residencyStatus as never,
           ukMoveDate: data.ukMoveDate ? new Date(data.ukMoveDate) : undefined,
           employmentType,
           monthlyIncomeDeclared,
@@ -91,7 +98,7 @@ export class ProfileService {
             employerName: data.employerName,
             jobTitle: data.jobTitle,
             monthlyIncomeDeclared,
-            payFrequency: data.payFrequency,
+            payFrequency: data.payFrequency as never,
             isCurrent: true,
           },
         })
