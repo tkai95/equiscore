@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth, useUser, SignOutButton } from '@clerk/nextjs'
-import { useQuery } from '@tanstack/react-query'
+import { useAuth, useUser, useClerk, SignOutButton } from '@clerk/nextjs'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import {
   UserCog,
@@ -199,7 +199,49 @@ function NotificationsSection() {
 // ── Privacy & data ────────────────────────────────────────────────────────
 
 function PrivacySection() {
+  const { getToken } = useAuth()
+  const { user } = useUser()
+  const { signOut } = useClerk()
+  const queryClient = useQueryClient()
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  // Data export — downloads the user's full data as JSON
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      return api.profile.exportData(token!)
+    },
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = window.document.createElement('a')
+      a.href = url
+      a.download = `equiscore-data-${new Date().toISOString().slice(0, 10)}.json`
+      window.document.body.appendChild(a)
+      a.click()
+      window.document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    },
+  })
+
+  // Account deletion — deletes DB user (cascades all data) + Clerk user
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken()
+      // 1. Delete the DB user (revokes shares, cascades all owned data)
+      await api.profile.deleteAccount(token!)
+      // 2. Delete the Clerk identity
+      await user?.delete()
+    },
+    onSuccess: () => {
+      void queryClient.clear()
+      void signOut({ redirectUrl: '/' })
+    },
+    onError: (err) => {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete account.')
+    },
+  })
 
   return (
     <>
@@ -212,9 +254,19 @@ function PrivacySection() {
           <SettingsRow
             icon={Download}
             title="Download my data"
-            description="Request a copy of your EquiScore data"
-            action={<span className="text-sm font-medium text-brand-900">Request export</span>}
-            onClick={() => alert('Data export is coming soon.')}
+            description="Export a copy of your EquiScore data as a JSON file"
+            action={
+              exportMutation.isPending ? (
+                <span className="text-sm text-content-muted">Preparing…</span>
+              ) : (
+                <span
+                  className="cursor-pointer text-sm font-medium text-brand-900"
+                >
+                  Download
+                </span>
+              )
+            }
+            onClick={() => exportMutation.mutate()}
           />
         </div>
       </Card>
@@ -239,7 +291,10 @@ function PrivacySection() {
                   Delete
                 </span>
               }
-              onClick={() => setDeleteConfirm(true)}
+              onClick={() => {
+                setDeleteError('')
+                setDeleteConfirm(true)
+              }}
             />
           ) : (
             <div className="px-4 py-5">
@@ -254,18 +309,23 @@ function PrivacySection() {
                     active sharing links. Some information may need to be retained where legally
                     required. This cannot be undone.
                   </p>
+                  {deleteError && (
+                    <p className="mt-2 text-xs text-danger-strong">{deleteError}</p>
+                  )}
                   <div className="mt-4 flex gap-3">
                     <button
                       onClick={() => setDeleteConfirm(false)}
-                      className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-hover"
+                      disabled={deleteMutation.isPending}
+                      className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-hover disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
-                      onClick={() => alert('Account deletion requires verification. Please contact support@equiscore.app to complete this action.')}
-                      className="rounded-lg bg-danger-strong px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90"
+                      onClick={() => deleteMutation.mutate()}
+                      disabled={deleteMutation.isPending}
+                      className="rounded-lg bg-danger-strong px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
                     >
-                      Delete account permanently
+                      {deleteMutation.isPending ? 'Deleting…' : 'Delete account permanently'}
                     </button>
                   </div>
                 </div>

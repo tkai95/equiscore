@@ -244,6 +244,9 @@ export const api = {
     getAddresses: (token: string) => apiFetch('/profile/addresses', {}, token),
     getEmployment: (token: string) => apiFetch('/profile/employment', {}, token),
     getRental: (token: string) => apiFetch('/profile/rental', {}, token),
+    exportData: (token: string) => apiFetch('/profile/export', {}, token),
+    deleteAccount: (token: string) =>
+      apiFetch<{ deleted: boolean }>('/profile/account', { method: 'DELETE' }, token),
   },
   goals: {
     list: (token: string) => apiFetch<ConsumerGoal[]>('/goals', {}, token),

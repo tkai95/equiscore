@@ -1,5 +1,6 @@
-import { Controller, Get, Put, Patch, Body, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Put, Patch, Delete, Body, UseGuards, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import type { Response } from 'express'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { ProfileService } from './profile.service'
@@ -61,5 +62,23 @@ export class ProfileController {
   async getRentalProfile(@CurrentUser() user: RequestUser) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
     return this.profileService.getRentalProfile(userId)
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: 'Export the authenticated user data as JSON' })
+  async exportData(@CurrentUser() user: RequestUser, @Res() res: Response) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    const data = await this.profileService.exportUserData(userId)
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Content-Disposition', `attachment; filename="equiscore-data-${userId.slice(-8)}.json"`)
+    res.json(data)
+  }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Permanently delete the user account and all data' })
+  async deleteAccount(@CurrentUser() user: RequestUser) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    await this.profileService.deleteAccount(userId)
+    return { deleted: true }
   }
 }

@@ -173,6 +173,90 @@ export class ProfileService {
     })
   }
 
+  /**
+   * Export all user data as a JSON object (UK GDPR right of access / portability).
+   * Gathers profile, addresses, employment, rental, documents, bank accounts +
+   * transactions, trust scores, share links, audit events, and goals.
+   */
+  async exportUserData(userId: string) {
+    const [user, addresses, employment, rental, documents, trustScores, sharedProfiles, auditEvents, goals] = await Promise.all([
+      db.user.findUnique({
+        where: { id: userId },
+        include: { profile: true },
+      }),
+      db.userAddress.findMany({ where: { userId } }),
+      db.employmentProfile.findMany({ where: { userId } }),
+      db.rentalProfile.findMany({ where: { userId } }),
+      db.uploadedDocument.findMany({ where: { userId }, select: { id: true, documentType: true, verificationStatus: true, uploadedAt: true, reviewedAt: true } }),
+      db.trustScore.findMany({ where: { userId }, orderBy: { computedAt: 'desc' } }),
+      db.sharedProfile.findMany({ where: { userId }, select: { id: true, targetType: true, expiresAt: true, viewCount: true, createdAt: true, revokedAt: true } }),
+      db.auditEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 200 }),
+      db.consumerGoal.findMany({ where: { userId } }),
+    ])
+
+    // Bank data (connections, accounts, transactions)
+    const bankConnections = await db.bankConnection.findMany({
+      where: { userId },
+      include: {
+        bankAccounts: {
+          include: {
+            transactions: { orderBy: { bookedAt: 'desc' }, take: 500 },
+          },
+        },
+      },
+    })
+
+    return {
+      exportedAt: new Date().toISOString(),
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+            createdAt: user.createdAt,
+            profile: user.profile,
+          }
+        : null,
+      addresses,
+      employment,
+      rental,
+      documents,
+      bankConnections: bankConnections.map((c) => ({
+        ...c,
+        accessToken: undefined,
+        refreshToken: undefined,
+      })),
+      trustScores,
+      sharedProfiles,
+      auditEvents,
+      goals,
+    }
+  }
+
+  /**
+   * Permanently delete the user and all their data.
+   * - Revokes all share links first (so recipients can't access stale data).
+   * - Hard-deletes the User row (cascades to all owned data per schema).
+   * - The Clerk user is deleted separately from the frontend via Clerk's
+   *   user.delete() after this succeeds.
+   * - Audit logs the deletion intent before the user row is gone.
+   */
+  async deleteAccount(userId: string) {
+    // Revoke all active share links before deletion
+    await db.sharedProfile.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+
+    // Log the deletion intent (the audit event is user-scoped, so it cascades
+    // — we log it, it's deleted with the user, but the intent is captured).
+    this.audit.log(userId, 'account.deleted')
+
+    // Hard-delete the user — cascades to profile, addresses, employment,
+    // bank connections/accounts/transactions, documents, trust scores, share
+    // links, audit events, goals, etc. per the schema's onDelete: Cascade.
+    await db.user.delete({ where: { id: userId } })
+  }
+
   private finiteNumber(value: number | null | undefined): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined
   }
