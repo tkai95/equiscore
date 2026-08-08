@@ -22,6 +22,26 @@ export class AuthService {
 
   async syncUser(clerkId: string, email: string | undefined) {
     const resolvedEmail = (email || (await this.fetchEmailFromClerk(clerkId))).trim().toLowerCase()
+
+    // A user may already exist with this email under a DIFFERENT authProviderId
+    // — most commonly when the same email signs in from two Clerk instances
+    // (e.g. dev and prod) that share a database. The naive upsert-by-clerkId
+    // would try to create a second row and hit the email unique constraint.
+    // Resolve that first: if a row exists for this email, re-link it to the
+    // current clerkId (the identity is the same person).
+    const existingByEmail = await db.user.findUnique({ where: { email: resolvedEmail } })
+    if (existingByEmail && existingByEmail.authProviderId !== clerkId) {
+      const relinked = await db.user.update({
+        where: { id: existingByEmail.id },
+        data: { authProviderId: clerkId },
+        include: { profile: true },
+      })
+      if (!relinked.profile) {
+        await db.userProfile.create({ data: { userId: relinked.id, profileStage: 'created' } })
+      }
+      return relinked
+    }
+
     const user = await db.user.upsert({
       where: { authProviderId: clerkId },
       update: { email: resolvedEmail },
