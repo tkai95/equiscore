@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { api } from '@/lib/api'
+import { track } from '@/lib/analytics'
 import { step1Schema, step2Schema, step3Schema, step4Schema } from '@equiscore/shared'
 import type { Step1Data, Step2Data, Step3Data, Step4Data } from '@equiscore/shared'
 import { Step1Personal } from './step-1-personal'
@@ -38,6 +39,11 @@ export function OnboardingWizard() {
 
   const form = useForm({ resolver: zodResolver(currentSchema as never), mode: 'onChange' })
 
+  // Fire onboarding_started once when the wizard first loads
+  useEffect(() => {
+    track('onboarding_started')
+  }, [])
+
   const pendingRequestToken =
     searchParams.get('request') ??
     (typeof window !== 'undefined'
@@ -53,6 +59,7 @@ export function OnboardingWizard() {
   ) => {
     const token = await getToken()
     await api.profile.completeOnboarding(token!, data)
+    track('onboarding_completed')
     if (pendingRequestToken && typeof window !== 'undefined') {
       window.localStorage.removeItem('equiscore:pending-assessment-request')
     }
@@ -64,6 +71,7 @@ export function OnboardingWizard() {
     setFormData(merged)
 
     if (step < 4) {
+      track('onboarding_step_completed', { step })
       setStep(step + 1)
       return
     }

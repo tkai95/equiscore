@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isOpenSite } from '@/lib/site'
+import { track } from '@/lib/analytics'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -392,6 +393,7 @@ export function RegisterInterestModal({ open, onOpenChange }: RegisterInterestMo
 
       if (!res.ok) throw new Error('Failed')
       setSubmittedEmail((profileType === 'individual' ? indData.email : bizData.email).trim().toLowerCase())
+      track('waitlist_submitted', { profile_type: profileType ?? 'unknown' })
       setStep(TOTAL_STEPS + 1)
     } catch {
       setSubmitError('Something went wrong. Please try again.')

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useUser, useClerk } from '@clerk/nextjs'
 import { User, Settings, LifeBuoy, LogOut, ChevronUp } from 'lucide-react'
+import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 
 // EquiScore-owned account menu. Replaces the Clerk <UserButton> entirely —
@@ -16,9 +17,9 @@ import { cn } from '@/lib/utils'
 //   - Clerk UI is never launched from this menu.
 
 const MENU_ITEMS = [
-  { label: 'Profile', icon: User, href: '/dashboard/profile' },
-  { label: 'Settings', icon: Settings, href: '/dashboard/settings' },
-  { label: 'Help & support', icon: LifeBuoy, href: '/dashboard/support' },
+  { label: 'Profile', icon: User, href: '/dashboard/profile', event: 'account_menu_profile_clicked' as const },
+  { label: 'Settings', icon: Settings, href: '/dashboard/settings', event: 'account_menu_settings_clicked' as const },
+  { label: 'Help & support', icon: LifeBuoy, href: '/dashboard/support', event: undefined },
 ] as const
 
 export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
@@ -37,6 +38,11 @@ export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  // Fire account_menu_opened when the menu opens
+  useEffect(() => {
+    if (open) track('account_menu_opened')
   }, [open])
 
   // Close on Escape
@@ -143,11 +149,14 @@ function AccountMenuPanel({
 
       {/* Menu items */}
       <div className="p-2">
-        {MENU_ITEMS.map(({ label, icon: Icon, href }) => (
+        {MENU_ITEMS.map(({ label, icon: Icon, href, event }) => (
           <Link
             key={href}
             href={href}
-            onClick={onNavigate}
+            onClick={() => {
+              if (event) track(event)
+              onNavigate()
+            }}
             className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
           >
             <Icon className="h-4 w-4 shrink-0 text-white/60" />
@@ -162,7 +171,10 @@ function AccountMenuPanel({
       {/* Sign out */}
       <div className="p-2">
         <button
-          onClick={onSignOut}
+          onClick={() => {
+            track('account_menu_signout_clicked')
+            onSignOut()
+          }}
           className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10"
         >
           <LogOut className="h-4 w-4 shrink-0" />
