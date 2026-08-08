@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { Menu, X, ChevronDown } from 'lucide-react'
+import { SignedOut } from '@clerk/nextjs'
 import { hasAuth, showWaitlist } from '@/lib/site'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
 
@@ -220,10 +221,16 @@ export function LandingNav({ dark = false }: LandingNavProps) {
           </div>
         </div>
 
-        {/* Desktop CTAs — auth CTAs on authed builds, waitlist on public/open */}
+        {/* Desktop CTAs — auth CTAs on authed builds, waitlist on public/open.
+            The waitlist button is signed-out-only (a signed-in user is already
+            past it) and never on the invitation (dev) site. */}
         <div className="hidden items-center gap-3 md:flex">
           {hasAuth ? <NavAuthCTAs /> : null}
-          {showWaitlist ? (
+          {showWaitlist && hasAuth ? (
+            <SignedOut>
+              <RegisterInterestButton label="Join the waitlist" variant="primary" />
+            </SignedOut>
+          ) : showWaitlist ? (
             <RegisterInterestButton label="Join the waitlist" variant="primary" />
           ) : null}
         </div>
@@ -264,7 +271,11 @@ export function LandingNav({ dark = false }: LandingNavProps) {
           </div>
           <div className="mt-4 flex flex-col gap-3 border-t border-ink-border pt-4">
             {hasAuth ? <NavAuthMobileCTAs onClose={closeAll} /> : null}
-            {showWaitlist ? (
+            {showWaitlist && hasAuth ? (
+              <SignedOut>
+                <RegisterInterestButton label="Join the waitlist" variant="primary" />
+              </SignedOut>
+            ) : showWaitlist ? (
               <RegisterInterestButton label="Join the waitlist" variant="primary" />
             ) : null}
           </div>
