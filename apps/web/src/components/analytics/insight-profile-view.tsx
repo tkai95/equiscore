@@ -280,7 +280,7 @@ export function InsightProfileView() {
         <ShieldCheck className="mx-auto h-8 w-8 text-content-muted" />
         <p className="mt-3 text-sm font-medium text-content">No financial evidence yet</p>
         <p className="mt-1 text-xs text-content-muted">
-          Connect a bank account or upload a statement to build your insight profile.
+          Upload a bank statement to build your insight profile.
         </p>
       </UICard>
     )

@@ -27,7 +27,13 @@ async function bootstrap() {
       'https://dev.equiscore.app',
       'https://admin.equiscore.app',
       'https://partners.equiscore.app',
+      // Production + staging + their www variants. The frontend may be served
+      // from either the apex or www; both must be CORS-allowed or every
+      // authenticated request fails with a generic "couldn't save" error.
       'https://equiscore.app',
+      'https://www.equiscore.app',
+      'https://staged.equiscore.app',
+      'https://www.staged.equiscore.app',
     ])
   )
   app.enableCors({

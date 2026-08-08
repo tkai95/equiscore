@@ -13,8 +13,8 @@ import {
   User,
   Settings,
   ChevronDown,
-  Target,
   Wallet,
+  Target,
   LifeBuoy,
   Lock,
   PanelLeftClose,
@@ -24,6 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { showGoals } from '@/lib/site'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
 import { useActionItems } from '@/lib/use-action-items'
 
@@ -81,14 +82,16 @@ function SidebarNav({
       ))}
 
       <div className="pt-2" />
-      <NavLink
-        href="/dashboard/goals"
-        label="Goals"
-        icon={Target}
-        pathname={pathname}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
+      {showGoals && (
+        <NavLink
+          href="/dashboard/goals"
+          label="Goals"
+          icon={Target}
+          pathname={pathname}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      )}
       <NavLink
         href="/dashboard/my-money"
         label="My Money"

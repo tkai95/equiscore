@@ -5,15 +5,18 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { Menu, X, ChevronDown } from 'lucide-react'
-import { isPublicSite } from '@/lib/site'
+import { hasAuth, showWaitlist } from '@/lib/site'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
 
-const DevNavCTAs = dynamic(
-  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevNavCTAs),
+// Auth CTAs (Sign in / Build my profile / dashboard) are only mounted on authed
+// builds, so they're dynamically imported and SSR-skipped to avoid pulling
+// Clerk into the public marketing bundle.
+const NavAuthCTAs = dynamic(
+  () => import('@/components/landing/auth-ctas').then((m) => m.NavAuthCTAs),
   { ssr: false },
 )
-const DevNavMobileCTAs = dynamic(
-  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevNavMobileCTAs),
+const NavAuthMobileCTAs = dynamic(
+  () => import('@/components/landing/auth-ctas').then((m) => m.NavAuthMobileCTAs),
   { ssr: false },
 )
 
@@ -217,13 +220,12 @@ export function LandingNav({ dark = false }: LandingNavProps) {
           </div>
         </div>
 
-        {/* Desktop CTAs */}
-        <div className="hidden items-center md:flex">
-          {isPublicSite ? (
+        {/* Desktop CTAs — auth CTAs on authed builds, waitlist on public/open */}
+        <div className="hidden items-center gap-3 md:flex">
+          {hasAuth ? <NavAuthCTAs /> : null}
+          {showWaitlist ? (
             <RegisterInterestButton label="Join the waitlist" variant="primary" />
-          ) : (
-            <DevNavCTAs />
-          )}
+          ) : null}
         </div>
 
         {/* Mobile hamburger */}
@@ -260,12 +262,11 @@ export function LandingNav({ dark = false }: LandingNavProps) {
               </div>
             ))}
           </div>
-          <div className="mt-4 border-t border-ink-border pt-4">
-            {isPublicSite ? (
+          <div className="mt-4 flex flex-col gap-3 border-t border-ink-border pt-4">
+            {hasAuth ? <NavAuthMobileCTAs onClose={closeAll} /> : null}
+            {showWaitlist ? (
               <RegisterInterestButton label="Join the waitlist" variant="primary" />
-            ) : (
-              <DevNavMobileCTAs onClose={closeAll} />
-            )}
+            ) : null}
           </div>
         </div>
       )}

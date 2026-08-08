@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import {
   Home,
   Briefcase,
@@ -320,7 +320,7 @@ export default function GigWorkersPage() {
               Build a verified Trust Portfolio using your actual earnings history. No payslips required.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               ) : (
                 <Link

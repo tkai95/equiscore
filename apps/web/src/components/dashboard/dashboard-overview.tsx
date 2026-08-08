@@ -297,11 +297,11 @@ export function DashboardOverview() {
           ) : (
             <div className="mt-6">
               <p className="text-sm leading-relaxed text-content-secondary">
-                Your Trust Profile is a verified, reusable financial profile. Connect a bank or
-                upload a statement to build it from real financial evidence.
+                Your Trust Profile is a verified, reusable financial profile. Upload a bank statement
+                to build it from real financial evidence.
               </p>
               <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
-                Connect bank account <ArrowRight className="h-4 w-4" />
+                Upload a statement <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           )}
@@ -359,13 +359,13 @@ export function DashboardOverview() {
               <p className="mt-2 text-sm leading-relaxed text-content-secondary">
                 {hasScore
                   ? 'No outstanding actions. You can share your Trust Profile whenever you need to.'
-                  : 'Connect a bank account to generate your assessment.'}
+                  : 'Upload a bank statement to generate your assessment.'}
               </p>
               <Link
                 href={hasScore ? '/dashboard/share' : '/dashboard/connections'}
                 className={buttonClasses('primary', 'md', 'mt-5')}
               >
-                {hasScore ? 'Create a share' : 'Connect bank account'}
+                {hasScore ? 'Create a share' : 'Upload a statement'}
               </Link>
             </div>
           )}
@@ -465,7 +465,7 @@ function PortfolioStatusPanel({
           : DIMENSION_STATUS.action_required,
       weight: hasActiveBank ? 1 : hasAnyBank ? 0.5 : 0,
       href: '/dashboard/connections',
-      action: hasAnyBank ? 'Manage' : 'Connect bank',
+      action: hasAnyBank ? 'Manage' : 'Upload statement',
     },
     {
       area: 'Income',
@@ -747,7 +747,7 @@ function AffordabilityCard({
           href="/dashboard/connections"
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-900 hover:underline"
         >
-          Connect bank account <ArrowRight className="h-3.5 w-3.5" />
+          Upload a statement <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </Panel>
     )
@@ -866,7 +866,8 @@ function ConnectedEvidence({
         ))}
       </div>
       <p className="mt-3 text-xs text-content-muted">
-        Connected Open Banking data counts as verified evidence, alongside any uploaded documents.
+        Connected bank data and uploaded statements count as verified evidence, alongside any
+        uploaded documents.
       </p>
     </Panel>
   )

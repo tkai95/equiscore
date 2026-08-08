@@ -83,8 +83,8 @@ export function Step4Rental({ form }: Props) {
       </div>
 
       <div className="rounded-panel bg-surface-inset p-4 text-sm text-content-secondary">
-        You can improve your profile at any time by connecting a bank account and uploading
-        supporting documents. Your score improves as we verify more information.
+        You can improve your profile at any time by uploading a bank statement and supporting
+        documents. Your score improves as we verify more information.
       </div>
     </div>
   )

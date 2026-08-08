@@ -77,7 +77,7 @@ export function InsightsCard({
 
       {!hasData && !isLoading && (
         <p className="text-sm text-gray-500">
-          Connect a bank account to generate personalised insights.
+          Upload a bank statement to generate personalised insights.
         </p>
       )}
 

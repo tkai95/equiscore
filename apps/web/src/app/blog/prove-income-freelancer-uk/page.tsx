@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import { ArrowRight, Lock } from 'lucide-react'
 
 export default function ProveIncomeFreelancerUKPage() {
@@ -151,7 +151,7 @@ export default function ProveIncomeFreelancerUKPage() {
               Equiscore builds a verified Trust Portfolio using open banking data, giving non-PAYE earners a structured, shareable record of their income pattern.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               ) : (
                 <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-xl bg-teal px-7 py-3.5 text-base font-semibold text-ink hover:bg-teal-dark">

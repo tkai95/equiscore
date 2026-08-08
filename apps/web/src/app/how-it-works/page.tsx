@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import {
   ArrowRight,
   Lock,
@@ -275,7 +275,7 @@ export default function HowItWorksPage() {
               Takes about 15 minutes. Your data is encrypted and private. You choose exactly who sees your profile and when.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               ) : (
                 <Link

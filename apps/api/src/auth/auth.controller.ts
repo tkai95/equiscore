@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
@@ -24,5 +24,19 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user' })
   async me(@CurrentUser() user: RequestUser) {
     return this.authService.getMe(user.clerkId)
+  }
+
+  @Get('dev-invite')
+  @ApiOperation({ summary: 'Validate a dev site sign-up invite token' })
+  async devInvite(@Query('token') token?: string) {
+    return this.authService.validateDevInvite(token ?? '')
+  }
+
+  @Get('dev-access')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check whether the current user has dev site access' })
+  async devAccess(@CurrentUser() user: RequestUser) {
+    return this.authService.checkDevAccess(user.clerkId, user.email)
   }
 }

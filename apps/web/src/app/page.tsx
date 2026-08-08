@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
 import {
   ArrowRight,
@@ -21,12 +21,12 @@ import {
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 
-const DevHeroCTAs = dynamic(
-  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevHeroCTAs),
+const HeroAuthCTAs = dynamic(
+  () => import('@/components/landing/auth-ctas').then((m) => m.HeroAuthCTAs),
   { ssr: false },
 )
-const DevBottomCTA = dynamic(
-  () => import('@/components/landing/dev-clerk-ctas').then((m) => m.DevBottomCTA),
+const BottomAuthCTA = dynamic(
+  () => import('@/components/landing/auth-ctas').then((m) => m.BottomAuthCTA),
   { ssr: false },
 )
 
@@ -194,7 +194,7 @@ export default function LandingPage() {
               </p>
 
               <div className="flex flex-col gap-4 sm:flex-row">
-                {isPublicSite ? (
+                {showWaitlist ? (
                   <>
                     <RegisterInterestButton label="Join the waitlist" variant="primary" />
                     <Link
@@ -205,7 +205,7 @@ export default function LandingPage() {
                     </Link>
                   </>
                 ) : (
-                  <DevHeroCTAs />
+                  <HeroAuthCTAs />
                 )}
               </div>
             </div>
@@ -320,7 +320,7 @@ export default function LandingPage() {
               <p className="mb-1 font-bold text-cream">Start with your situation. Build the evidence profile that fits.</p>
               <p className="text-sm text-cream/60">Join the early access list and tell us what you are trying to unlock.</p>
             </div>
-            {isPublicSite ? (
+            {showWaitlist ? (
               <div className="shrink-0">
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               </div>
@@ -427,7 +427,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                 </div>
-                {isPublicSite ? (
+                {showWaitlist ? (
                   <RegisterInterestButton label="Join individual waitlist" variant="primary" />
                 ) : (
                   <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-xl bg-teal px-6 py-3 text-sm font-semibold text-ink hover:bg-teal-dark">
@@ -502,10 +502,10 @@ export default function LandingPage() {
               </h2>
               <p className="text-cream">Register for early access and follow the launch of Equiscore.</p>
             </div>
-            {isPublicSite ? (
+            {showWaitlist ? (
               <RegisterInterestButton label="Join the waitlist" variant="primary" />
             ) : (
-              <DevBottomCTA />
+              <BottomAuthCTA />
             )}
           </div>
         </div>

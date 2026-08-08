@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import { ArrowRight, Lock } from 'lucide-react'
 
 export default function GigWorkersFinancialAccessPage() {
@@ -141,7 +141,7 @@ export default function GigWorkersFinancialAccessPage() {
               Equiscore uses open banking data to verify income patterns over time, giving non-PAYE earners a way to show financial reliability on their own terms.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               ) : (
                 <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-xl bg-teal px-7 py-3.5 text-base font-semibold text-ink hover:bg-teal-dark">

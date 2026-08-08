@@ -101,8 +101,8 @@ const DIM_META: Record<DimKey, { assessed: string[]; improve: string[] }> = {
     improve: ['Set your profile name to your legal name as it appears at the bank', 'Reconnect the correct account, or upload proof of ID / address'],
   },
   verificationStrengthScore: {
-    assessed: ['Whether evidence is Open Banking (strongest) or an uploaded statement', 'Number of verified sources', 'Uploaded documents'],
-    improve: ['Connect a bank via Open Banking', 'Upload an ID or proof of address'],
+    assessed: ['Whether evidence is bank-connected or an uploaded statement', 'Number of verified sources', 'Uploaded documents'],
+    improve: ['Upload a bank statement', 'Upload an ID or proof of address'],
   },
   profileCompletenessScore: {
     assessed: ['Profile fields completed (name, DOB, nationality, residency, employment)'],
@@ -209,12 +209,12 @@ export function TrustScoreView() {
         <Card className="text-center" padding="lg">
           <p className="font-semibold text-content">No assessment yet</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-content-secondary">
-            Your Trust Profile is built from real financial evidence. Connect a bank or upload a statement, then
+            Your Trust Profile is built from real financial evidence. Upload a bank statement, then
             generate your assessment.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <Link href="/dashboard/connections" className={buttonClasses('primary')}>
-              Add your bank data
+              Upload a statement
             </Link>
             <Button variant="secondary" loading={recompute.isPending} onClick={() => recompute.mutate()}>
               {recompute.isPending ? 'Generating…' : 'Generate assessment'}
@@ -347,7 +347,7 @@ export function TrustScoreView() {
                   ? 'The name connected to your bank account does not fully match your EquiScore profile. Resolving this raises your verification confidence.'
                   : score.identityConfidenceScore < 50
                     ? 'Add a government photo ID so we can verify your identity — the biggest lever on your tier. A verified ID confirms your name and date of birth.'
-                    : 'Your evidence is statement-only. Connecting Open Banking or adding a document strengthens verification.'}
+                    : 'Adding a verified document (an ID or proof of address) strengthens your verification.'}
               </p>
             </div>
           </div>
@@ -452,7 +452,7 @@ export function TrustScoreView() {
             <ul className="space-y-1.5">
               <Check ok={identityVerified} label="Name matched to the connected account holder" />
               <Check ok={!nameMismatch} label="No name mismatch detected" />
-              <Check ok={evidenceStrong} label="Evidence verified via Open Banking" />
+              <Check ok={evidenceStrong} label="Bank data verified" />
               <Check ok={score.profileCompletenessScore >= 80} label={`Profile ${score.profileCompletenessScore}% complete`} />
             </ul>
           </Accordion>
@@ -470,7 +470,11 @@ export function TrustScoreView() {
               <Fact label="Valid until" value={score.validUntil ? formatDate(score.validUntil) : '—'} />
               <li className="text-sm text-content-secondary">
                 An assessment is valid for up to three months from the latest date its evidence covers.
-                {!evidenceStrong && ' Connecting Open Banking would raise evidence quality from statement-only.'}
+              </li>
+              <li className="text-sm text-content-secondary">
+                <span className="font-medium text-content">Open Banking is coming soon</span> —
+                live, read-only bank connections will offer the strongest verified evidence in a
+                future release. Until then, statements are the primary evidence source.
               </li>
             </ul>
           </Accordion>

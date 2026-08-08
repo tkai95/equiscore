@@ -56,6 +56,10 @@ model User {
   internalAdminInvitationsSent       InternalAdminInvitation[]   @relation("InternalAdminInvitationInviter")
   internalAdminInvitationsAccepted   InternalAdminInvitation[]   @relation("InternalAdminInvitationAccepter")
   internalAdminAuditEvents           InternalAdminAuditEvent[]   @relation("InternalAdminAuditActor")
+  devAccesses                        DevAccess[]                 @relation("DevAccessUser")
+  grantedDevAccesses                 DevAccess[]                 @relation("DevAccessGrantor")
+  devAccessInvitesSent               DevAccessInvite[]           @relation("DevAccessInviteInviter")
+  devAccessInvitesAccepted           DevAccessInvite[]           @relation("DevAccessInviteAccepter")
   commitmentSettings                 CommitmentSetting[]
   reminders                          Reminder[]
   savingsGoals                       SavingsGoal[]
@@ -1287,6 +1291,70 @@ model InternalAdminAuditEvent {
   @@index([organisationId, createdAt])
   @@index([actorUserId, createdAt])
   @@map("internal_admin_audit_events")
+}
+
+// ─── Dev Access (invite-only dev.equiscore.app) ──────────────────────────────
+// Mirrors the internal-admin invitation model. An internal admin authorises an
+// email; the invitee receives a token-in-URL sign-up link
+// (https://dev.equiscore.app/sign-up?invite=<token>). A DevAccess row is
+// created when the invitee first authenticates, and the dev access gate
+// requires it before the dashboard is usable. This keeps dev functional but
+// closed to anyone who wasn't explicitly invited from admin.equiscore.app.
+
+model DevAccessInvite {
+  id           String                @id @default(cuid())
+  email        String
+  token        String                @unique
+  status       DevAccessInviteStatus @default(pending)
+  invitedById  String?               @map("invited_by_id")
+  expiresAt    DateTime              @map("expires_at")
+  acceptedById String?               @map("accepted_by_id")
+  acceptedAt   DateTime?             @map("accepted_at")
+  revokedAt    DateTime?             @map("revoked_at")
+  note         String?
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  invitedBy  User? @relation("DevAccessInviteInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedBy User? @relation("DevAccessInviteAccepter", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([status, expiresAt])
+  @@map("dev_access_invites")
+}
+
+enum DevAccessInviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+
+  @@map("dev_access_invite_status")
+}
+
+model DevAccess {
+  id          String          @id @default(cuid())
+  userId      String          @unique @map("user_id")
+  status      DevAccessStatus @default(active)
+  grantedById String?         @map("granted_by_id")
+  grantedAt   DateTime        @default(now()) @map("granted_at")
+  revokedAt   DateTime?       @map("revoked_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  user      User  @relation("DevAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("DevAccessGrantor", fields: [grantedById], references: [id])
+
+  @@index([status])
+  @@map("dev_access")
+}
+
+enum DevAccessStatus {
+  active
+  suspended
+  revoked
+
+  @@map("dev_access_status")
 }
 
 // ─── Statement Import Jobs ────────────────────────────────────────────────────

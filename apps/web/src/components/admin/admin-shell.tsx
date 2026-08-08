@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
   ShieldCheck,
   UserCog,
+  UserPlus,
   Users,
   X,
   type LucideIcon,
@@ -34,6 +35,7 @@ const ADMIN_NAV = [
   { href: '/admin/usage', label: 'Usage', icon: BarChart3 },
   { href: '/admin/activity', label: 'Activity', icon: Activity },
   { href: '/admin/internal-admins', label: 'Internal admins', icon: UserCog },
+  { href: '/admin/dev-access', label: 'Dev access', icon: UserPlus },
   { href: '/admin/audit', label: 'Admin audit', icon: ClipboardList },
 ]
 

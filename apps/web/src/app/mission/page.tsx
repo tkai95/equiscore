@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { LandingNav } from '@/components/landing/nav'
 import { LandingFooter } from '@/components/landing/footer'
 import { RegisterInterestButton } from '@/components/landing/register-interest-modal'
-import { isPublicSite } from '@/lib/site'
+import { showWaitlist } from "@/lib/site"
 import {
   ArrowRight,
   ShieldCheck,
@@ -179,7 +179,7 @@ export default function MissionPage() {
               Register for early access and be among the first to build a Trust Portfolio when we launch.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {isPublicSite ? (
+              {showWaitlist ? (
                 <RegisterInterestButton label="Join the waitlist" variant="primary" />
               ) : (
                 <Link
