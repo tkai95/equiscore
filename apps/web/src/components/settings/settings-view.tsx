@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth, useUser, useClerk, SignOutButton } from '@clerk/nextjs'
+import { useAuth, useUser, SignOutButton } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import {
@@ -11,9 +11,6 @@ import {
   Lock,
   SlidersHorizontal,
   LogOut,
-  Key,
-  Smartphone,
-  Check,
   X,
   Download,
   AlertTriangle,
@@ -22,6 +19,7 @@ import {
 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import { Card, PageLayout } from '@/components/ui'
+import { SecuritySection } from '@/components/settings/security-section'
 
 type SettingsSection = 'account' | 'security' | 'notifications' | 'privacy' | 'preferences'
 
@@ -176,126 +174,6 @@ function AccountSection() {
         />
       </div>
     </Card>
-  )
-}
-
-// ── Security section ──────────────────────────────────────────────────────
-
-function SecuritySection() {
-  const { user } = useUser()
-  const { signOut, openUserProfile } = useClerk()
-
-  const connectedMethods = [
-    { label: 'Google', connected: !!user?.externalAccounts?.find((a) => a.provider === 'google') },
-    { label: 'Apple', connected: !!user?.externalAccounts?.find((a) => a.provider === 'apple') },
-    { label: 'Email', connected: !!user?.primaryEmailAddress },
-  ].filter((m) => m.connected)
-
-  return (
-    <>
-      {/* Sign-in & security */}
-      <Card padding="none">
-        <div className="border-b border-line-subtle px-5 py-4">
-          <h2 className="text-base font-semibold text-content">Sign-in & security</h2>
-        </div>
-        <div className="px-4 py-2">
-          <SettingsRow
-            icon={Key}
-            title="Password"
-            description={
-              user?.passwordEnabled ? 'Password is set' : 'No password set'
-            }
-            value={user?.passwordEnabled ? 'Set' : 'Not set'}
-            onClick={() => openUserProfile?.()}
-          />
-          <SettingsRow
-            icon={Smartphone}
-            title="2-step verification"
-            description={
-              user?.twoFactorEnabled
-                ? 'Extra layer of security is active'
-                : 'Add an extra layer of security'
-            }
-            value={user?.twoFactorEnabled ? 'Enabled' : 'Not enabled'}
-            onClick={() => openUserProfile?.()}
-          />
-        </div>
-      </Card>
-
-      {/* Connected sign-in methods */}
-      <Card padding="none">
-        <div className="border-b border-line-subtle px-5 py-4">
-          <h2 className="text-base font-semibold text-content">Connected sign-in methods</h2>
-        </div>
-        <div className="px-4 py-2">
-          <SettingsRow
-            icon={UserCog}
-            title="Google"
-            description="Sign in with your Google account"
-            value={
-              user?.externalAccounts?.find((a) => a.provider === 'google')
-                ? 'Connected'
-                : 'Not connected'
-            }
-            action={
-              !user?.externalAccounts?.find((a) => a.provider === 'google') ? (
-                <span className="text-sm font-medium text-brand-900">Connect</span>
-              ) : (
-                <Check className="h-4 w-4 text-success-strong" />
-              )
-            }
-            onClick={() => openUserProfile?.()}
-          />
-          <SettingsRow
-            icon={UserCog}
-            title="Apple"
-            description="Sign in with your Apple account"
-            value={
-              user?.externalAccounts?.find((a) => a.provider === 'apple')
-                ? 'Connected'
-                : 'Not connected'
-            }
-            action={
-              !user?.externalAccounts?.find((a) => a.provider === 'apple') ? (
-                <span className="text-sm font-medium text-brand-900">Connect</span>
-              ) : (
-                <Check className="h-4 w-4 text-success-strong" />
-              )
-            }
-            onClick={() => openUserProfile?.()}
-          />
-          <SettingsRow
-            icon={UserCog}
-            title="Email"
-            description="Your primary email address"
-            value={
-              user?.primaryEmailAddress ? 'Connected' : 'Not connected'
-            }
-            action={<Check className="h-4 w-4 text-success-strong" />}
-          />
-        </div>
-      </Card>
-
-      {/* Session */}
-      <Card padding="none">
-        <div className="border-b border-line-subtle px-5 py-4">
-          <h2 className="text-base font-semibold text-content">Session</h2>
-        </div>
-        <div className="px-4 py-2">
-          <SignOutButton redirectUrl="/sign-in">
-            <button className="flex w-full items-center gap-3 border-b border-line-subtle px-4 py-4 text-left text-danger-strong transition-colors last:border-0 hover:bg-surface-hover">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-danger-soft text-danger-strong">
-                <LogOut className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-danger-strong">Sign out</p>
-                <p className="mt-0.5 text-xs text-danger-strong/80">Sign out of this device</p>
-              </div>
-            </button>
-          </SignOutButton>
-        </div>
-      </Card>
-    </>
   )
 }
 
