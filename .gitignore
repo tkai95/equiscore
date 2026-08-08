@@ -38,3 +38,6 @@ coverage
 
 # Prisma
 prisma/migrations
+
+# TypeScript incremental build info
+*.tsbuildinfo
