@@ -295,7 +295,7 @@ export function TrustScoreView() {
         <div className="flex items-start gap-3 rounded-panel bg-warning-soft px-5 py-3">
           <Clock className="mt-0.5 h-5 w-5 shrink-0 text-warning-strong" />
           <p className="text-sm text-warning-strong">
-            This assessment is based on financial evidence that is no longer current. Refresh your bank data or upload a
+            This assessment is based on financial evidence that is no longer current. Upload a
             newer statement to bring it up to date.
           </p>
         </div>

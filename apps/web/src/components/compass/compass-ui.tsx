@@ -104,12 +104,23 @@ export function Bar({ value, tone = 'brand' }: { value: number; tone?: 'brand' |
   )
 }
 
-export function EmptyState({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+export function EmptyState({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: React.ReactNode
+  title: string
+  body: string
+  action?: React.ReactNode
+}) {
   return (
     <div className="rounded-card border border-dashed border-line bg-surface-card p-10 text-center">
       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center text-content-muted">{icon}</div>
       <p className="text-sm font-medium text-content">{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-content-secondary">{body}</p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   )
 }

@@ -21,15 +21,18 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const stage = me?.profile?.profileStage
-  const profileStarted = stage && stage !== 'created'
+  // Profile is "started" once onboarding has been completed at least once
+  // (stage advances from 'created' to 'profile_building'). A null `me` (no DB
+  // row yet) also counts as not-started — onboarding triggers the lazy sync.
+  const profileStarted = !!stage && stage !== 'created'
 
   useEffect(() => {
     // Only redirect once we're certain: auth resolved, user signed in, profile
-    // fetched, and it's still at the pre-onboarding stage.
-    if (isLoaded && userId && !isLoading && me && !profileStarted) {
+    // fetch finished (not loading), and onboarding hasn't been completed.
+    if (isLoaded && userId && !isLoading && !profileStarted) {
       router.replace('/onboarding')
     }
-  }, [isLoaded, userId, isLoading, me, profileStarted, router])
+  }, [isLoaded, userId, isLoading, profileStarted, router])
 
   // Still resolving auth or profile — render a neutral loader so the dashboard
   // never flashes for a half-finished onboarding user.

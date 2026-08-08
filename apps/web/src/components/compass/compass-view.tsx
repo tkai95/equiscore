@@ -18,6 +18,7 @@ import type { CompassPayload } from '@/lib/compass-types'
 import { useMe } from '@/lib/use-me'
 import { useCompassActions } from '@/lib/use-compass'
 import { cn } from '@/lib/utils'
+import { buttonClasses } from '@/components/ui'
 import { BreakdownDrawer, type DrawerSpec } from '@/components/analytics/breakdown-drawer'
 import { Card, EmptyState } from './compass-ui'
 import {
@@ -222,7 +223,12 @@ function NoData() {
     <EmptyState
       icon={<Wallet className="h-8 w-8" />}
       title="My Money needs some financial evidence first"
-      body="Connect a bank account or upload a statement to map your income, spending, bills and savings."
+      body="Upload a bank statement to map your income, spending, bills and savings."
+      action={
+        <Link href="/dashboard/connections" className={buttonClasses('primary')}>
+          Upload a statement
+        </Link>
+      }
     />
   )
 }
