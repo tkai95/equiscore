@@ -57,6 +57,12 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1')
 
+  // Global exception filter — logs the full stack trace for non-HTTP exceptions
+  // (the real crashes) so they show up in Railway logs instead of being swallowed
+  // as a generic 500.
+  const { GlobalExceptionFilter } = await import('./common/filters/http-exception.filter')
+  app.useGlobalFilters(new GlobalExceptionFilter())
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
