@@ -142,14 +142,22 @@ export class ProfileService {
   }
 
   async updateProfile(userId: string, data: UpdateProfileData) {
+    // If firstName/lastName are provided, derive fullName from them for backcompat.
+    const fullName =
+      data.firstName || data.lastName
+        ? [data.firstName, data.lastName].filter(Boolean).join(' ').trim() || undefined
+        : data.fullName
+
     const updated = await db.userProfile.update({
       where: { userId },
       data: {
-        fullName: data.fullName,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        fullName,
         dob: data.dob ? new Date(data.dob) : undefined,
         nationality: data.nationality,
-        residencyStatus: data.residencyStatus,
-        employmentType: data.employmentType,
+        residencyStatus: data.residencyStatus as never,
+        employmentType: data.employmentType as never,
         monthlyIncomeDeclared: data.monthlyIncomeDeclared,
         monthlyRentDeclared: data.monthlyRentDeclared,
       },

@@ -9,9 +9,9 @@ import { api } from '@/lib/api'
 import { updateProfileSchema } from '@equiscore/shared'
 import type { UpdateProfileData } from '@equiscore/shared'
 import Link from 'next/link'
-import { User, MapPin, Briefcase, Edit2, Check, X, type LucideIcon } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
-import { Button, buttonClasses, Card, PageLayout, PageTitle } from '@/components/ui'
+import { User, MapPin, Briefcase, Edit2, type LucideIcon } from 'lucide-react'
+import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { Button, buttonClasses, Card, PageLayout, Drawer } from '@/components/ui'
 
 const RESIDENCY_LABELS: Record<string, string> = {
   british_citizen: 'British Citizen',
@@ -36,6 +36,8 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
 }
 
 interface UserProfile {
+  firstName: string | null
+  lastName: string | null
   fullName: string | null
   dob: string | null
   nationality: string | null
@@ -63,16 +65,18 @@ interface Employment {
   isCurrent: boolean
 }
 
-/** Report-style panel: icon chip + heading, hairline divider, then content. */
-function Panel({
+// ── Shared primitives ─────────────────────────────────────────────────────
+
+/** Profile section card: icon + title + Edit button, then content. */
+function ProfileSectionCard({
   icon: Icon,
   title,
-  action,
+  onEdit,
   children,
 }: {
   icon: LucideIcon
   title: string
-  action?: React.ReactNode
+  onEdit?: () => void
   children: React.ReactNode
 }) {
   return (
@@ -84,59 +88,73 @@ function Panel({
           </span>
           <h2 className="text-base font-semibold text-content">{title}</h2>
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {onEdit && (
+          <Button variant="secondary" size="sm" onClick={onEdit}>
+            <Edit2 className="h-3 w-3" />
+            Edit
+          </Button>
+        )}
       </div>
       <div className="px-5 py-5">{children}</div>
     </Card>
   )
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+/** A single labelled value. Empty values show "Not added" instead of a dash. */
+function ProfileField({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const display = value != null && value !== '' ? value : null
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-content-muted">{label}</dt>
-      <dd className="mt-1 text-sm text-content">{value ?? '—'}</dd>
+      <dt className="text-sm font-medium text-content-muted">{label}</dt>
+      <dd className={cn('mt-0.5 text-sm', display ? 'text-content' : 'text-content-muted/70')}>
+        {display ?? 'Not added'}
+      </dd>
     </div>
   )
 }
 
-function EditForm({
+const inputClass =
+  'w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
+const labelClass = 'mb-1.5 block text-sm font-medium text-content'
+
+// ── Edit drawers ──────────────────────────────────────────────────────────
+
+function EditPersonalDrawer({
   profile,
+  open,
+  onOpenChange,
   onSave,
-  onCancel,
   isPending,
 }: {
   profile: UserProfile
+  open: boolean
+  onOpenChange: (o: boolean) => void
   onSave: (data: UpdateProfileData) => void
-  onCancel: () => void
   isPending: boolean
 }) {
   const form = useForm<UpdateProfileData>({
     resolver: zodResolver(updateProfileSchema),
     defaultValues: {
-      fullName: profile.fullName ?? '',
+      firstName: profile.firstName ?? '',
+      lastName: profile.lastName ?? '',
       dob: profile.dob ? profile.dob.slice(0, 10) : '',
       nationality: profile.nationality ?? '',
       residencyStatus: (profile.residencyStatus as UpdateProfileData['residencyStatus']) ?? undefined,
-      employmentType: (profile.employmentType as UpdateProfileData['employmentType']) ?? undefined,
-      monthlyIncomeDeclared: profile.monthlyIncomeDeclared ?? undefined,
-      monthlyRentDeclared: profile.monthlyRentDeclared ?? undefined,
     },
   })
 
-  const inputClass =
-    'w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
-  const labelClass = 'mb-1.5 block text-sm font-medium text-content'
-
   return (
-    <form onSubmit={form.handleSubmit(onSave)} className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelClass}>Full name</label>
-          <input {...form.register('fullName')} className={inputClass} />
-          {form.formState.errors.fullName && (
-            <p className="mt-1 text-xs text-danger-strong">{form.formState.errors.fullName.message}</p>
-          )}
+    <Drawer open={open} onOpenChange={onOpenChange} title="Edit personal information" subtitle="Update your personal details and how EquiScore identifies you.">
+      <form onSubmit={form.handleSubmit(onSave)} className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>First name</label>
+            <input {...form.register('firstName')} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Last name</label>
+            <input {...form.register('lastName')} className={inputClass} />
+          </div>
         </div>
         <div>
           <label className={labelClass}>Date of birth</label>
@@ -144,7 +162,7 @@ function EditForm({
         </div>
         <div>
           <label className={labelClass}>Nationality</label>
-          <input {...form.register('nationality')} className={inputClass} />
+          <input {...form.register('nationality')} className={inputClass} placeholder="e.g. British, Nigerian" />
         </div>
         <div>
           <label className={labelClass}>Residency status</label>
@@ -155,6 +173,45 @@ function EditForm({
             ))}
           </select>
         </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-line-subtle pt-4">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={isPending}>
+            {isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </form>
+    </Drawer>
+  )
+}
+
+function EditEmploymentDrawer({
+  profile,
+  open,
+  onOpenChange,
+  onSave,
+  isPending,
+}: {
+  profile: UserProfile
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSave: (data: UpdateProfileData) => void
+  isPending: boolean
+}) {
+  const form = useForm<UpdateProfileData>({
+    resolver: zodResolver(updateProfileSchema),
+    defaultValues: {
+      employmentType: (profile.employmentType as UpdateProfileData['employmentType']) ?? undefined,
+      monthlyIncomeDeclared: profile.monthlyIncomeDeclared ?? undefined,
+      monthlyRentDeclared: profile.monthlyRentDeclared ?? undefined,
+    },
+  })
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange} title="Edit employment & income" subtitle="Update your employment status and declared income.">
+      <form onSubmit={form.handleSubmit(onSave)} className="space-y-5">
         <div>
           <label className={labelClass}>Employment type</label>
           <select {...form.register('employmentType')} className={inputClass}>
@@ -166,44 +223,33 @@ function EditForm({
         </div>
         <div>
           <label className={labelClass}>Monthly income (£)</label>
-          <input
-            type="number"
-            step="1"
-            min="0"
-            {...form.register('monthlyIncomeDeclared', { valueAsNumber: true })}
-            className={inputClass}
-          />
+          <input type="number" step="1" min="0" {...form.register('monthlyIncomeDeclared', { valueAsNumber: true })} className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Monthly rent (£)</label>
-          <input
-            type="number"
-            step="1"
-            min="0"
-            {...form.register('monthlyRentDeclared', { valueAsNumber: true })}
-            className={inputClass}
-          />
+          <input type="number" step="1" min="0" {...form.register('monthlyRentDeclared', { valueAsNumber: true })} className={inputClass} />
         </div>
-      </div>
 
-      <div className="flex items-center justify-end gap-3 border-t border-line-subtle pt-4">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          <X className="h-3.5 w-3.5" />
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" loading={isPending}>
-          {!isPending && <Check className="h-3.5 w-3.5" />}
-          {isPending ? 'Saving…' : 'Save changes'}
-        </Button>
-      </div>
-    </form>
+        <div className="flex items-center justify-end gap-3 border-t border-line-subtle pt-4">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={isPending}>
+            {isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </form>
+    </Drawer>
   )
 }
+
+// ── Main view ─────────────────────────────────────────────────────────────
 
 export function ProfileView() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
-  const [isEditing, setIsEditing] = useState(false)
+  const [personalOpen, setPersonalOpen] = useState(false)
+  const [employmentOpen, setEmploymentOpen] = useState(false)
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile'],
@@ -236,12 +282,16 @@ export function ProfileView() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['profile'] })
-      setIsEditing(false)
+      setPersonalOpen(false)
+      setEmploymentOpen(false)
     },
   })
 
   const currentAddress = addresses.find((a) => a.isCurrent)
   const currentEmployment = employment.find((e) => e.isCurrent)
+  const displayName = profile?.firstName || profile?.lastName
+    ? [profile?.firstName, profile?.lastName].filter(Boolean).join(' ')
+    : profile?.fullName
 
   if (profileLoading) {
     return (
@@ -268,93 +318,84 @@ export function ProfileView() {
 
   return (
     <PageLayout>
+      {/* Header */}
       <div>
-        <PageTitle>My profile</PageTitle>
-        <p className="mt-1 text-sm text-content-secondary">Last updated {formatDate(profile.updatedAt)}</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-content">My profile</h1>
+        <p className="mt-1 text-sm text-content-secondary">
+          Information used to build your Trust Profile.
+          {profile.updatedAt && (
+            <span className="text-content-muted"> · Last updated {formatDate(profile.updatedAt)}</span>
+          )}
+        </p>
       </div>
 
-      {/* Personal info */}
-      {!isEditing ? (
-        <Panel
-          icon={User}
-          title="Personal information"
-          action={
-            <Button variant="secondary" size="sm" onClick={() => setIsEditing(true)}>
-              <Edit2 className="h-3 w-3" />
-              Edit
-            </Button>
-          }
-        >
-          <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Full name" value={profile.fullName} />
-            <Field label="Date of birth" value={profile.dob ? formatDate(profile.dob) : null} />
-            <Field label="Nationality" value={profile.nationality} />
-            <Field
-              label="Residency status"
-              value={profile.residencyStatus ? RESIDENCY_LABELS[profile.residencyStatus] : null}
-            />
-            <Field
-              label="Employment type"
-              value={profile.employmentType ? EMPLOYMENT_LABELS[profile.employmentType] : null}
-            />
-            <Field
-              label="Monthly income"
-              value={profile.monthlyIncomeDeclared != null ? formatCurrency(profile.monthlyIncomeDeclared) : null}
-            />
-            <Field
-              label="Monthly rent"
-              value={profile.monthlyRentDeclared != null ? formatCurrency(profile.monthlyRentDeclared) : null}
-            />
-          </dl>
-        </Panel>
-      ) : (
-        <Panel icon={User} title="Edit personal information">
-          <EditForm
-            profile={profile}
-            onSave={(data) => updateMutation.mutate(data)}
-            onCancel={() => setIsEditing(false)}
-            isPending={updateMutation.isPending}
+      {/* Personal information */}
+      <ProfileSectionCard icon={User} title="Personal information" onEdit={() => setPersonalOpen(true)}>
+        <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2">
+          <ProfileField label="First name" value={profile.firstName} />
+          <ProfileField label="Last name" value={profile.lastName} />
+          <ProfileField label="Date of birth" value={profile.dob ? formatDate(profile.dob) : null} />
+          <ProfileField label="Nationality" value={profile.nationality} />
+          <ProfileField
+            label="Residency status"
+            value={profile.residencyStatus ? RESIDENCY_LABELS[profile.residencyStatus] : null}
           />
-          {updateMutation.isError && (
-            <p className="mt-3 text-sm text-danger-strong">
-              Failed to save — {(updateMutation.error as Error).message}
-            </p>
-          )}
-        </Panel>
-      )}
+        </dl>
+      </ProfileSectionCard>
 
-      {/* Address */}
-      <Panel icon={MapPin} title="Current address">
+      {/* Current address */}
+      <ProfileSectionCard icon={MapPin} title="Current address">
         {currentAddress ? (
           <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2">
-            <Field label="Address line 1" value={currentAddress.addressLine1} />
-            {currentAddress.addressLine2 && (
-              <Field label="Address line 2" value={currentAddress.addressLine2} />
-            )}
-            <Field label="City" value={currentAddress.city} />
-            <Field label="Postcode" value={currentAddress.postcode} />
+            <ProfileField label="Address line 1" value={currentAddress.addressLine1} />
+            <ProfileField label="Address line 2" value={currentAddress.addressLine2} />
+            <ProfileField label="City" value={currentAddress.city} />
+            <ProfileField label="Postcode" value={currentAddress.postcode} />
           </dl>
         ) : (
-          <p className="text-sm text-content-secondary">No address on record. Complete onboarding to add one.</p>
+          <p className="text-sm text-content-muted">Not added. Complete onboarding to add your address.</p>
         )}
-      </Panel>
+      </ProfileSectionCard>
 
-      {/* Employment detail */}
-      {currentEmployment && (
-        <Panel icon={Briefcase} title="Employment detail">
-          <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
-            <Field
-              label="Employment type"
-              value={EMPLOYMENT_LABELS[currentEmployment.employmentType] ?? currentEmployment.employmentType}
-            />
-            <Field label="Employer" value={currentEmployment.employerName} />
-            <Field label="Job title" value={currentEmployment.jobTitle} />
-            <Field
-              label="Monthly income"
-              value={currentEmployment.monthlyIncomeDeclared != null ? formatCurrency(currentEmployment.monthlyIncomeDeclared) : null}
-            />
-          </dl>
-        </Panel>
+      {/* Employment & income */}
+      <ProfileSectionCard icon={Briefcase} title="Employment & income" onEdit={() => setEmploymentOpen(true)}>
+        <dl className="grid gap-y-4 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+          <ProfileField
+            label="Employment type"
+            value={profile.employmentType ? EMPLOYMENT_LABELS[profile.employmentType] : null}
+          />
+          <ProfileField label="Employer" value={currentEmployment?.employerName} />
+          <ProfileField label="Job title" value={currentEmployment?.jobTitle} />
+          <ProfileField
+            label="Monthly income"
+            value={profile.monthlyIncomeDeclared != null ? formatCurrency(profile.monthlyIncomeDeclared) : null}
+          />
+          <ProfileField
+            label="Monthly rent"
+            value={profile.monthlyRentDeclared != null ? formatCurrency(profile.monthlyRentDeclared) : null}
+          />
+        </dl>
+      </ProfileSectionCard>
+
+      {/* Edit drawers */}
+      <EditPersonalDrawer
+        profile={profile}
+        open={personalOpen}
+        onOpenChange={setPersonalOpen}
+        onSave={(data) => updateMutation.mutate(data)}
+        isPending={updateMutation.isPending}
+      />
+      <EditEmploymentDrawer
+        profile={profile}
+        open={employmentOpen}
+        onOpenChange={setEmploymentOpen}
+        onSave={(data) => updateMutation.mutate(data)}
+        isPending={updateMutation.isPending}
+      />
+      {updateMutation.isError && (
+        <p className="text-sm text-danger-strong">
+          Failed to save — {(updateMutation.error as Error).message}
+        </p>
       )}
     </PageLayout>
   )
