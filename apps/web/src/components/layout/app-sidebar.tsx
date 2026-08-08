@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
 import { useState, useEffect } from 'react'
 import {
   LayoutGrid,
@@ -10,13 +9,9 @@ import {
   ShieldCheck,
   BarChart3,
   Share2,
-  User,
-  Settings,
   ChevronDown,
   Wallet,
   Target,
-  LifeBuoy,
-  Lock,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -26,6 +21,7 @@ import {
 import { cn } from '@/lib/utils'
 import { showGoals } from '@/lib/site'
 import { EquiScoreLogo, EquiScoreMark } from '@/components/brand/logo'
+import { AccountMenu } from '@/components/layout/account-menu'
 import { useActionItems } from '@/lib/use-action-items'
 
 type Leaf = { href: string; label: string; icon: LucideIcon }
@@ -124,44 +120,7 @@ function SidebarNav({
 function SidebarFooter({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div className={cn('border-t border-sidebar-border py-3', collapsed ? 'flex justify-center px-2' : 'px-4')}>
-      <UserButton
-        afterSignOutUrl="/"
-        appearance={{
-          elements: {
-            rootBox: 'w-full',
-            userButtonTrigger: collapsed
-              ? 'flex items-center justify-center rounded-lg p-1.5 hover:bg-sidebar-hover transition-colors'
-              : 'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-muted hover:bg-sidebar-hover hover:text-white transition-colors',
-            userButtonBox: collapsed ? '' : 'flex-row-reverse gap-3',
-            userButtonOuterIdentifier: 'text-sm text-sidebar-text',
-          },
-        }}
-        showName={!collapsed}
-      >
-        {/* Help & support and Privacy & security live in the account menu. */}
-        <UserButton.MenuItems>
-          <UserButton.Link
-            label="Personal details"
-            labelIcon={<User className="h-4 w-4" />}
-            href="/dashboard/profile"
-          />
-          <UserButton.Link
-            label="Account & security"
-            labelIcon={<Settings className="h-4 w-4" />}
-            href="/dashboard/settings"
-          />
-          <UserButton.Link
-            label="Help & support"
-            labelIcon={<LifeBuoy className="h-4 w-4" />}
-            href="/dashboard/support"
-          />
-          <UserButton.Link
-            label="Privacy & security"
-            labelIcon={<Lock className="h-4 w-4" />}
-            href="/dashboard/privacy"
-          />
-        </UserButton.MenuItems>
-      </UserButton>
+      <AccountMenu collapsed={collapsed} />
     </div>
   )
 }
