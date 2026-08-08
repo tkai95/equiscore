@@ -15,10 +15,11 @@ model User {
   email          String     @unique
   authProviderId String     @unique @map("auth_provider_id")
   status         UserStatus @default(active)
-  // Gates the Compass module (financial-coaching layer). Flipped on for
-  // subscribers; default off. Read via /auth/me and enforced by the API guard.
-  // Migration target once real billing exists: Clerk Billing has({plan}).
-  compassEnabled Boolean    @default(false) @map("compass_enabled")
+  // Gates the Compass module (financial-coaching layer). Enabled by default so
+  // My Money works for all users at launch; flip back to false (and add a real
+  // billing check) once Compass becomes a paid tier. Read via /auth/me and
+  // enforced by the API guard.
+  compassEnabled Boolean    @default(true) @map("compass_enabled")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
