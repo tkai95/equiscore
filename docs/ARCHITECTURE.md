@@ -126,6 +126,19 @@ verification*, there must be **exactly one** strategy configured. The
 `<SignUp>` / `<SignIn>` components are intentionally bare (no props) — do not
 add appearance/verification props to "fix" it; fix it in the Dashboard.
 
+### The onboarding funnel is enforced (INVARIANT)
+
+Clerk's `afterSignUpUrl=/onboarding` is only a *suggestion* — a user who
+navigates away could otherwise reach `/dashboard` directly with an empty
+profile. `OnboardingGate` (`apps/web/src/components/layout/onboarding-gate.tsx`)
+wraps the dashboard layout and redirects any signed-in user whose
+`profileStage` is still `created` (or has no profile) back to `/onboarding`.
+`completeOnboarding` advances the stage to `profile_building`, which releases
+the gate. **Do not remove this gate** — without it, new sign-ups see a broken
+dashboard. If you add a new entry route into the dashboard, it inherits this
+gate automatically because it lives in the layout.
+
+
 ---
 
 ## 5. Dev site access (invite-only)
