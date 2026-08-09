@@ -4,7 +4,7 @@ import { db } from '@equiscore/database'
 import { buildInsightProfile, detectInternalTransfers } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
-import { extractTransactionsFromPdf } from './ingest/pdf-extractor'
+import { extractTransactionsFromLargePdf } from './ingest/pdf-extractor'
 import { checkBalanceContinuity } from './engine/integrity'
 import { classify } from './engine/classify'
 import { resolveCategory } from './engine/expenses'
@@ -59,7 +59,7 @@ export class InsightsService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     try {
-      const cutoff = new Date(Date.now() - 3 * 60 * 1000)
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000)
       const reaped = await db.statementImportJob.updateMany({
         where: { status: 'processing', createdAt: { lt: cutoff } },
         data: {
@@ -166,7 +166,18 @@ export class InsightsService implements OnModuleInit {
       const apiKey = process.env['ANTHROPIC_API_KEY']
       if (!apiKey) throw new Error('Statement reading is not available right now.')
 
-      const extraction = await extractTransactionsFromPdf(apiKey, pdfBuffer.toString('base64'))
+      // extractTransactionsFromLargePdf splits into ~15-page chunks, extracts
+      // each via Claude, merges + dedupes the results. Small PDFs take the
+      // identical single-call path. isCancelled lets the user abort between
+      // chunks (checked before each Claude call).
+      const extraction = await extractTransactionsFromLargePdf(
+        apiKey,
+        pdfBuffer.toString('base64'),
+        async () => {
+          const job = await db.statementImportJob.findUnique({ where: { id: jobId } })
+          return !job || job.status === 'cancelled'
+        }
+      )
       this.logger.log(
         `Import ${jobId}: extracted ${extraction.transactions.length} txns in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`
       )
@@ -208,9 +219,10 @@ export class InsightsService implements OnModuleInit {
     }
   }
 
-  // The extractor self-aborts at 5 min, so a live read always resolves (complete
-  // or failed) well within this. Reaching it means the job is genuinely orphaned.
-  private static readonly JOB_STALE_MS = 6 * 60 * 1000
+  // The extractor self-aborts at 5 min per chunk, and a multi-chunk statement
+  // (4 chunks × ~90s) can take ~6 min + overhead. 15 min gives comfortable
+  // headroom for large statements. Reaching it means the job is genuinely orphaned.
+  private static readonly JOB_STALE_MS = 15 * 60 * 1000
 
   /** A job stuck "processing" past the timeout (e.g. a container restart) reads as failed. */
   private withStaleness<T extends { status: string; createdAt: Date }>(job: T): T {

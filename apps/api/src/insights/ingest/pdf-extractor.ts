@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { NormalizedTxn } from '../engine/types'
+import { splitPdfIntoChunks } from './pdf-splitter'
 
 /**
  * PDF bank-statement extraction via Claude vision.
@@ -150,3 +151,86 @@ export async function extractTransactionsFromPdf(
     warnings,
   }
 }
+
+/**
+ * Extract transactions from a PDF that may be too large for a single Claude
+ * call (1,000+ transactions would truncate the 64k output token ceiling).
+ *
+ * Splits the PDF into ~15-page chunks, extracts each via Claude sequentially,
+ * then merges + deduplicates the results into one transaction array. The
+ * integrity check downstream runs once on the full merged set, so balances
+ * still reconcile across the whole document.
+ *
+ * Small statements (≤15 pages) produce a single chunk and take the exact same
+ * code path as extractTransactionsFromPdf — no behaviour change.
+ *
+ * @param isCancelled  optional async check called between chunks; if it
+ *   resolves true, remaining chunks are skipped and whatever has been
+ *   extracted so far is returned with a cancellation warning.
+ */
+export async function extractTransactionsFromLargePdf(
+  apiKey: string,
+  base64Pdf: string,
+  isCancelled?: () => Promise<boolean>,
+): Promise<PdfExtractionResult> {
+  const pdfBuffer = Buffer.from(base64Pdf, 'base64')
+  const { pageCount, chunks } = await splitPdfIntoChunks(pdfBuffer)
+
+  // Single chunk = no merging overhead, identical to the old path.
+  if (chunks.length === 1) {
+    return extractTransactionsFromPdf(apiKey, base64Pdf)
+  }
+
+  console.log(`PDF chunking: ${pageCount} pages → ${chunks.length} chunks`)
+
+  const allTransactions: NormalizedTxn[] = []
+  const warnings: string[] = []
+  let accountHolderName: string | null = null
+
+  for (let i = 0; i < chunks.length; i++) {
+    // Cooperative cancellation between chunks.
+    if (isCancelled && (await isCancelled())) {
+      warnings.push('Import was cancelled — only partial transactions were extracted.')
+      break
+    }
+
+    const chunk = chunks[i]!
+    console.log(`  Extracting chunk ${i + 1}/${chunks.length} (pages ${chunk.startPage + 1}–${chunk.endPage})`)
+
+    const result = await extractTransactionsFromPdf(apiKey, chunk.base64)
+    allTransactions.push(...result.transactions)
+    warnings.push(...result.warnings)
+    if (result.accountHolderName && !accountHolderName) {
+      accountHolderName = result.accountHolderName
+    }
+  }
+
+  // Deduplicate at chunk boundaries: overlapping pages or repeated rows produce
+  // identical (date, amount, direction, description) tuples that would break the
+  // balance-continuity integrity check downstream.
+  const seen = new Set<string>()
+  const deduped = allTransactions.filter((txn) => {
+    const key = `${txn.date}|${txn.amount}|${txn.direction}|${txn.description ?? ''}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  // Sort oldest-first so the integrity check and engine see chronological order.
+  deduped.sort((a, b) => a.date.localeCompare(b.date))
+
+  if (allTransactions.length !== deduped.length) {
+    console.log(`  Deduped ${allTransactions.length - deduped.length} overlapping transactions`)
+  }
+
+  if (deduped.length === 0) {
+    warnings.push('No transactions could be read from this statement.')
+  }
+
+  return {
+    transactions: deduped,
+    accountHolderName,
+    warnings,
+  }
+}
+
