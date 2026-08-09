@@ -114,7 +114,7 @@ export function ImportJobsChip() {
     return (
       <div className="flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 ring-1 ring-red-200">
         <XCircle className="h-4 w-4 shrink-0 text-red-500" />
-        <span className="max-w-[18rem] truncate">
+        <span className="max-w-[22rem] truncate">
           {done.error ?? "Couldn't read that statement"}
         </span>
         <button

@@ -3,6 +3,7 @@
 import { useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useImportProcessing } from '@/lib/use-import-state'
 
 /**
  * Single source of truth for the user's outstanding actions.
@@ -48,6 +49,7 @@ const IDENTITY_DOC_TYPES = [
 
 export function useActionItems() {
   const { getToken } = useAuth()
+  const isImporting = useImportProcessing()
 
   const { data: score, isLoading: l1 } = useQuery({
     queryKey: ['score', 'general'],
@@ -153,5 +155,10 @@ export function useActionItems() {
 
   items.sort((a, b) => a.priority - b.priority)
 
-  return { items, count: items.length, isLoading: l1 || l2 || l3 }
+  // While a statement is being read in the background, the "Upload a bank
+  // statement" action is no longer outstanding — hide it so the To do list,
+  // sidebar badge and dashboard recommended-action don't nag during processing.
+  const visible = isImporting ? items.filter((i) => i.id !== 'upload-statement') : items
+
+  return { items: visible, count: visible.length, isLoading: l1 || l2 || l3 }
 }

@@ -17,6 +17,8 @@ import { api, type ScoreImprovements } from '@/lib/api'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { useActionItems } from '@/lib/use-action-items'
+import { useImportProcessing } from '@/lib/use-import-state'
+import { ImportProcessingNotice } from '@/components/banking/import-processing-notice'
 import {
   buttonClasses,
   Card,
@@ -191,6 +193,7 @@ export function DashboardOverview() {
   })
 
   const { items: actions } = useActionItems()
+  const isImporting = useImportProcessing()
 
   // ── Derived state ──────────────────────────────────────────────────────────
   const hasScore = !!score
@@ -300,9 +303,13 @@ export function DashboardOverview() {
                 Your Trust Profile is a verified, reusable financial profile. Upload a bank statement
                 to build it from real financial evidence.
               </p>
-              <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
-                Upload a statement <ArrowRight className="h-4 w-4" />
-              </Link>
+              {isImporting ? (
+                <ImportProcessingNotice className="mt-4" />
+              ) : (
+                <Link href="/dashboard/connections" className={buttonClasses('primary', 'md', 'mt-4')}>
+                  Upload a statement <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
           )}
         </Card>
@@ -361,12 +368,23 @@ export function DashboardOverview() {
                   ? 'No outstanding actions. You can share your Trust Profile whenever you need to.'
                   : 'Upload a bank statement to generate your assessment.'}
               </p>
-              <Link
-                href={hasScore ? '/dashboard/share' : '/dashboard/connections'}
-                className={buttonClasses('primary', 'md', 'mt-5')}
-              >
-                {hasScore ? 'Create a share' : 'Upload a statement'}
-              </Link>
+              {hasScore ? (
+                <Link
+                  href="/dashboard/share"
+                  className={buttonClasses('primary', 'md', 'mt-5')}
+                >
+                  Create a share
+                </Link>
+              ) : isImporting ? (
+                <ImportProcessingNotice className="mt-5" />
+              ) : (
+                <Link
+                  href="/dashboard/connections"
+                  className={buttonClasses('primary', 'md', 'mt-5')}
+                >
+                  Upload a statement
+                </Link>
+              )}
             </div>
           )}
         </div>

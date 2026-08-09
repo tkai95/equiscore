@@ -239,6 +239,8 @@ export const api = {
     get: (token: string) => apiFetch('/profile', {}, token),
     update: (token: string, data: unknown) =>
       apiFetch('/profile', { method: 'PATCH', body: JSON.stringify(data) }, token),
+    updateAddress: (token: string, data: { addressLine1: string; addressLine2?: string; city: string; postcode: string }) =>
+      apiFetch('/profile/address', { method: 'PATCH', body: JSON.stringify(data) }, token),
     completeOnboarding: (token: string, data: unknown) =>
       apiFetch('/profile/onboarding', { method: 'PUT', body: JSON.stringify(data) }, token),
     getAddresses: (token: string) => apiFetch('/profile/addresses', {}, token),
@@ -400,7 +402,7 @@ export const api = {
     cancelImportJob: (token: string, id: string) =>
       apiFetch<ImportJob>(`/insights/import-jobs/${id}/cancel`, { method: 'POST' }, token),
     importCsv: (token: string, csv: string) =>
-      apiFetch<StatementImportResult>(
+      apiFetch<{ jobId: string; status: ImportJobStatus }>(
         '/insights/import-csv',
         { method: 'POST', body: JSON.stringify({ csv }) },
         token

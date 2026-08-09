@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { db } from '@equiscore/database'
 import type { UpdateProfileData } from '@equiscore/shared'
 import { AuditService } from '../audit/audit.service'
+import { ScoringService } from '../scoring/scoring.service'
 import { OnboardingDto } from './onboarding.dto'
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly audit: AuditService) {}
+  private readonly logger = new Logger(ProfileService.name)
+
+  constructor(
+    private readonly audit: AuditService,
+    private readonly scoringService: ScoringService
+  ) {}
   async getProfile(userId: string) {
     const profile = await db.userProfile.findUnique({
       where: { userId },
@@ -163,7 +169,57 @@ export class ProfileService {
       },
     })
     this.audit.log(userId, 'profile.updated', { fields: Object.keys(data) })
+    // A profile change can move the score (employment type, declared income,
+    // residency, etc.), so reassess — best-effort: the save already succeeded.
+    await this.recomputeScore(userId)
     return updated
+  }
+
+  /**
+   * Update the user's current address in place. Editing your address shouldn't
+   * spawn a new address-history row each time (onboarding's retire-then-create
+   * is for first capture); this just corrects the live record. Triggers a score
+   * recompute so the change flows into the trust profile.
+   */
+  async updateAddress(
+    userId: string,
+    data: { addressLine1: string; addressLine2?: string; city: string; postcode: string }
+  ) {
+    const existing = await db.userAddress.findFirst({
+      where: { userId, isCurrent: true },
+      select: { id: true },
+    })
+    if (!existing) throw new NotFoundException('No current address to edit')
+
+    await db.userAddress.update({
+      where: { id: existing.id },
+      data: {
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+        city: data.city,
+        postcode: data.postcode,
+      },
+    })
+    this.audit.log(userId, 'profile.address_updated', {
+      postcode: data.postcode,
+      city: data.city,
+    })
+    await this.recomputeScore(userId)
+  }
+
+  /**
+   * Recompute the trust score after a data change. Failures are logged, not
+   * thrown — the profile/address edit has already been persisted, and scoring
+   * is a downstream consumer that re-runs on the next read regardless.
+   */
+  private async recomputeScore(userId: string): Promise<void> {
+    try {
+      await this.scoringService.recompute(userId)
+    } catch (err) {
+      this.logger.error(
+        `Score recompute after profile change failed for ${userId}: ${err instanceof Error ? err.message : err}`
+      )
+    }
   }
 
   async updateProfileStage(userId: string, stage: string) {

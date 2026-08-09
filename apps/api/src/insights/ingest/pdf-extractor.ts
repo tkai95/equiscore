@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { NormalizedTxn } from '../engine/types'
 import { splitPdfIntoChunks } from './pdf-splitter'
+import { checkBalanceContinuity, findBreakContext, type BreakContext } from '../engine/integrity'
 
 /**
  * PDF bank-statement extraction via Claude vision.
@@ -152,6 +153,243 @@ export async function extractTransactionsFromPdf(
   }
 }
 
+// ── Self-healing: targeted re-read of a misread region ──────────────────────
+//
+// When the balance-continuity check finds a break, the surrounding balances are
+// still trusted (they reconciled). So instead of giving up on the whole
+// statement, we hand Claude the break context — the known-good balances
+// bracketing the break, plus what we currently read in that window — and ask it
+// to re-read JUST that region, then VERIFY the result actually reconciles
+// before keeping it. We never accept an unverified splice: if the re-read
+// doesn't fix the break, we revert and the break persists. There is NO
+// downstream tolerance — a break that survives healing means the data is
+// genuinely wrong, and persistStatement rejects it. That keeps the integrity
+// guarantee intact: only reconciling data ever gets scored.
+
+/** Don't attempt more break fixes than this — a clearly-tampered statement can
+ *  produce dozens and we'd burn Claude calls for nothing. Cap reached ⇒ reject. */
+const HEAL_MAX_ATTEMPTS = 5
+/** Re-read tries per break: a second attempt, re-prompted with the new error,
+ *  catches a re-read that was itself slightly off. */
+const HEAL_MAX_RETRIES_PER_BREAK = 2
+
+/** Builds the targeted re-read prompt from a break context. */
+function buildRereadPrompt(ctx: BreakContext): string {
+  const lines = ctx.windowTxns.map(
+    (t) =>
+      `  ${t.date} | ${t.direction === 'credit' ? '+' : '-'}${t.amount.toFixed(2)} | balance: ${t.balance ?? '?'} | ${t.description ?? ''}`
+  )
+  return `You previously extracted transactions from a UK bank statement, but the running balance does NOT reconcile around ${ctx.breakDate}.
+
+A different process independently verified these anchor balances are CORRECT (they reconciled with the surrounding rows):
+- Balance immediately BEFORE the break: ${ctx.beforeBalance ?? 'unknown'}
+- Balance at/after the break: ${ctx.afterBalance ?? 'unknown'}
+
+What we currently have in that window (date | amount | balance | description):
+${lines.join('\n')}
+
+Something in this window was misread — a wrong amount, a wrong balance, a dropped row, or a duplicated row — such that the running balance jumps. Look very carefully at the same pages of the statement and re-extract ONLY the transactions within roughly 7 days of ${ctx.breakDate}.
+
+Return ONLY a JSON object, no markdown, no commentary, in exactly this shape:
+{
+  "transactions": [
+    {
+      "date": "YYYY-MM-DD",
+      "description": string,
+      "amount": number,
+      "direction": "credit" | "debit",
+      "balance": number | null
+    }
+  ]
+}
+
+Rules:
+- Re-read carefully: the amounts and balances must connect ${ctx.beforeBalance ?? 'the prior balance'} to ${ctx.afterBalance ?? 'the following balance'} exactly.
+- Copy the running balance EXACTLY as printed — do not compute or "correct" it.
+- Include EVERY transaction line in that window, in chronological order. Do not include transactions outside the window.
+- If a row is genuinely unreadable, omit it rather than guessing.
+- Output only the JSON object.`
+}
+
+/**
+ * Targeted re-read of the region around a balance break. Same model + limits +
+ * abort as the main extractor, but with a focused prompt that gives Claude the
+ * trusted anchor balances and asks it to fix only the suspect window. Returns
+ * the corrected transactions for that window (to splice back in).
+ */
+async function rereadTransactionsFromPdf(
+  apiKey: string,
+  base64Pdf: string,
+  ctx: BreakContext
+): Promise<NormalizedTxn[]> {
+  const client = new Anthropic({ apiKey })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+
+  let message
+  try {
+    const stream = client.messages.stream(
+      {
+        model: 'claude-sonnet-5',
+        max_tokens: 16000,
+        thinking: { type: 'disabled' },
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf },
+              },
+              { type: 'text', text: buildRereadPrompt(ctx) },
+            ],
+          },
+        ],
+      },
+      { signal: controller.signal }
+    )
+    message = await stream.finalMessage()
+  } catch (err) {
+    if (controller.signal.aborted) return [] // a heal timeout isn't fatal — the break stays and the statement rejects
+    throw err
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  const text = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+
+  let parsed: { transactions?: unknown[] }
+  try {
+    parsed = JSON.parse(extractJson(text))
+  } catch {
+    return [] // unparseable heal response — give up on this break, not fatal
+  }
+
+  const out: NormalizedTxn[] = []
+  for (const raw of parsed.transactions ?? []) {
+    const t = raw as Record<string, unknown>
+    const date = typeof t.date === 'string' ? t.date : null
+    const amount = typeof t.amount === 'number' ? Math.abs(t.amount) : null
+    const direction = t.direction === 'credit' || t.direction === 'debit' ? t.direction : null
+    if (!date || amount === null || !direction || Number.isNaN(new Date(date).getTime())) continue
+    out.push({
+      date,
+      amount,
+      direction,
+      description: typeof t.description === 'string' ? t.description : null,
+      merchantName: null,
+      balance: typeof t.balance === 'number' ? t.balance : null,
+    })
+  }
+  return out
+}
+
+/**
+ * Splice a re-read into the full transaction set, replacing the ±window around
+ * the break date. Pure — returns the new array, doesn't mutate input.
+ */
+function spliceWindow(all: NormalizedTxn[], breakDate: string, replacement: NormalizedTxn[]): NormalizedTxn[] {
+  const breakTime = new Date(breakDate).getTime()
+  const windowMs = 7 * 24 * 60 * 60 * 1000
+  const outside = all.filter((t) => {
+    const dt = new Date(t.date).getTime()
+    return dt < breakTime - windowMs || dt > breakTime + windowMs
+  })
+  return [...outside, ...replacement].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * Targeted self-healing of balance breaks. For each break: ask Claude to re-read
+ * the region, splice the result in, and VERIFY it actually reconciles before
+ * keeping it. If the splice doesn't fix the break (or introduces new ones), it's
+ * reverted and the original break stands — we never ship an unverified fix.
+ * Each break is retried once with an updated prompt if the first re-read fails.
+ *
+ * Because there is no downstream tolerance, this MUST be honest: a break that
+ * survives healing means the data is genuinely wrong and persistStatement will
+ * reject it. That's the correct outcome — wrong data should not be scored.
+ */
+async function healBreaks(
+  apiKey: string,
+  base64Pdf: string,
+  txns: NormalizedTxn[]
+): Promise<{ transactions: NormalizedTxn[]; warnings: string[] }> {
+  const warnings: string[] = []
+  let current = txns
+
+  let integrity = checkBalanceContinuity(current)
+  if (integrity.continuous || !integrity.hasBalances) return { transactions: current, warnings }
+
+  const breaksToFix = integrity.breaks.slice(0, HEAL_MAX_ATTEMPTS)
+  if (integrity.breaks.length > HEAL_MAX_ATTEMPTS) {
+    warnings.push(
+      `Statement had ${integrity.breaks.length} balance breaks — too many to self-heal; not attempted.`
+    )
+    return { transactions: current, warnings }
+  }
+
+  console.log(
+    `Self-healing: ${breaksToFix.length} break(s), largest drift ${Math.max(
+      ...breaksToFix.map((b) => Math.abs(b.expected - b.actual))
+    ).toFixed(2)} — attempting targeted re-read`
+  )
+
+  for (const brk of breaksToFix) {
+    // Re-locate the break each iteration: a prior splice may have shifted it.
+    integrity = checkBalanceContinuity(current)
+    const liveBreak = integrity.breaks.find((b) => b.date === brk.date && b.expected === brk.expected)
+    if (!liveBreak) continue // already resolved by an earlier splice
+
+    for (let attempt = 1; attempt <= HEAL_MAX_RETRIES_PER_BREAK; attempt++) {
+      try {
+        const ctx = findBreakContext(current, liveBreak)
+        const corrected = await rereadTransactionsFromPdf(apiKey, base64Pdf, ctx)
+        if (corrected.length === 0) break // nothing to splice — give up on this break
+
+        const candidate = spliceWindow(current, liveBreak.date, corrected)
+
+        // VERIFY before keeping: only accept the splice if it's strictly better —
+        // it resolved THIS break and didn't introduce new ones. Otherwise revert.
+        const beforeCheck = checkBalanceContinuity(current)
+        const afterCheck = checkBalanceContinuity(candidate)
+        const resolvedThisBreak = !afterCheck.breaks.some(
+          (b) => b.date === liveBreak.date && b.expected === liveBreak.expected
+        )
+        const fewerBreaks = afterCheck.breaks.length < beforeCheck.breaks.length
+
+        if (resolvedThisBreak && fewerBreaks) {
+          current = candidate
+          console.log(`Self-healing: break around ${liveBreak.date} resolved on attempt ${attempt}`)
+          break // success — move to next break
+        }
+        // Didn't verify — if we have a retry left, loop; else abandon this break.
+        if (attempt === HEAL_MAX_RETRIES_PER_BREAK) {
+          warnings.push(`Could not reconcile balances around ${liveBreak.date} after re-read.`)
+        }
+      } catch (err) {
+        warnings.push(
+          `Self-heal error around ${liveBreak.date}: ${err instanceof Error ? err.message : 'unknown error'}`
+        )
+        break
+      }
+    }
+  }
+
+  const after = checkBalanceContinuity(current)
+  if (after.continuous) {
+    console.log('Self-healing: all balances now reconcile')
+  } else {
+    console.log(
+      `Self-healing: ${after.breaks.length} break(s) remain unreconciled — statement will be rejected`
+    )
+  }
+
+  return { transactions: current, warnings }
+}
+
 /**
  * Extract transactions from a PDF that may be too large for a single Claude
  * call (1,000+ transactions would truncate the 64k output token ceiling).
@@ -176,9 +414,13 @@ export async function extractTransactionsFromLargePdf(
   const pdfBuffer = Buffer.from(base64Pdf, 'base64')
   const { pageCount, chunks } = await splitPdfIntoChunks(pdfBuffer)
 
-  // Single chunk = no merging overhead, identical to the old path.
+  // Single chunk = no merging overhead, but still run the self-healing pass so
+  // a small statement with one OCR misread isn't hard-rejected downstream.
   if (chunks.length === 1) {
-    return extractTransactionsFromPdf(apiKey, base64Pdf)
+    const result = await extractTransactionsFromPdf(apiKey, base64Pdf)
+    if (result.transactions.length === 0) return result
+    const healed = await healBreaks(apiKey, base64Pdf, result.transactions)
+    return { ...result, transactions: healed.transactions, warnings: [...result.warnings, ...healed.warnings] }
   }
 
   console.log(`PDF chunking: ${pageCount} pages → ${chunks.length} chunks`)
@@ -227,8 +469,19 @@ export async function extractTransactionsFromLargePdf(
     warnings.push('No transactions could be read from this statement.')
   }
 
+  // Self-healing pass: if the merged set has a few small balance breaks (the
+  // signature of an OCR misread, not tampering), re-read just those regions and
+  // splice the corrections back in. Best-effort — failures fall through and the
+  // break either tolerates or rejects in persistStatement.
+  let transactions = deduped
+  if (deduped.length > 0) {
+    const healed = await healBreaks(apiKey, base64Pdf, deduped)
+    transactions = healed.transactions
+    warnings.push(...healed.warnings)
+  }
+
   return {
-    transactions: deduped,
+    transactions,
     accountHolderName,
     warnings,
   }

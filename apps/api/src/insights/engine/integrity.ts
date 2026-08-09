@@ -59,3 +59,56 @@ export function checkBalanceContinuity(input: NormalizedTxn[]): StatementIntegri
     closingBalance: round2(withBalance[withBalance.length - 1]!.balance as number),
   }
 }
+
+/**
+ * Context for a targeted re-read around a balance break: the transactions on
+ * and around the break date, plus the known-good running balances that bracket
+ * it. This is the "here's what we're confident about, fix the middle" payload
+ * handed to Claude when self-healing a misread.
+ *
+ * Returns the break row plus up to 2 neighbours each side that carry a printed
+ * balance (those balances are trusted — they reconciled), and the surrounding
+ * window of transactions (±7 days) so the re-read sees the full context. The
+ * `beforeBalance`/`afterBalance` are the closest reconciled balances on each
+ * side, i.e. the anchors the corrected rows must connect to.
+ */
+export interface BreakContext {
+  breakDate: string
+  beforeBalance: number | null
+  afterBalance: number | null
+  windowTxns: NormalizedTxn[]
+}
+
+export function findBreakContext(
+  input: NormalizedTxn[],
+  brk: { date: string; expected: number; actual: number }
+): BreakContext {
+  const txns = [...input].sort((a, b) => toDate(a.date).getTime() - toDate(b.date).getTime())
+  const breakTime = toDate(brk.date).getTime()
+
+  // ±7 calendar days either side of the break — wide enough to catch a
+  // misread line that drifted onto a neighbouring date, narrow enough to keep
+  // the re-read focused.
+  const windowMs = 7 * 24 * 60 * 60 * 1000
+  const windowTxns = txns.filter((t) => {
+    const dt = toDate(t.date).getTime()
+    return dt >= breakTime - windowMs && dt <= breakTime + windowMs
+  })
+
+  // The closest reconciled balances bracketing the break — these are trusted
+  // anchors the corrected rows must connect to.
+  const withBalance = txns.filter((t) => typeof t.balance === 'number')
+  const before = withBalance
+    .filter((t) => toDate(t.date).getTime() < breakTime)
+    .at(-1)
+  const after = withBalance
+    .filter((t) => toDate(t.date).getTime() >= breakTime)
+    .at(0)
+
+  return {
+    breakDate: brk.date,
+    beforeBalance: before ? (before.balance as number) : null,
+    afterBalance: after ? (after.balance as number) : null,
+    windowTxns,
+  }
+}

@@ -26,6 +26,8 @@ import { api, type ScoreImprovements } from '@/lib/api'
 import { formatDate, cn } from '@/lib/utils'
 import type { TrustTier } from '@equiscore/shared'
 import { Button, buttonClasses, Card, Display, Drawer, PageLayout, PageTitle } from '@/components/ui'
+import { useImportProcessing } from '@/lib/use-import-state'
+import { ImportProcessingNotice } from '@/components/banking/import-processing-notice'
 
 type ScoreDisplayStatus = 'current' | 'expiring_soon' | 'expired' | 'evidence_withdrawn' | 'insufficient_evidence'
 
@@ -151,6 +153,7 @@ const DIM_CAMEL: Record<string, string> = {
 export function TrustScoreView() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
+  const isImporting = useImportProcessing()
   const [drawerDim, setDrawerDim] = useState<DimKey | null>(null)
   const [findingsOpen, setFindingsOpen] = useState(false)
 
@@ -213,9 +216,13 @@ export function TrustScoreView() {
             generate your assessment.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link href="/dashboard/connections" className={buttonClasses('primary')}>
-              Upload a statement
-            </Link>
+            {isImporting ? (
+              <ImportProcessingNotice />
+            ) : (
+              <Link href="/dashboard/connections" className={buttonClasses('primary')}>
+                Upload a statement
+              </Link>
+            )}
             <Button variant="secondary" loading={recompute.isPending} onClick={() => recompute.mutate()}>
               {recompute.isPending ? 'Generating…' : 'Generate assessment'}
             </Button>

@@ -23,6 +23,8 @@ import { TIER_LABELS } from '@equiscore/shared'
 import type { TrustTier } from '@equiscore/shared'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Card as UICard, Display, StatusPill, buttonClasses, type StatusTone } from '@/components/ui'
+import { useImportProcessing } from '@/lib/use-import-state'
+import { ImportProcessingNotice } from '@/components/banking/import-processing-notice'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
 
 // Mirrors the InsightProfile shape returned by GET /insights/profile.
@@ -232,6 +234,7 @@ function Panel({
 
 export function InsightProfileView() {
   const { getToken } = useAuth()
+  const isImporting = useImportProcessing()
   const queryClient = useQueryClient()
   const [drawer, setDrawer] = useState<DrawerSpec | null>(null)
   const [answering, setAnswering] = useState<string | null>(null)
@@ -275,7 +278,9 @@ export function InsightProfileView() {
     return <div className="h-64 animate-pulse rounded-card bg-surface-hover" />
   }
   if (!profile || profile.period.transactionCount === 0) {
-    return (
+    return isImporting ? (
+      <ImportProcessingNotice variant="panel" />
+    ) : (
       <UICard padding="none" className="border-dashed p-10 text-center">
         <ShieldCheck className="mx-auto h-8 w-8 text-content-muted" />
         <p className="mt-3 text-sm font-medium text-content">No financial evidence yet</p>

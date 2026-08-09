@@ -7,6 +7,8 @@ import { TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { Card, PageTitle, Section } from '@/components/ui'
+import { useImportProcessing } from '@/lib/use-import-state'
+import { ImportProcessingNotice } from '@/components/banking/import-processing-notice'
 import { MonthlyFlowChart } from './monthly-flow-chart'
 import { InsightProfileView } from './insight-profile-view'
 import { BreakdownDrawer, type DrawerSpec } from './breakdown-drawer'
@@ -66,6 +68,7 @@ function Panel({
 
 export function AnalyticsOverview() {
   const { getToken } = useAuth()
+  const isImporting = useImportProcessing()
   const [monthDrawer, setMonthDrawer] = useState<DrawerSpec | null>(null)
 
   // Shares the ['insight-profile'] cache with InsightProfileView, so the monthly
@@ -175,13 +178,17 @@ export function AnalyticsOverview() {
       )}
 
       {!hasData && !profile && (
-        <Card padding="none" className="border-dashed p-10 text-center">
-          <TrendingUp className="mx-auto h-8 w-8 text-content-muted" />
-          <p className="mt-3 text-sm font-medium text-content">No transaction data yet</p>
-          <p className="mt-1 text-xs text-content-muted">
-            Upload a bank statement to see your trends.
-          </p>
-        </Card>
+        isImporting ? (
+          <ImportProcessingNotice variant="panel" />
+        ) : (
+          <Card padding="none" className="border-dashed p-10 text-center">
+            <TrendingUp className="mx-auto h-8 w-8 text-content-muted" />
+            <p className="mt-3 text-sm font-medium text-content">No transaction data yet</p>
+            <p className="mt-1 text-xs text-content-muted">
+              Upload a bank statement to see your trends.
+            </p>
+          </Card>
+        )
       )}
 
       <BreakdownDrawer spec={monthDrawer} onClose={() => setMonthDrawer(null)} />

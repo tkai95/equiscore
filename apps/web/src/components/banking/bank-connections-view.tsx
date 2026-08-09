@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -169,32 +169,25 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
   })
 
   // Upload a statement (PDF or CSV) — the primary way to build a Trust Profile.
-  // CSV parses deterministically in-request, so it stays synchronous. A PDF is
-  // read by Claude (30–90s), so it runs as a background job: we return instantly
-  // and the user can leave the page — the global chip announces completion.
+  // Both formats run as background jobs: the POST returns instantly with a job,
+  // and the user can leave the page or close the tab — the global chip on every
+  // dashboard page announces completion.
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
 
   const { data: jobs = [] } = useImportJobs()
   const activeJob = activeJobId ? jobs.find((j) => j.id === activeJobId) : undefined
 
-  const importCsvMut = useMutation({
-    mutationFn: async (file: File): Promise<StatementImportResult> => {
-      const token = await getToken()
-      const csv = await file.text()
-      return api.insights.importCsv(token!, csv)
-    },
-    onSuccess: () => {
-      for (const key of [['bank-accounts'], ['score'], ['analytics-summary'], ['accounts'], ['insight-profile']]) {
-        void queryClient.invalidateQueries({ queryKey: key })
-      }
-    },
-  })
-
-  const startPdfMut = useMutation({
+  // One mutation for both formats. PDF and CSV each return { jobId, status }
+  // from their import endpoint, so the rest of the component is source-agnostic:
+  // the upload card and the global chip track the same job regardless of type.
+  const startImportMut = useMutation({
     mutationFn: async (file: File) => {
       const token = await getToken()
-      return api.insights.importPdf(token!, file)
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      return isPdf
+        ? api.insights.importPdf(token!, file)
+        : api.insights.importCsv(token!, await file.text())
     },
     onSuccess: (data) => {
       setActiveJobId(data.jobId)
@@ -212,32 +205,57 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
   })
 
   const handleFile = (file: File) => {
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-    importCsvMut.reset()
-    startPdfMut.reset()
-    if (isPdf) {
-      setActiveJobId(null)
-      startPdfMut.mutate(file)
-    } else {
-      setActiveJobId(null)
-      importCsvMut.mutate(file)
-    }
+    startImportMut.reset()
+    setActiveJobId(null)
+    startImportMut.mutate(file)
   }
 
+  // Persistent record of failed imports that need the user's attention. A
+  // rejected statement is never imported, so it has no row in the uploaded-
+  // statements list — without this card the failure (and its location) only
+  // shows as a transient chip. Here we surface each failure with the exact
+  // reconciliation location so the user knows what to fix when they come back.
+  // Reuses the chip's per-id dismiss pattern (localStorage), so a dismissed
+  // failure stays dismissed across sessions.
+  const FAILED_DISMISS_KEY = 'equiscore.dismissedFailedImports'
+  const [dismissedFailed, setDismissedFailed] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    try {
+      setDismissedFailed(new Set(JSON.parse(localStorage.getItem(FAILED_DISMISS_KEY) ?? '[]') as string[]))
+    } catch {
+      /* storage unavailable — dismissals just won't persist */
+    }
+  }, [])
+  const dismissFailed = (id: string) => {
+    setDismissedFailed((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      try {
+        localStorage.setItem(FAILED_DISMISS_KEY, JSON.stringify([...next]))
+      } catch {
+        /* storage unavailable */
+      }
+      return next
+    })
+  }
+  const failedJobs = jobs.filter(
+    (j) => j.status === 'failed' && j.error && !dismissedFailed.has(j.id)
+  )
+
   // Upload is a two-step flow, and each step gets exactly one indicator:
-  //   1. uploading  — the file is being sent (fast; the PDF POST returns as soon
-  //                    as the background job is created, the CSV as soon as parsed)
-  //   2. processing — the background read is running (can take a couple of minutes)
-  // `pdfProcessing` optimistically holds the processing state from the moment the
-  // job id is known until the poll confirms it, so the UI never flickers back to an
-  // idle "Upload" button in the gap between the POST resolving and the first poll.
-  const uploading = startPdfMut.isPending || importCsvMut.isPending
-  const pdfProcessing =
+  //   1. uploading  — the file is being sent (fast; the POST returns as soon as
+  //                    the background job is created, for both PDF and CSV)
+  //   2. processing — the background parse/read is running (a couple of minutes
+  //                    for PDF, a few seconds for CSV — either way, leave the page)
+  // `processing` optimistically holds the state from the moment the job id is
+  // known until the poll confirms it, so the UI never flickers back to an idle
+  // "Upload" button in the gap between the POST resolving and the first poll.
+  const uploading = startImportMut.isPending
+  const processing =
     activeJobId !== null && (activeJob === undefined || activeJob.status === 'processing')
-  const csvDone = importCsvMut.isSuccess && !!importCsvMut.data
   const jobDone = activeJob?.status === 'completed' && !!activeJob.result
-  const hasResult = jobDone || csvDone
-  const busy = uploading || pdfProcessing
+  const hasResult = jobDone
+  const busy = uploading || processing
 
   const connections = groupByConnection(accounts)
   const bankGroups = connections.filter((g) => !isUpload(g))
@@ -324,12 +342,12 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
             {uploading && (
               <div className="mt-3 flex items-center gap-2.5 rounded-panel border border-line bg-surface-card px-3.5 py-2.5 text-sm font-medium text-content-secondary">
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-900" />
-                {startPdfMut.isPending ? 'Uploading your statement…' : 'Reading your statement…'}
+                Uploading your statement…
               </div>
             )}
 
             {/* Step 2 — the background read is running. The user is free to leave. */}
-            {!uploading && pdfProcessing && (
+            {!uploading && processing && (
               <div className="mt-3 rounded-panel border border-line bg-surface-card px-3.5 py-2.5 text-sm text-content-secondary">
                 <p className="flex items-center gap-2 font-medium text-content">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-900" />
@@ -352,10 +370,26 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
 
             {/* Terminal states */}
             {jobDone && <ImportSummary data={activeJob!.result!} />}
-            {csvDone && <ImportSummary data={importCsvMut.data!} />}
             {activeJob?.status === 'failed' && (
-              <div className="mt-3 rounded-panel bg-danger-soft px-3.5 py-2.5 text-sm text-danger-strong">
-                {activeJob.error || "We couldn't read that statement. Try a clearer copy or a CSV export."}
+              <div className="mt-3 flex items-start gap-2.5 rounded-panel border border-danger-strong/20 bg-danger-soft px-3.5 py-3 text-sm text-danger-strong">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger-strong" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">We couldn&apos;t finish your analysis</p>
+                  <p className="mt-0.5">
+                    {activeJob.error || "We couldn't read that statement. Try a clearer copy or a CSV export."}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setActiveJobId(null)
+                      startImportMut.reset()
+                      fileInputRef.current?.click()
+                    }}
+                    className="mt-2 flex items-center gap-1.5 rounded-lg bg-danger-strong px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Try again
+                  </button>
+                </div>
               </div>
             )}
             {activeJob?.status === 'cancelled' && (
@@ -363,9 +397,9 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
                 Import cancelled. Nothing was saved — you can upload again whenever you&apos;re ready.
               </div>
             )}
-            {(startPdfMut.isError || importCsvMut.isError) && (
+            {startImportMut.isError && (
               <div className="mt-3 rounded-panel bg-danger-soft px-3.5 py-2.5 text-sm text-danger-strong">
-                {((startPdfMut.error ?? importCsvMut.error) as Error)?.message ||
+                {(startImportMut.error as Error)?.message ||
                   "We couldn't read that file. Make sure it's a CSV export or a clear PDF."}
               </div>
             )}
@@ -395,6 +429,62 @@ export function BankConnectionsView({ bankConnected, bankError }: Props) {
           upload a statement above to build your Trust Profile.
         </p>
       </div>
+
+      {/* Statements that failed verification — a persistent record (not transient
+          like the chip) showing the exact reconciliation location, so the user
+          knows what to fix or that they need a fresh export. Rendered whether or
+          not they have other accounts, since a first-upload failure lands here. */}
+      {failedJobs.length > 0 && (
+        <Card padding="none" className="overflow-hidden border-danger-strong/20">
+          <div className="flex items-center gap-3 border-b border-line-subtle bg-danger-soft/50 px-5 py-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-danger-soft text-danger-strong">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-content">Needs attention</p>
+              <p className="text-xs text-content-muted">
+                {failedJobs.length} {failedJobs.length === 1 ? 'statement' : 'statements'} we couldn’t verify
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-line-subtle">
+            {failedJobs.map((job) => (
+              <div key={job.id} className="flex items-start gap-3 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium text-content">
+                      {job.fileName ?? (job.sourceType === 'pdf' ? 'PDF statement' : 'CSV statement')}
+                    </p>
+                    <StatusPill status="danger" label="Couldn’t verify" />
+                  </div>
+                  <p className="mt-1 text-xs text-content-muted">
+                    Uploaded {formatDate(job.completedAt ?? job.createdAt)}
+                  </p>
+                  <p className="mt-1.5 text-sm text-danger-strong">{job.error}</p>
+                  <button
+                    onClick={() => {
+                      setActiveJobId(null)
+                      startImportMut.reset()
+                      fileInputRef.current?.click()
+                    }}
+                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-900 transition-opacity hover:opacity-80"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Re-upload
+                  </button>
+                </div>
+                <button
+                  onClick={() => dismissFailed(job.id)}
+                  className="shrink-0 rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-hover"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Existing data sources — only shown when the user already has accounts */}
       {/* (uploaded statements and any previously-connected banks). */}

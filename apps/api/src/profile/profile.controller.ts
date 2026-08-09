@@ -5,7 +5,7 @@ import { ClerkAuthGuard } from '../common/guards/clerk-auth.guard'
 import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator'
 import { ProfileService } from './profile.service'
 import { AuthService } from '../auth/auth.service'
-import { OnboardingDto } from './onboarding.dto'
+import { OnboardingDto, UpdateAddressDto } from './onboarding.dto'
 
 @ApiTags('profile')
 @Controller('profile')
@@ -34,6 +34,14 @@ export class ProfileController {
   async updateProfile(@CurrentUser() user: RequestUser, @Body() body: Record<string, unknown>) {
     const userId = await this.resolveUserId(user.clerkId, user.email)
     return this.profileService.updateProfile(userId, body as never)
+  }
+
+  @Patch('address')
+  @ApiOperation({ summary: "Update the user's current address" })
+  async updateAddress(@CurrentUser() user: RequestUser, @Body() dto: UpdateAddressDto) {
+    const userId = await this.resolveUserId(user.clerkId, user.email)
+    await this.profileService.updateAddress(userId, dto)
+    return { ok: true }
   }
 
   @Put('onboarding')

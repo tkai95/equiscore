@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@equiscore/database'
 import { buildInsightProfile, detectInternalTransfers } from './engine'
@@ -13,6 +14,7 @@ import { monthKey, toDate, round2 } from './engine/util'
 import { classifyTransaction } from '../banking/transaction-classifier'
 import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
+import { InvitationEmailService } from '../common/invitation-email.service'
 import type { PreviewProfileDto } from './insights.dto'
 
 const GAMBLING =
@@ -47,7 +49,9 @@ export class InsightsService implements OnModuleInit {
 
   constructor(
     private readonly scoringService: ScoringService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly config: ConfigService,
+    private readonly email: InvitationEmailService
   ) {}
 
   /**
@@ -144,6 +148,186 @@ export class InsightsService implements OnModuleInit {
   }
 
   /**
+   * Start an async CSV import. CSV parsing + persistence + scoring still take a
+   * few seconds, and we want CSV to behave exactly like PDF: return instantly,
+   * process in the background, survive the user leaving the page or closing the
+   * tab, and announce completion through the same global chip. Keeping both
+   * formats on the job path means every "processing" state is source-agnostic.
+   */
+  async startCsvImportJob(userId: string, csv: string) {
+    const job = await db.statementImportJob.create({
+      data: { userId, sourceType: 'csv', fileName: null, status: 'processing' },
+    })
+    // Fire-and-forget; the promise keeps the event loop alive and captures its
+    // own errors onto the job row, so it never rejects unhandled.
+    void this.runCsvImportJob(job.id, userId, csv)
+    return { jobId: job.id, status: job.status }
+  }
+
+  private async runCsvImportJob(jobId: string, userId: string, csv: string): Promise<void> {
+    const startedAt = Date.now()
+    this.logger.log(`Import ${jobId}: parsing CSV (${(csv.length / 1024).toFixed(0)} KB)`)
+    try {
+      const parsed = parseStatementCsv(csv)
+      this.logger.log(
+        `Import ${jobId}: parsed ${parsed.transactions.length} txns in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`
+      )
+
+      // Cancelled before we got here? Stop before persisting anything.
+      const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
+      if (!current || current.status === 'cancelled') {
+        this.logger.log(`Import ${jobId}: cancelled, discarding result`)
+        return
+      }
+
+      if (parsed.transactions.length === 0) {
+        throw new Error(
+          parsed.warnings.join(' ') || 'No transactions could be read from this file.'
+        )
+      }
+
+      const result = await this.persistStatement(userId, parsed.transactions, {
+        sourceType: 'csv',
+        skipped: parsed.detected.rowsSkipped,
+        warnings: parsed.warnings,
+      })
+
+      await db.statementImportJob.update({
+        where: { id: jobId },
+        data: { status: 'completed', result: result as never, completedAt: new Date() },
+      })
+      this.logger.log(`Import ${jobId}: completed in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
+      // Notify the user by email (best-effort: never turns a success into a failure).
+      await this.notifyImportComplete(userId, jobId, result).catch((e) =>
+        this.logger.error(`Import ${jobId}: completion notify failed: ${e instanceof Error ? e.message : e}`)
+      )
+    } catch (err) {
+      // Plain-English, figure-free reason for the user (on-site + email). The
+      // raw error and detailed figures stay in the audit log for debugging.
+      const { kind, message } = this.classifyImportError(err)
+      this.logger.error(`Import ${jobId}: failed (${kind}) after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${err instanceof Error ? err.message : err}`)
+      await db.statementImportJob
+        .update({
+          where: { id: jobId },
+          data: { status: 'failed', error: message, completedAt: new Date() },
+        })
+        .catch(() => undefined)
+      await this.notifyImportFailed(userId, jobId, message).catch((e) =>
+        this.logger.error(`Import ${jobId}: failure notify failed: ${e instanceof Error ? e.message : e}`)
+      )
+    }
+  }
+
+  /**
+   * The public-facing reason a statement import failed. The job runner writes
+   * THIS message to the job row (what the user sees on-site and in the failure
+   * email). For the integrity case we KEEP the precise location — the exception
+   * already carries the break date and expected/actual figures, and the user
+   * needs to see exactly where the problem is so they can fix it. The other
+   * categories have no useful location data, so they stay generic.
+   */
+  private classifyImportError(err: unknown): { kind: string; message: string } {
+    const raw = err instanceof Error ? err.message : ''
+    if (err instanceof BadRequestException) {
+      // persistStatement's message already reads, e.g.: "The figures we read
+      // from this statement don't add up around 2025-09-04 (expected 15615.21,
+      // we read 15604.71) — the scan may be unclear. Please try a clearer copy
+      // or a CSV export from your bank." Surface it verbatim — no sanitising.
+      return { kind: 'integrity', message: raw }
+    }
+    if (/no transactions could be read/i.test(raw)) {
+      return {
+        kind: 'empty',
+        message:
+          "We couldn't read any transactions from that file. Make sure it's a complete bank statement export.",
+      }
+    }
+    if (/not available right now|anthropic_api_key|timed out|timed out while reading/i.test(raw)) {
+      return {
+        kind: 'extraction',
+        message: "We couldn't process your statement right now. Please try again in a few minutes.",
+      }
+    }
+    return {
+      kind: 'unknown',
+      message: 'Something went wrong reading your statement. Please try again.',
+    }
+  }
+
+  /** First WEB_URL origin (it may be a comma-separated CORS list). */
+  private webUrl(): string {
+    return (this.config.get<string>('WEB_URL') ?? 'http://localhost:3000').split(',')[0]!.trim()
+  }
+
+  /** Email the user that their statement analysis completed, with a score link. */
+  private async notifyImportComplete(
+    userId: string,
+    jobId: string,
+    result: {
+      imported: number
+      coverageStart: string
+      coverageEnd: string
+      overallScore: number
+      overallTier: string
+    }
+  ): Promise<void> {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { email: true, profile: { select: { fullName: true } } },
+    })
+    if (!user?.email) {
+      this.logger.warn(`Import ${jobId}: skipping completion email (no address on file)`)
+      return
+    }
+    const first = user.profile?.fullName?.trim().split(/\s+/)[0]
+    const greeting = first ? `Hi ${first},` : 'Hi,'
+    const delivery = await this.email.sendBrandedEmail({
+      to: user.email,
+      subject: 'Your statement analysis is complete',
+      eyebrow: 'Trust Profile',
+      heading: 'Your statement analysis is complete',
+      preview: `We analysed ${result.imported} transactions — your Trust Score is ${result.overallTier}.`,
+      intro: `${greeting} we've finished reading your statement and analysed ${result.imported} transactions. Your Trust Score is now ${result.overallTier} / ${result.overallScore}.`,
+      body: 'You can review the breakdown of your income, spending and commitments on your financial profile.',
+      ctaLabel: 'View your score',
+      ctaUrl: `${this.webUrl()}/dashboard/trust-profile/financial-profile`,
+      surfaceLabel: 'Trust Profile',
+    })
+    this.logger.log(
+      `Import ${jobId}: completion email ${delivery.sent ? 'sent' : `skipped (${delivery.reason ?? 'no reason'})`}`
+    )
+  }
+
+  /** Email the user that their statement analysis failed, with a retry link. */
+  private async notifyImportFailed(userId: string, jobId: string, reason: string): Promise<void> {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { email: true, profile: { select: { fullName: true } } },
+    })
+    if (!user?.email) {
+      this.logger.warn(`Import ${jobId}: skipping failure email (no address on file)`)
+      return
+    }
+    const first = user.profile?.fullName?.trim().split(/\s+/)[0]
+    const greeting = first ? `Hi ${first},` : 'Hi,'
+    const delivery = await this.email.sendBrandedEmail({
+      to: user.email,
+      subject: "Action needed: we couldn't verify your statement",
+      eyebrow: 'Action needed',
+      heading: "We couldn't verify your statement",
+      preview: 'The figures in your statement don’t reconcile — details inside.',
+      intro: `${greeting} we couldn't complete the analysis because the figures in your statement don't add up. The specific problem is below — please re-upload a clearer copy or a fresh CSV export from your bank.`,
+      body: reason,
+      ctaLabel: 'Re-upload your statement',
+      ctaUrl: `${this.webUrl()}/dashboard/connections`,
+      surfaceLabel: 'Bank statements',
+    })
+    this.logger.log(
+      `Import ${jobId}: failure email ${delivery.sent ? 'sent' : `skipped (${delivery.reason ?? 'no reason'})`}`
+    )
+  }
+
+  /**
    * Start an async PDF import. Reading a PDF with Claude takes 30–90s, so we
    * create a persisted job, kick off processing in the background, and return
    * immediately — the user can navigate away or close the browser and pick the
@@ -207,15 +391,24 @@ export class InsightsService implements OnModuleInit {
         data: { status: 'completed', result: result as never, completedAt: new Date() },
       })
       this.logger.log(`Import ${jobId}: completed in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
+      // Notify the user by email (best-effort: never turns a success into a failure).
+      await this.notifyImportComplete(userId, jobId, result).catch((e) =>
+        this.logger.error(`Import ${jobId}: completion notify failed: ${e instanceof Error ? e.message : e}`)
+      )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Something went wrong reading the statement.'
-      this.logger.error(`Import ${jobId}: failed after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${message}`)
+      // Plain-English, figure-free reason for the user (on-site + email). The
+      // raw error and detailed figures stay in the audit log for debugging.
+      const { kind, message } = this.classifyImportError(err)
+      this.logger.error(`Import ${jobId}: failed (${kind}) after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${err instanceof Error ? err.message : err}`)
       await db.statementImportJob
         .update({
           where: { id: jobId },
           data: { status: 'failed', error: message, completedAt: new Date() },
         })
         .catch(() => undefined)
+      await this.notifyImportFailed(userId, jobId, message).catch((e) =>
+        this.logger.error(`Import ${jobId}: failure notify failed: ${e instanceof Error ? e.message : e}`)
+      )
     }
   }
 
@@ -269,11 +462,14 @@ export class InsightsService implements OnModuleInit {
     txns: NormalizedTxn[],
     opts: { sourceType: 'csv' | 'pdf'; skipped: number; warnings: string[]; accountHolderName?: string | null }
   ) {
-    // Anti-tamper gate. A real bank export is a ledger: each row's running
-    // balance must equal the previous balance plus or minus that row's amount.
-    // A doctored CSV — or a misread PDF — breaks this, so we refuse to score it
-    // rather than let a wrong figure inflate a score that gets shared.
-    // (Statements with no balance column can't be checked, so they pass.)
+    // Anti-tamper gate — strict. A real bank export is a ledger: every row's
+    // running balance must equal the previous balance ± that row's amount. If
+    // it doesn't reconcile, the data is WRONG (a misread, a dropped row, or an
+    // edit), and scoring over wrong figures produces a misleading Trust Profile
+    // — so we refuse rather than ship bad data with a penalty. PDFs have already
+    // been through a self-healing re-read by here; any break that survives that
+    // is genuinely unreconcilable (illegible or tampered), not noise to absorb.
+    // Statements with no balance column can't be checked, so they pass.
     const integrity = checkBalanceContinuity(txns)
     if (integrity.hasBalances && !integrity.continuous) {
       const b = integrity.breaks[0]

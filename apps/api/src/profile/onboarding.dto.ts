@@ -82,3 +82,21 @@ export class OnboardingDto {
   @IsString()
   reasonForUsingEquiscore?: string
 }
+
+// DTO for PATCH /profile/address — edit the user's current address in place.
+// Same field shape + validators as the onboarding address fields, so the two
+// paths accept identical input.
+export class UpdateAddressDto {
+  @IsString()
+  addressLine1!: string
+
+  @IsOptional()
+  @IsString()
+  addressLine2?: string
+
+  @IsString()
+  city!: string
+
+  @IsString()
+  postcode!: string
+}

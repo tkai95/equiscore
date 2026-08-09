@@ -164,17 +164,18 @@ export class InsightsController {
   }
 
   /**
-   * Import a CSV bank statement for the signed-in user: parse, persist as a
-   * statement-sourced connection, and recompute the score. This is the
-   * "get a score without Open Banking" path.
+   * Import a CSV bank statement for the signed-in user. CSV runs on the same
+   * background-job path as PDF so the behaviour is identical: this returns a
+   * job immediately and processing happens out-of-request — the user can leave
+   * the page or close the tab, and a global chip announces completion.
    */
   @Post('import-csv')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Import a CSV bank statement and recompute the score' })
+  @ApiOperation({ summary: 'Start an async CSV statement import; returns a job to poll' })
   async importCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
     const dbUser = await this.authService.syncUser(user.clerkId, user.email)
-    return this.insights.importCsv(dbUser.id, dto.csv)
+    return this.insights.startCsvImportJob(dbUser.id, dto.csv)
   }
 
   /**

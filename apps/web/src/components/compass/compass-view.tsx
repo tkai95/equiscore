@@ -19,6 +19,8 @@ import { useMe } from '@/lib/use-me'
 import { useCompassActions } from '@/lib/use-compass'
 import { cn } from '@/lib/utils'
 import { buttonClasses } from '@/components/ui'
+import { useImportProcessing } from '@/lib/use-import-state'
+import { ImportProcessingNotice } from '@/components/banking/import-processing-notice'
 import { BreakdownDrawer, type DrawerSpec } from '@/components/analytics/breakdown-drawer'
 import { Card, EmptyState } from './compass-ui'
 import {
@@ -219,15 +221,20 @@ function Upsell() {
 }
 
 function NoData() {
+  const isImporting = useImportProcessing()
   return (
     <EmptyState
       icon={<Wallet className="h-8 w-8" />}
       title="My Money needs some financial evidence first"
       body="Upload a bank statement to map your income, spending, bills and savings."
       action={
-        <Link href="/dashboard/connections" className={buttonClasses('primary')}>
-          Upload a statement
-        </Link>
+        isImporting ? (
+          <ImportProcessingNotice />
+        ) : (
+          <Link href="/dashboard/connections" className={buttonClasses('primary')}>
+            Upload a statement
+          </Link>
+        )
       }
     />
   )
