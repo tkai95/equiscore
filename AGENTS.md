@@ -26,6 +26,15 @@ short version of the rules that matter most:
    + rental share-pack are all present. Flip `showGoals` when ready; don't delete
    it. (Compass `SavingsGoal` is a *different* feature — leave it alone.)
 
+## Debugging production
+
+When something breaks on the live site, **read the Railway logs first** — don't
+guess. The API runs on Railway (project `vigilant-vision`, service `equiscore`).
+Full instructions (Dashboard + GraphQL API method + what to look for) are in
+[docs/DEPLOYMENT.md → Debugging production](./docs/DEPLOYMENT.md#debugging-production-how-to-review-railway-logs).
+The `GlobalExceptionFilter` logs full stack traces for 500s, so the root cause
+will be there.
+
 ## Things that are NOT code (fix in the relevant console, not here)
 
 - **Duplicate Clerk verification email** → Clerk Dashboard → Email verification

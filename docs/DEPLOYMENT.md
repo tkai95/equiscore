@@ -117,3 +117,99 @@ migration.
       won't send (links are still returned for manual copy in the admin UI).
 - [ ] Smoke test: sign-up path matches the site mode (open = anyone; dev =
       invite link required).
+
+---
+
+## Debugging production: how to review Railway logs
+
+When something breaks in production (500 errors, sign-in failures, onboarding
+not saving), the root cause is almost always in the **Railway API logs**. The
+API runs on Railway (project `vigilant-vision`, service `equiscore`). Here's
+how to read them.
+
+### Method 1 — Railway Dashboard (visual)
+
+1. Go to **railway.com** → open the **`vigilant-vision`** project.
+2. Click the **`equiscore`** service.
+3. Click the **Deployments** tab → the latest deployment → **View Logs**, OR
+   use the **Logs** tab directly on the service for live runtime output.
+4. Reproduce the error in your browser (e.g. trigger the failing onboarding
+   save), then watch the Railway log panel — errors appear within ~1 second.
+5. Look for red `[ERROR]` lines or stack traces (e.g. `PrismaClientKnownRequestError`,
+   `Unhandled exception on PUT /api/v1/...`).
+
+### Method 2 — Railway GraphQL API (automated / programmatic)
+
+If you have a Railway API token (generate at railway.com → Account Settings →
+API Tokens), you can pull logs programmatically. The endpoint is:
+
+```
+https://backboard.railway.app/graphql/v2
+```
+
+**Step-by-step:**
+
+```bash
+# 1. Find the service ID (the equiscore service inside the vigilant-vision project)
+TOKEN="your-railway-token"
+curl -s "https://backboard.railway.app/graphql/v2" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{"query":"{ projects { edges { node { id name services { edges { node { id name } } } } } } }"}'
+
+# 2. Get the latest deployment ID for the service
+SERVICE_ID="19a26434-c84d-42cc-893d-7ca624b4bea6"
+curl -s "https://backboard.railway.app/graphql/v2" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d "{\"query\":\"{ deployments(input: {serviceId: \\\"$SERVICE_ID\\\"}) { edges { node { id status createdAt } } } }\"}"
+
+# 3. Fetch the runtime logs (use the deployment ID from step 2)
+DEPLOYMENT_ID="the-deployment-id"
+curl -s "https://backboard.railway.app/graphql/v2" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d "{\"query\":\"{ environmentLogs(environmentId: \\\"226056ad-c585-4b99-b2d4-af2277d49058\\\", afterLimit: 200, filter: \\\"\\\") { severity message timestamp } }\"}"
+```
+
+**Key IDs for the equiscore project:**
+- Project: `vigilant-vision` (`a9237cdd-f741-4bb9-9d30-1cd20d65ce0f`)
+- Service: `equiscore` (`19a26434-c84d-42cc-893d-7ca624b4bea6`)
+- Production environment: `226056ad-c585-4b99-b2d4-af2277d49058`
+
+**Two log endpoints exist:**
+- `deploymentLogs(deploymentId, limit)` — boot/build logs (NestJS route
+  mapping, startup). Capped at the boot sequence.
+- `environmentLogs(environmentId, afterLimit, filter)` — **live runtime logs**
+  (actual errors, API requests, Prisma errors). This is where production 500s
+  show up. Use this for debugging.
+
+### Method 3 — From the browser (Network tab)
+
+If you can't access Railway, open DevTools (F12) → **Network** tab → trigger
+the error → click the red request → **Response** tab. The JSON response body
+often contains the error message (e.g. `{"message":"Invalid or expired token"}`).
+Less detailed than Railway logs, but immediate.
+
+### What to look for
+
+| Error pattern | Likely cause |
+|---|---|
+| `PrismaClientKnownRequestError: Unique constraint` | Email/ID collision (shared DB + multi-instance) |
+| `Unhandled exception on PUT /api/v1/profile/onboarding` | Look at the stack trace line — usually a DB constraint or type error |
+| `Invalid or expired token` | Clerk instance mismatch (frontend mints prod tokens, API verifies dev JWKS) |
+| `CORS: origin ... not allowed` | Missing host in the API CORS allow-list (`main.ts`) |
+| `Statement reading is not available` | Missing `ANTHROPIC_API_KEY` on the API service |
+| `Timed out while reading the statement` | PDF extraction exceeded the staleness ceiling |
+
+### Important: the GlobalExceptionFilter
+
+The API has a `GlobalExceptionFilter` (`apps/api/src/common/filters/http-exception.filter.ts`)
+that **logs the full stack trace** of non-HTTP exceptions to the Railway logs.
+This was added specifically because 500s were previously swallowed silently.
+If you see a 500 but no log detail, check that the filter is registered in
+`main.ts` via `app.useGlobalFilters(new GlobalExceptionFilter())`.
+
