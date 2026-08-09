@@ -167,8 +167,11 @@ export async function extractTransactionsFromPdf(
 // guarantee intact: only reconciling data ever gets scored.
 
 /** Don't attempt more break fixes than this — a clearly-tampered statement can
- *  produce dozens and we'd burn Claude calls for nothing. Cap reached ⇒ reject. */
-const HEAL_MAX_ATTEMPTS = 5
+ *  produce dozens and we'd burn Claude calls for nothing. Cap reached ⇒ reject.
+ *  Set high: a chunked 600+ transaction statement can legitimately produce many
+ *  chunk-boundary breaks, each individually fixable, and we'd rather try (and
+ *  log what we find) than silently bail. */
+const HEAL_MAX_ATTEMPTS = 20
 /** Re-read tries per break: a second attempt, re-prompted with the new error,
  *  catches a re-read that was itself slightly off. */
 const HEAL_MAX_RETRIES_PER_BREAK = 2
@@ -333,18 +336,25 @@ async function healBreaks(
   let integrity = checkBalanceContinuity(current)
   if (integrity.continuous || !integrity.hasBalances) return { transactions: current, warnings }
 
+  // Always log the situation we found, even if we cap out — a silent bail made
+  // this undiagnosable in production. We attempt up to HEAL_MAX_ATTEMPTS breaks;
+  // any beyond that are left to reject downstream (and logged here so it's clear
+  // why healing stopped).
+  const totalBreaks = integrity.breaks.length
   const breaksToFix = integrity.breaks.slice(0, HEAL_MAX_ATTEMPTS)
-  if (integrity.breaks.length > HEAL_MAX_ATTEMPTS) {
-    warnings.push(
-      `Statement had ${integrity.breaks.length} balance breaks — too many to self-heal; not attempted.`
+  if (totalBreaks > HEAL_MAX_ATTEMPTS) {
+    console.log(
+      `Self-healing: ${totalBreaks} breaks found — capping at ${HEAL_MAX_ATTEMPTS} attempts (remainder will reject if unresolved)`
     )
-    return { transactions: current, warnings }
+    warnings.push(
+      `Statement had ${totalBreaks} balance breaks; attempted the first ${HEAL_MAX_ATTEMPTS}.`
+    )
   }
 
   console.log(
-    `Self-healing: ${breaksToFix.length} break(s), largest drift ${Math.max(
+    `Self-healing: attempting ${breaksToFix.length} break(s), largest drift ${Math.max(
       ...breaksToFix.map((b) => Math.abs(b.expected - b.actual))
-    ).toFixed(2)} — attempting targeted re-read`
+    ).toFixed(2)} — targeted re-read`
   )
 
   for (const brk of breaksToFix) {
