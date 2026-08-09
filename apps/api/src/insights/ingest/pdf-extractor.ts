@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { NormalizedTxn } from '../engine/types'
 import { splitPdfIntoChunks } from './pdf-splitter'
 import { checkBalanceContinuity, findBreakContext, windowReconciles, type BreakContext } from '../engine/integrity'
+import { renderPagesToPngs } from './pdf-render'
+import { crossCheckBreak } from './cross-check'
 
 /**
  * PDF bank-statement extraction via Claude vision.
@@ -46,8 +48,9 @@ Rules:
 - If a value is genuinely unreadable, omit that single row rather than guessing.
 - Output only the JSON object.`
 
-/** Best-effort JSON extraction: strip any prose/markdown fences the model may add. */
-function extractJson(text: string): string {
+/** Best-effort JSON extraction: strip any prose/markdown fences the model may add.
+ *  Exported so the cross-check path can reuse the same robust parsing. */
+export function extractJson(text: string): string {
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
   if (start === -1 || end === -1 || end < start) throw new Error('No JSON object found in model output')
@@ -358,7 +361,7 @@ function spliceWindow(all: NormalizedTxn[], breakDate: string, replacement: Norm
  * page we need to re-read. Falls back to the whole-document base64 if no chunk
  * matches (defensive; shouldn't happen).
  */
-function chunkForBreak(chunks: ChunkIndex[], breakDate: string): { base64: string; label: string } {
+function chunkForBreak(chunks: ChunkIndex[], breakDate: string): { base64: string; startPage: number; endPage: number; label: string } {
   const breakTime = new Date(breakDate).getTime()
   // Pick the chunk whose transaction date range contains the break, else the
   // chunk whose max date is closest to (and before) the break.
@@ -370,7 +373,7 @@ function chunkForBreak(chunks: ChunkIndex[], breakDate: string): { base64: strin
     const min = Math.min(...times)
     const max = Math.max(...times)
     if (breakTime >= min && breakTime <= max) {
-      return { base64: c.base64, label: `pages ${c.startPage + 1}–${c.endPage}` }
+      return { base64: c.base64, startPage: c.startPage, endPage: c.endPage, label: `pages ${c.startPage + 1}–${c.endPage}` }
     }
     const dist = Math.min(Math.abs(breakTime - min), Math.abs(breakTime - max))
     if (dist < bestDist) {
@@ -378,13 +381,16 @@ function chunkForBreak(chunks: ChunkIndex[], breakDate: string): { base64: strin
       best = c
     }
   }
-  return best ? { base64: best.base64, label: `pages ${best.startPage + 1}–${best.endPage}` } : { base64: '', label: 'no chunk' }
+  return best
+    ? { base64: best.base64, startPage: best.startPage, endPage: best.endPage, label: `pages ${best.startPage + 1}–${best.endPage}` }
+    : { base64: '', startPage: 0, endPage: 0, label: 'no chunk' }
 }
 
 async function healBreaks(
   apiKey: string,
   chunks: ChunkIndex[],
   fallbackBase64: string,
+  pdfBuffer: Buffer,
   txns: NormalizedTxn[]
 ): Promise<{ transactions: NormalizedTxn[]; warnings: string[] }> {
   const warnings: string[] = []
@@ -439,33 +445,64 @@ async function healBreaks(
     // viable on a large statement without timing out.
     const target = chunkForBreak(chunks, liveBreak.date)
     const reReadBase64 = target.base64 || fallbackBase64
+    // Pages to rasterize for the cross-check model (OpenAI-compatible models
+    // need images, not PDFs). Empty range ⇒ cross-check no-ops.
+    const pageIndices =
+      target.endPage > target.startPage
+        ? Array.from({ length: target.endPage - target.startPage }, (_, k) => target.startPage + k)
+        : []
 
     for (let attempt = 1; attempt <= HEAL_MAX_RETRIES_PER_BREAK; attempt++) {
       try {
         const ctx = findBreakContext(current, liveBreak)
-        const corrected = await rereadTransactionsFromPdf(apiKey, reReadBase64, ctx)
+
+        // Run Claude's re-read and the cheap-model cross-check IN PARALLEL. The
+        // cross-check needs page images (rasterized); Claude gets the sub-PDF.
+        // Both are independently verified with windowReconciles — a different
+        // model reading the same pixels is the independent second chance that
+        // catches an error Claude repeats. Either may return [] (disabled,
+        // rasterization failed, parse error) and we just use the other.
+        let claudeTxns: NormalizedTxn[] = []
+        let crossTxns: NormalizedTxn[] = []
+        if (attempt === 1) {
+          // First attempt: race both. Render images and call both at once.
+          const pagePngs = pageIndices.length > 0 ? await renderPagesToPngs(pdfBuffer, pageIndices) : []
+          ;[claudeTxns, crossTxns] = await Promise.all([
+            rereadTransactionsFromPdf(apiKey, reReadBase64, ctx),
+            pagePngs.length > 0 ? crossCheckBreak(ctx, pagePngs) : Promise.resolve([]),
+          ])
+        } else {
+          // Retry: Claude only (a retry is for Claude re-reads that were close
+          // but didn't reconcile; the cross-check already had its shot).
+          claudeTxns = await rereadTransactionsFromPdf(apiKey, reReadBase64, ctx)
+        }
+
+        const claudeOk = windowReconciles(claudeTxns, ctx.beforeBalance, ctx.afterBalance)
+        const crossOk = windowReconciles(crossTxns, ctx.beforeBalance, ctx.afterBalance)
         console.log(
-          `Self-healing ${liveBreak.date} (attempt ${attempt}, ${target.label}): got ${corrected.length} txn(s)` +
+          `Self-healing ${liveBreak.date} (attempt ${attempt}, ${target.label}): claude=${claudeTxns.length}txn${claudeOk ? '✓' : '✗'}` +
+            `${crossTxns.length > 0 || attempt === 1 ? ` cross=${crossTxns.length}txn${crossOk ? '✓' : '✗'}` : ''}` +
             ` (was ${ctx.windowTxns.length}); anchors before=${ctx.beforeBalance} after=${ctx.afterBalance}`
         )
-        if (corrected.length === 0) break // nothing to splice — give up on this break
 
-        // VERIFY LOCALLY: do the corrected rows connect the trusted before/after
-        // anchors? This is the real correctness question — it's immune to the
-        // splice shifting break dates/signatures elsewhere, which the old global
-        // break-count check was not. A window that reconciles is a correct fix.
-        const reconciled = windowReconciles(corrected, ctx.beforeBalance, ctx.afterBalance)
-        if (reconciled) {
+        // Prefer Claude on ties (established path); take the cross-check if it
+        // reconciled and Claude didn't.
+        const corrected = claudeOk ? claudeTxns : crossOk ? crossTxns : []
+        if (corrected.length > 0) {
           current = spliceWindow(current, liveBreak.date, corrected)
-          console.log(`Self-healing: break around ${liveBreak.date} resolved on attempt ${attempt}`)
+          console.log(
+            `Self-healing: break around ${liveBreak.date} resolved on attempt ${attempt}` +
+              `${!claudeOk && crossOk ? ' (via cross-check)' : ''}`
+          )
           fixed++
           break // success — move to next break
         }
-        // Didn't reconcile — if we have a retry left, loop; else abandon.
+
+        // Neither reconciled — if we have a retry left, loop; else abandon.
         if (attempt === HEAL_MAX_RETRIES_PER_BREAK) {
           warnings.push(`Could not reconcile balances around ${liveBreak.date} after ${attempt} re-read attempt(s).`)
           console.log(
-            `Self-healing: ${liveBreak.date} NOT resolved after ${attempt} attempt(s) — window did not connect anchors`
+            `Self-healing: ${liveBreak.date} NOT resolved after ${attempt} attempt(s) — no provider produced a reconciling window`
           )
         }
       } catch (err) {
@@ -522,7 +559,7 @@ export async function extractTransactionsFromLargePdf(
     const chunkIndex: ChunkIndex[] = [
       { base64: base64Pdf, startPage: chunks[0]!.startPage, endPage: chunks[0]!.endPage, txns: result.transactions },
     ]
-    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, result.transactions)
+    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, pdfBuffer, result.transactions)
     return { ...result, transactions: healed.transactions, warnings: [...result.warnings, ...healed.warnings] }
   }
 
@@ -583,7 +620,7 @@ export async function extractTransactionsFromLargePdf(
   // index so each re-read is page-scoped (fast) instead of whole-document.
   let transactions = deduped
   if (deduped.length > 0) {
-    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, deduped)
+    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, pdfBuffer, deduped)
     transactions = healed.transactions
     warnings.push(...healed.warnings)
   }
