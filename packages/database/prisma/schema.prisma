@@ -314,6 +314,20 @@ model BankTransaction {
   category      TransactionCategory?
   direction     TransactionDirection
   rawPayload    Json?                @map("raw_payload")
+  // ── Provenance + ledger evidence (statement-ingestion rewrite) ──────────────
+  // The running balance AFTER this transaction, as printed on the statement.
+  // Previously verified at ingest then dropped — once persisted it makes the
+  // ledger re-verifiable from the database, not just in-memory at import time.
+  balance       Float?
+  // Where this row came from in the source document (1-based page, row within
+  // page). Null for Open Banking / non-document sources. Enables the evidence
+  // trace: document → page → row → raw text → normalised transaction.
+  sourcePage    Int?                 @map("source_page")
+  sourceRow     Int?                 @map("source_row")
+  // Which extractor produced this row + its version, for auditability and
+  // selective reprocessing. e.g. "native_pdf" / "csv" / "oci" / "llm_crop".
+  extractor     String?
+  extractorVersion String?           @map("extractor_version")
   createdAt     DateTime             @default(now()) @map("created_at")
 
   bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
@@ -1376,10 +1390,52 @@ model StatementImportJob {
   createdAt   DateTime                 @default(now()) @map("created_at")
   completedAt DateTime?                @map("completed_at")
 
+  // ── Real processing state machine (statement-ingestion rewrite) ────────────
+  // Replaces treating `status=processing` as one opaque bucket. `stage` tracks
+  // where in the pipeline the job is, so we can distinguish "extracting" from
+  // "validating" from "stuck", and surface the real failure class instead of a
+  // generic "couldn't read your statement". Terminal stages map to failure
+  // statuses (needs_better_source / unsupported_format / unresolved_extraction /
+  // provider_error → status=failed).
+  stage        StatementImportStage    @default(uploaded) @map("stage")
+  // The full validation result object (per-check PASS/FAIL, breaks, unresolved
+  // fields) per the verification spec. Null until validation runs.
+  validation   Json?
+  // How trustworthy the source itself is — distinct from extraction
+  // confidence. A perfectly-parsed user-uploaded CSV is HIGH confidence but
+  // USER_DOCUMENT assurance (editable), vs BANK_API (attested). These must
+  // never be conflated.
+  sourceAssurance String?             @map("source_assurance")
+  // Which extractor strategy handled this job + version, for auditability.
+  extractor    String?
+  extractorVersion String?            @map("extractor_version")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@map("statement_import_jobs")
+}
+
+/// Pipeline stages. The happy path is uploaded→…→verified→analysing→complete;
+/// the rest are terminal failure classes (the job's `status` is set to `failed`
+/// and `stage` records which kind).
+enum StatementImportStage {
+  uploaded
+  preflight
+  classified
+  extracting
+  normalising
+  validating
+  resolving
+  verified
+  analysing
+  complete
+  needs_better_source
+  unsupported_format
+  unresolved_extraction
+  provider_error
+
+  @@map("statement_import_stage")
 }
 
 enum StatementImportJobStatus {
