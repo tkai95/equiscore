@@ -112,3 +112,53 @@ export function findBreakContext(
     windowTxns,
   }
 }
+
+/**
+ * Does a set of transactions reconcile LOCALLY between two trusted anchor
+ * balances? This is the verification behind self-healing: after Claude re-reads
+ * the suspect window, we check that walking the corrected rows from the
+ * before-anchor lands exactly on the after-anchor. If it does, the splice is
+ * correct and we keep it — regardless of what breaks exist elsewhere in the
+ * statement (those are separate problems, handled separately).
+ *
+ * Unlike the global checkBalanceContinuity, this is immune to the splice
+ * shifting break signatures: it only cares that THIS window now connects,
+ * which is the actual correctness question.
+ *
+ * @param windowTxns  the corrected transactions (sorted oldest-first)
+ * @param beforeBalance  the trusted running balance immediately before the window (null = unanchored start)
+ * @param afterBalance   the trusted running balance at/after the window (null = unanchored end)
+ */
+export function windowReconciles(
+  windowTxns: NormalizedTxn[],
+  beforeBalance: number | null,
+  afterBalance: number | null
+): boolean {
+  // Need at least the rows and one anchor to say anything meaningful.
+  const withBalance = windowTxns
+    .slice()
+    .sort((a, b) => toDate(a.date).getTime() - toDate(b.date).getTime())
+    .filter((t) => typeof t.balance === 'number')
+  if (withBalance.length === 0) return false
+
+  // Walk forward from the before-anchor: each printed balance must equal the
+  // previous printed balance ± the row's amount. If beforeBalance is null we
+  // can't verify the first hop, so start from the first printed balance instead.
+  let prev: number | null = beforeBalance
+  for (const t of withBalance) {
+    const bal = t.balance as number
+    if (prev !== null) {
+      const delta = t.direction === 'credit' ? t.amount : -t.amount
+      if (Math.abs(round2(prev + delta) - round2(bal)) > TOLERANCE) return false
+    }
+    prev = bal
+  }
+
+  // The last printed balance in the window must connect to the after-anchor.
+  // (If afterBalance is null, the window is unanchored at the end — accept on
+  // the internal-continuity check above having passed.)
+  if (afterBalance !== null && prev !== null) {
+    if (Math.abs(round2(prev) - round2(afterBalance)) > TOLERANCE) return false
+  }
+  return true
+}

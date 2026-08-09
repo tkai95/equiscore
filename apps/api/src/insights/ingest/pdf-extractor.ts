@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { NormalizedTxn } from '../engine/types'
 import { splitPdfIntoChunks } from './pdf-splitter'
-import { checkBalanceContinuity, findBreakContext, type BreakContext } from '../engine/integrity'
+import { checkBalanceContinuity, findBreakContext, windowReconciles, type BreakContext } from '../engine/integrity'
 
 /**
  * PDF bank-statement extraction via Claude vision.
@@ -179,6 +179,15 @@ function buildRereadPrompt(ctx: BreakContext): string {
     (t) =>
       `  ${t.date} | ${t.direction === 'credit' ? '+' : '-'}${t.amount.toFixed(2)} | balance: ${t.balance ?? '?'} | ${t.description ?? ''}`
   )
+  // Quantify the gap so Claude knows the exact magnitude it's hunting for —
+  // this is a strong signal: a gap of exactly 2× a transaction's amount almost
+  // always means a direction (credit/debit) was flipped; a gap equal to a
+  // missing transaction's amount means a row was dropped or duplicated.
+  const gap =
+    ctx.beforeBalance !== null && ctx.afterBalance !== null
+      ? `\nThe running balance is off by ${Math.abs(ctx.afterBalance - ctx.beforeBalance).toFixed(2)} across this window. A gap of exactly 2× some transaction's amount usually means that transaction's direction (credit vs debit) was read backwards. A gap equal to a transaction's amount usually means a row was dropped or duplicated.`
+      : ''
+
   return `You previously extracted transactions from a UK bank statement, but the running balance does NOT reconcile around ${ctx.breakDate}.
 
 A different process independently verified these anchor balances are CORRECT (they reconciled with the surrounding rows):
@@ -187,8 +196,9 @@ A different process independently verified these anchor balances are CORRECT (th
 
 What we currently have in that window (date | amount | balance | description):
 ${lines.join('\n')}
+${gap}
 
-Something in this window was misread — a wrong amount, a wrong balance, a dropped row, or a duplicated row — such that the running balance jumps. Look very carefully at the same pages of the statement and re-extract ONLY the transactions within roughly 7 days of ${ctx.breakDate}.
+One of the rows in this window was misread. The most common causes, in order: (1) a transaction's DIRECTION was flipped (credit read as debit or vice-versa) — this doubles the error; (2) a row was dropped or duplicated; (3) an amount digit was misread; (4) the running balance was copied wrong. Look very carefully at the same pages of the statement and re-extract ONLY the transactions within roughly 7 days of ${ctx.breakDate}, correcting whichever of these errors occurred.
 
 Return ONLY a JSON object, no markdown, no commentary, in exactly this shape:
 {
@@ -204,8 +214,8 @@ Return ONLY a JSON object, no markdown, no commentary, in exactly this shape:
 }
 
 Rules:
-- Re-read carefully: the amounts and balances must connect ${ctx.beforeBalance ?? 'the prior balance'} to ${ctx.afterBalance ?? 'the following balance'} exactly.
-- Copy the running balance EXACTLY as printed — do not compute or "correct" it.
+- The amounts and balances MUST connect ${ctx.beforeBalance ?? 'the prior balance'} to ${ctx.afterBalance ?? 'the following balance'} exactly — verify this yourself before returning.
+- Copy the running balance EXACTLY as printed on the statement — do not compute or "correct" it.
 - Include EVERY transaction line in that window, in chronological order. Do not include transactions outside the window.
 - If a row is genuinely unreadable, omit it rather than guessing.
 - Output only the JSON object.`
@@ -347,27 +357,28 @@ async function healBreaks(
       try {
         const ctx = findBreakContext(current, liveBreak)
         const corrected = await rereadTransactionsFromPdf(apiKey, base64Pdf, ctx)
+        console.log(
+          `Self-healing ${liveBreak.date} (attempt ${attempt}): re-read returned ${corrected.length} txn(s)` +
+            ` (was ${ctx.windowTxns.length}); anchors before=${ctx.beforeBalance} after=${ctx.afterBalance}`
+        )
         if (corrected.length === 0) break // nothing to splice — give up on this break
 
-        const candidate = spliceWindow(current, liveBreak.date, corrected)
-
-        // VERIFY before keeping: only accept the splice if it's strictly better —
-        // it resolved THIS break and didn't introduce new ones. Otherwise revert.
-        const beforeCheck = checkBalanceContinuity(current)
-        const afterCheck = checkBalanceContinuity(candidate)
-        const resolvedThisBreak = !afterCheck.breaks.some(
-          (b) => b.date === liveBreak.date && b.expected === liveBreak.expected
-        )
-        const fewerBreaks = afterCheck.breaks.length < beforeCheck.breaks.length
-
-        if (resolvedThisBreak && fewerBreaks) {
-          current = candidate
+        // VERIFY LOCALLY: do the corrected rows connect the trusted before/after
+        // anchors? This is the real correctness question — it's immune to the
+        // splice shifting break dates/signatures elsewhere, which the old global
+        // break-count check was not. A window that reconciles is a correct fix.
+        const reconciled = windowReconciles(corrected, ctx.beforeBalance, ctx.afterBalance)
+        if (reconciled) {
+          current = spliceWindow(current, liveBreak.date, corrected)
           console.log(`Self-healing: break around ${liveBreak.date} resolved on attempt ${attempt}`)
           break // success — move to next break
         }
-        // Didn't verify — if we have a retry left, loop; else abandon this break.
+        // Didn't reconcile — if we have a retry left, loop; else abandon.
         if (attempt === HEAL_MAX_RETRIES_PER_BREAK) {
-          warnings.push(`Could not reconcile balances around ${liveBreak.date} after re-read.`)
+          warnings.push(`Could not reconcile balances around ${liveBreak.date} after ${attempt} re-read attempt(s).`)
+          console.log(
+            `Self-healing: ${liveBreak.date} NOT resolved after ${attempt} attempt(s) — window did not connect anchors`
+          )
         }
       } catch (err) {
         warnings.push(
