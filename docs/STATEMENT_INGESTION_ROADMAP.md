@@ -169,53 +169,40 @@ Each phase is committed separately so it's reviewable and revertable. This
 section's "Shipped" entries update as each lands.
 
 ### Shipped
-_(none yet — build in progress)_
-
-### In progress
 
 - **Phase 1 — Canonical ledger + validation engine + schema.** Provider-neutral
-  `CanonicalTransaction` / `ExtractionResult` / `ValidationResult` types.
-  Multi-layer validation (structural, completeness, deduplication by row-identity,
-  balance-continuity in minor currency, statement-level opening/closing, dates,
-  metadata, provenance coverage). Schema migration: `BankTransaction.balance` +
-  provenance columns; `StatementImportJob.stage` state machine + `validation` +
-  `sourceAssurance`. This is pure backend, no external deps, and immediately
-  improves safety even before extractors change.
+  `CanonicalTransaction` / `ExtractionResult` / `ValidationResult` types;
+  8-layer validation engine (structural, completeness, deduplication,
+  running-balance, statement-level, dates, metadata, provenance coverage).
+  Schema migration applied: `BankTransaction.balance` + provenance columns;
+  `StatementImportJob.stage` state machine + `validation` + `sourceAssurance`.
+- **Phase 2-3 — `extractDocument` dispatcher + CSV + native-PDF.** Strategy
+  abstraction; CSV wraps the deterministic parser; native-PDF reads the PDF's
+  own text layer via pdfjs `getTextContent` + positional grouping (the ~£0
+  route that eliminates the LLM-digit-misread class for digital PDFs).
+- **Phase 4 — Deleted the Claude-primary path.** `pdf-extractor.ts` (all the
+  extraction + self-healing) and `cross-check.ts` removed; `−1015` lines. CSV +
+  PDF now flow through the deterministic-first pipeline.
+- **Phase 5 — Scan adapters + LLM last-resort crop.** OCI + Google adapters
+  (fail closed until credentials); exception resolver crops the suspect PAGE
+  only and accepts corrections with evidence + reconciliation, never arithmetic
+  alone.
+- **Phase 6 — Rewired job runners.** Both inputs run classify → extract →
+  validate → resolve → persist-verified. Real stage transitions + audit events;
+  failures surface their true class. `persistVerifiedLedger` persists balance +
+  provenance and only runs after `validation.status === 'verified'` (scoring
+  gate). Scanned PDFs reject cleanly as `needs_better_source` until cloud keys.
+- **Phase 7 — Benchmark harness.** `benchmark/harness.ts` measures each strategy
+  on date/amount/direction/balance/row/count exact + reconciles + **false
+  auto-accept rate**. Runs the moment a golden corpus is dropped in.
 
-### Upcoming
+### Notes on what shipped vs. the original plan
 
-- **Phase 2 — `extractDocument` dispatcher + CSV route.** The strategy
-  abstraction (`DocumentExtractor` interface, `extractDocument(input, strategy)`).
-  CSV extractor wraps the existing deterministic `parseStatementCsv`, now
-  returning `ExtractionResult` and routing through the new validator.
-
-- **Phase 3 — Native PDF text-layer extraction.** `classifyPdf` (digital /
-  scanned / mixed via per-page text density) + `extractNativePdf` (pdfjs
-  `getTextContent` + positional grouping into rows/columns, header detection,
-  page-checkpointed for the 600-transaction case). This is the single
-  highest-value change: eliminates the LLM-digit-misread class for digital PDFs.
-
-- **Phase 4 — Delete the Claude-primary path.** Remove `extractTransactionsFromLargePdf`,
-  the self-healing, the cross-check, the rasterizer, the `@napi-rs/canvas` dep,
-  and the webpack externals. Rewire `runPdfImportJob` to the new pipeline:
-  classify → extract(strategy) → normalise → validate → resolve → persist-verified.
-
-- **Phase 5 — Scan adapters (configured-on-demand stubs).** `document-ai/oci.ts`
-  and `document-ai/google.ts` implementing the `DocumentExtractor` interface,
-  throwing `ProviderNotConfigured` until env keys exist. The cheap-OCR → parser
-  → reconcile → escalate cascade is wired through them. A scanned upload with
-  no keys returns a clean `needs_better_source` rejection — never a fake
-  "couldn't read."
-
-- **Phase 6 — LLM as last-resort crop.** `exception-resolver.ts`: when cheap OCR
-  + better extractor both fail a row, send ONLY the suspect page crop to a
-  vision model for transcription. Corrections require source evidence +
-  reconciliation (Invariant 2). Semantic categorisation (`classifyTransaction`)
-  stays — post-validation, can't mutate ledger fields.
-
-- **Phase 7 — Benchmark harness.** `benchmark/` loads the golden corpus and
-  measures each strategy on the exactness metrics above. Runs the moment a
-  corpus is dropped in; until then it's the gate for OCI-vs-Google selection.
+- The rasterizer (`pdf-render.ts` + `@napi-rs/canvas`) was **retained**, not
+  deleted as the original Phase 4 plan said — the LLM last-resort crop resolver
+  needs page images for the vision model. The webpack externals for it stay too.
+- AWS Textract was never built (deliberately excluded per the brief).
+- Self-hosted OCR (PaddleOCR) remains deferred on cost grounds.
 
 ---
 
