@@ -412,14 +412,19 @@ export class InsightsService implements OnModuleInit {
     }
   }
 
-  // The extractor self-aborts at 5 min per chunk, and a multi-chunk statement
-  // (4 chunks × ~90s) can take ~6 min + overhead. 15 min gives comfortable
-  // headroom for large statements. Reaching it means the job is genuinely orphaned.
-  private static readonly JOB_STALE_MS = 15 * 60 * 1000
+  // Extraction of a large statement (~5-6 min for 600+ txns) plus a bounded
+  // self-healing pass can legitimately take ~12-15 min. 20 min gives headroom
+  // for that real work; reaching it means the job is genuinely orphaned (a
+  // crashed/deploved process), not just slow. The healing pass has its own
+  // tighter wall-clock budget so it stops gracefully well before this.
+  private static readonly JOB_STALE_MS = 20 * 60 * 1000
 
   /** A job stuck "processing" past the timeout (e.g. a container restart) reads as failed. */
   private withStaleness<T extends { status: string; createdAt: Date }>(job: T): T {
     if (job.status === 'processing' && Date.now() - job.createdAt.getTime() > InsightsService.JOB_STALE_MS) {
+      this.logger.warn(
+        `Import ${'id' in job ? (job as { id?: string }).id : '?'}: marked stale after ${((Date.now() - job.createdAt.getTime()) / 1000).toFixed(0)}s — likely an orphaned process (deploy/crash)`
+      )
       return { ...job, status: 'failed', error: 'Timed out while reading the statement. Please try again.' } as T
     }
     return job

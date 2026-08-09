@@ -175,6 +175,24 @@ const HEAL_MAX_ATTEMPTS = 20
 /** Re-read tries per break: a second attempt, re-prompted with the new error,
  *  catches a re-read that was itself slightly off. */
 const HEAL_MAX_RETRIES_PER_BREAK = 2
+/** Wall-clock budget for the whole healing pass. Extraction of a large statement
+ *  already takes several minutes; healing must finish well inside the job's
+ *  staleness ceiling or the whole import times out. When the budget is up, we
+ *  stop fixing remaining breaks (keeping whatever we fixed) and let the
+ *  integrity gate decide — graceful, not an opaque timeout. */
+const HEAL_TIME_BUDGET_MS = 6 * 60 * 1000
+
+/**
+ * A chunk's sub-PDF plus the transactions extracted from it, kept so self-healing
+ * can re-read ONLY the relevant pages around a break (seconds) instead of
+ * re-sending the whole document (a minute+ per call). Built during extraction.
+ */
+interface ChunkIndex {
+  base64: string
+  startPage: number
+  endPage: number
+  txns: NormalizedTxn[]
+}
 
 /** Builds the targeted re-read prompt from a break context. */
 function buildRereadPrompt(ctx: BreakContext): string {
@@ -237,7 +255,11 @@ async function rereadTransactionsFromPdf(
 ): Promise<NormalizedTxn[]> {
   const client = new Anthropic({ apiKey })
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+  // Per-call ceiling is shorter than the overall healing budget so a single
+  // stuck re-read can't eat the whole budget. 90s is plenty for a page-scoped
+  // re-read (the slow case was re-reading the WHOLE document).
+  const timeout = setTimeout(() => controller.abort(), 90 * 1000)
+  const startedAt = Date.now()
 
   let message
   try {
@@ -263,7 +285,10 @@ async function rereadTransactionsFromPdf(
     )
     message = await stream.finalMessage()
   } catch (err) {
-    if (controller.signal.aborted) return [] // a heal timeout isn't fatal — the break stays and the statement rejects
+    if (controller.signal.aborted) {
+      console.log(`Self-healing: re-read aborted after ${((Date.now() - startedAt) / 1000).toFixed(0)}s (page-scoped ceiling)`)
+      return [] // a heal timeout isn't fatal — the break stays and the statement rejects
+    }
     throw err
   } finally {
     clearTimeout(timeout)
@@ -297,6 +322,7 @@ async function rereadTransactionsFromPdf(
       balance: typeof t.balance === 'number' ? t.balance : null,
     })
   }
+  console.log(`Self-healing: re-read returned ${out.length} txn(s) in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
   return out
 }
 
@@ -325,13 +351,45 @@ function spliceWindow(all: NormalizedTxn[], breakDate: string, replacement: Norm
  * survives healing means the data is genuinely wrong and persistStatement will
  * reject it. That's the correct outcome — wrong data should not be scored.
  */
+/**
+ * Find the chunk whose extracted transactions bracket a break date. Each chunk
+ * covers a contiguous page range, so its transactions cover a contiguous date
+ * range — the chunk containing the break date (or nearest before it) holds the
+ * page we need to re-read. Falls back to the whole-document base64 if no chunk
+ * matches (defensive; shouldn't happen).
+ */
+function chunkForBreak(chunks: ChunkIndex[], breakDate: string): { base64: string; label: string } {
+  const breakTime = new Date(breakDate).getTime()
+  // Pick the chunk whose transaction date range contains the break, else the
+  // chunk whose max date is closest to (and before) the break.
+  let best = chunks[0]
+  let bestDist = Infinity
+  for (const c of chunks) {
+    if (c.txns.length === 0) continue
+    const times = c.txns.map((t) => new Date(t.date).getTime())
+    const min = Math.min(...times)
+    const max = Math.max(...times)
+    if (breakTime >= min && breakTime <= max) {
+      return { base64: c.base64, label: `pages ${c.startPage + 1}–${c.endPage}` }
+    }
+    const dist = Math.min(Math.abs(breakTime - min), Math.abs(breakTime - max))
+    if (dist < bestDist) {
+      bestDist = dist
+      best = c
+    }
+  }
+  return best ? { base64: best.base64, label: `pages ${best.startPage + 1}–${best.endPage}` } : { base64: '', label: 'no chunk' }
+}
+
 async function healBreaks(
   apiKey: string,
-  base64Pdf: string,
+  chunks: ChunkIndex[],
+  fallbackBase64: string,
   txns: NormalizedTxn[]
 ): Promise<{ transactions: NormalizedTxn[]; warnings: string[] }> {
   const warnings: string[] = []
   let current = txns
+  const healStartedAt = Date.now()
 
   let integrity = checkBalanceContinuity(current)
   if (integrity.continuous || !integrity.hasBalances) return { transactions: current, warnings }
@@ -354,21 +412,40 @@ async function healBreaks(
   console.log(
     `Self-healing: attempting ${breaksToFix.length} break(s), largest drift ${Math.max(
       ...breaksToFix.map((b) => Math.abs(b.expected - b.actual))
-    ).toFixed(2)} — targeted re-read`
+    ).toFixed(2)} — targeted page-scoped re-read (budget ${HEAL_TIME_BUDGET_MS / 1000}s)`
   )
 
+  let fixed = 0
   for (const brk of breaksToFix) {
+    // Wall-clock budget: stop before we blow the job staleness ceiling. Keep
+    // whatever we've fixed so far and let the integrity gate judge the rest.
+    const elapsed = Date.now() - healStartedAt
+    if (elapsed > HEAL_TIME_BUDGET_MS) {
+      const remaining = breaksToFix.length - fixed - 0
+      console.log(
+        `Self-healing: stopping after ${(elapsed / 1000).toFixed(0)}s — budget reached with ${remaining} break(s) unattempted (keeping ${fixed} fix(es))`
+      )
+      warnings.push(`Self-healing stopped early: time budget reached with breaks still outstanding.`)
+      break
+    }
+
     // Re-locate the break each iteration: a prior splice may have shifted it.
     integrity = checkBalanceContinuity(current)
     const liveBreak = integrity.breaks.find((b) => b.date === brk.date && b.expected === brk.expected)
     if (!liveBreak) continue // already resolved by an earlier splice
 
+    // Pick the page-scoped sub-PDF for THIS break (seconds to re-read) instead
+    // of re-sending the whole document (a minute+). This is what makes healing
+    // viable on a large statement without timing out.
+    const target = chunkForBreak(chunks, liveBreak.date)
+    const reReadBase64 = target.base64 || fallbackBase64
+
     for (let attempt = 1; attempt <= HEAL_MAX_RETRIES_PER_BREAK; attempt++) {
       try {
         const ctx = findBreakContext(current, liveBreak)
-        const corrected = await rereadTransactionsFromPdf(apiKey, base64Pdf, ctx)
+        const corrected = await rereadTransactionsFromPdf(apiKey, reReadBase64, ctx)
         console.log(
-          `Self-healing ${liveBreak.date} (attempt ${attempt}): re-read returned ${corrected.length} txn(s)` +
+          `Self-healing ${liveBreak.date} (attempt ${attempt}, ${target.label}): got ${corrected.length} txn(s)` +
             ` (was ${ctx.windowTxns.length}); anchors before=${ctx.beforeBalance} after=${ctx.afterBalance}`
         )
         if (corrected.length === 0) break // nothing to splice — give up on this break
@@ -381,6 +458,7 @@ async function healBreaks(
         if (reconciled) {
           current = spliceWindow(current, liveBreak.date, corrected)
           console.log(`Self-healing: break around ${liveBreak.date} resolved on attempt ${attempt}`)
+          fixed++
           break // success — move to next break
         }
         // Didn't reconcile — if we have a retry left, loop; else abandon.
@@ -401,10 +479,10 @@ async function healBreaks(
 
   const after = checkBalanceContinuity(current)
   if (after.continuous) {
-    console.log('Self-healing: all balances now reconcile')
+    console.log(`Self-healing: all balances now reconcile (fixed ${fixed} break(s) in ${((Date.now() - healStartedAt) / 1000).toFixed(0)}s)`)
   } else {
     console.log(
-      `Self-healing: ${after.breaks.length} break(s) remain unreconciled — statement will be rejected`
+      `Self-healing: ${after.breaks.length} break(s) remain unreconciled after ${((Date.now() - healStartedAt) / 1000).toFixed(0)}s — statement will be rejected`
     )
   }
 
@@ -440,7 +518,11 @@ export async function extractTransactionsFromLargePdf(
   if (chunks.length === 1) {
     const result = await extractTransactionsFromPdf(apiKey, base64Pdf)
     if (result.transactions.length === 0) return result
-    const healed = await healBreaks(apiKey, base64Pdf, result.transactions)
+    // One chunk → the whole document is the only page scope available.
+    const chunkIndex: ChunkIndex[] = [
+      { base64: base64Pdf, startPage: chunks[0]!.startPage, endPage: chunks[0]!.endPage, txns: result.transactions },
+    ]
+    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, result.transactions)
     return { ...result, transactions: healed.transactions, warnings: [...result.warnings, ...healed.warnings] }
   }
 
@@ -449,6 +531,9 @@ export async function extractTransactionsFromLargePdf(
   const allTransactions: NormalizedTxn[] = []
   const warnings: string[] = []
   let accountHolderName: string | null = null
+  // Per-chunk index kept for self-healing: lets a targeted re-read send only the
+  // page range around a break (seconds) instead of the whole document (a minute+).
+  const chunkIndex: ChunkIndex[] = []
 
   for (let i = 0; i < chunks.length; i++) {
     // Cooperative cancellation between chunks.
@@ -466,6 +551,7 @@ export async function extractTransactionsFromLargePdf(
     if (result.accountHolderName && !accountHolderName) {
       accountHolderName = result.accountHolderName
     }
+    chunkIndex.push({ base64: chunk.base64, startPage: chunk.startPage, endPage: chunk.endPage, txns: result.transactions })
   }
 
   // Deduplicate at chunk boundaries: overlapping pages or repeated rows produce
@@ -493,10 +579,11 @@ export async function extractTransactionsFromLargePdf(
   // Self-healing pass: if the merged set has a few small balance breaks (the
   // signature of an OCR misread, not tampering), re-read just those regions and
   // splice the corrections back in. Best-effort — failures fall through and the
-  // break either tolerates or rejects in persistStatement.
+  // break either tolerates or rejects in persistStatement. Uses the per-chunk
+  // index so each re-read is page-scoped (fast) instead of whole-document.
   let transactions = deduped
   if (deduped.length > 0) {
-    const healed = await healBreaks(apiKey, base64Pdf, deduped)
+    const healed = await healBreaks(apiKey, chunkIndex, base64Pdf, deduped)
     transactions = healed.transactions
     warnings.push(...healed.warnings)
   }
