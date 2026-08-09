@@ -149,9 +149,18 @@ function groupIntoLines(items: TextItem[], lineHeightTolerance = 2): Line[] {
 // We recognise columns by content pattern + x-position clustering, not by
 // assuming a fixed layout (every bank differs).
 
-const DATE_RE = /^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/
+// Numeric dd/mm/yyyy OR long-form "1 August 2026" / "1 Aug 2026" — Wise and
+// several fintech statements use the long form, so both must be recognised.
+const DATE_RE = /^(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})$/
 const AMOUNT_RE = /^[-£$€]?\s*[\d,]+\.\d{2}$/
 const SIGNED_AMOUNT_RE = /^-?\s*[\d,]+\.\d{2}$/
+
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6, july: 7,
+  august: 8, september: 9, october: 10, november: 11, december: 12,
+}
 
 /** Parse a recognised amount string into a number (handles £, commas, () negatives). */
 function parseAmount(s: string): number | null {
@@ -162,15 +171,27 @@ function parseAmount(s: string): number | null {
   return neg ? -v : v
 }
 
-/** Normalise a recognised UK date string (dd/mm/yyyy or dd-mm-yy) to ISO yyyy-mm-dd. */
+/** Normalise a recognised UK date to ISO yyyy-mm-dd. Handles both numeric
+ *  (dd/mm/yyyy) and long-form ("1 August 2026", "1 Aug 26"). */
 function normaliseDate(s: string): string | null {
-  const m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s.trim())
-  if (!m) return null
-  let [, d, mo, y] = m
-  const day = d!.padStart(2, '0')
-  const month = mo!.padStart(2, '0')
-  const year = y!.length === 2 ? `20${y}` : y!
-  return `${year}-${month}-${day}`
+  const t = s.trim()
+  // Numeric form.
+  const num = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(t)
+  if (num) {
+    const [, d, mo, y] = num
+    const year = y!.length === 2 ? `20${y}` : y!
+    return `${year}-${mo!.padStart(2, '0')}-${d!.padStart(2, '0')}`
+  }
+  // Long form: "1 August 2026" / "1 Aug 26".
+  const long = /^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/.exec(t)
+  if (long) {
+    const [, d, monName, y] = long
+    const mo = MONTHS[monName!.toLowerCase()]
+    if (!mo) return null
+    const year = y!.length === 2 ? `20${y}` : y!
+    return `${year}-${String(mo).padStart(2, '0')}-${d!.padStart(2, '0')}`
+  }
+  return null
 }
 
 /**
@@ -181,6 +202,7 @@ interface ParsedRow {
   date: string | null
   dateRaw: string | null
   description: string | null
+  descriptionRaw: string | null
   amounts: { raw: string; value: number }[] // 1-3 numeric tokens on the line
   balance: { raw: string; value: number } | null
 }
@@ -195,39 +217,51 @@ interface ParsedRow {
  * UK statement layouts. The validator's balance-continuity check is the real
  * arbiter — if a row was mis-parsed, the ledger won't reconcile and it escalates.
  */
-function parseLine(line: Line): ParsedRow | null {
-  const items = line.items
+function parseText(fullText: string): ParsedRow | null {
+  // Strip descriptive "of N.NN CURRENCY" fragments (e.g. "Card transaction of
+  // 53.78 GBP issued by ...") — these are NOT the transaction amount and were
+  // being captured as one, which corrupted direction detection. The real amount
+  // is the signed standalone token (-53.78) later in the block.
+  let text = fullText.replace(/\bof\s+[\d,]+\.\d{2}\s+[A-Z]{3}\b/gi, '')
+  // Also drop bare "N.NN CURRENCY" mentions inside the description.
+  text = text.replace(/\b[\d,]+\.\d{2}\s+(?:GBP|USD|EUR|AUD)\b/g, '')
+
   let date: string | null = null
   let dateRaw: string | null = null
-  const descriptionParts: string[] = []
-  const numerics: { raw: string; value: number }[] = []
+  let remainder = text
 
-  for (const it of items) {
-    const tok = it.str.trim()
-    if (tok === '') continue
-    if (!date && DATE_RE.test(tok)) {
-      const iso = normaliseDate(tok)
-      if (iso) {
-        date = iso
-        dateRaw = tok
-        continue
-      }
+  // Try to find a date (numeric OR long-form) anywhere in the block.
+  const dateMatch = /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/.exec(text)
+  if (dateMatch) {
+    const iso = normaliseDate(dateMatch[0]!)
+    if (iso) {
+      date = iso
+      dateRaw = dateMatch[0]!
+      remainder = (text.slice(0, dateMatch.index) + ' ' + text.slice(dateMatch.index! + dateMatch[0]!.length)).trim()
     }
-    if (AMOUNT_RE.test(tok) || SIGNED_AMOUNT_RE.test(tok)) {
-      const v = parseAmount(tok)
+  }
+
+  // Scan the remainder's tokens for amounts; everything else is description.
+  const numerics: { raw: string; value: number }[] = []
+  const descriptionParts: string[] = []
+  for (const tok of remainder.split(/\s{2,}|\s+/)) {
+    const t = tok.trim()
+    if (!t) continue
+    if (AMOUNT_RE.test(t) || SIGNED_AMOUNT_RE.test(t)) {
+      const v = parseAmount(t)
       if (v !== null) {
-        numerics.push({ raw: tok, value: v })
+        numerics.push({ raw: t, value: v })
         continue
       }
     }
-    descriptionParts.push(tok)
+    descriptionParts.push(t)
   }
 
   if (!date && numerics.length === 0) return null // not a transaction line (header/footer/blank)
 
-  // Conventionally the last numeric on the line is the running balance; earlier
-  // numerics are the debit and/or credit. If there's only one numeric it's
-  // ambiguous (could be amount-only with no balance) — treat as amount, no balance.
+  // The LAST numeric is conventionally the running balance; earlier numerics are
+  // the amount(s). With the descriptive amounts stripped, we expect exactly one
+  // amount (+ optional balance). If two remain, the first is the amount.
   let balance: { raw: string; value: number } | null = null
   let amounts = numerics
   if (numerics.length >= 2) {
@@ -235,10 +269,12 @@ function parseLine(line: Line): ParsedRow | null {
     amounts = numerics.slice(0, -1)
   }
 
+  const description = descriptionParts.join(' ').trim() || null
   return {
     date,
     dateRaw,
-    description: descriptionParts.join(' ').trim() || null,
+    description,
+    descriptionRaw: description,
     amounts,
     balance,
   }
@@ -253,28 +289,16 @@ function toCanonical(
   if (!row.date) return null
   if (row.amounts.length === 0) return null
 
-  // Direction resolution: a single signed amount → sign gives direction.
-  // A single positive amount with no balance column is ambiguous; default debit
-  // (most statement lines are debits) and let the validator catch mistakes.
-  // Two amounts (debit col + credit col) → the non-zero one wins.
+  // Direction resolution. Prefer a SIGNED amount (real transaction amounts
+  // carry the sign: -53.78 for a debit). If multiple amounts remain after the
+  // balance was split off, pick the one with an explicit sign; failing that the
+  // first. Unsigned single amounts default to debit (most statement lines are).
   let amount: number
   let direction: 'credit' | 'debit'
-  if (row.amounts.length === 1) {
-    const a = row.amounts[0]!
-    amount = Math.abs(a.value)
-    direction = a.value < 0 ? 'debit' : 'credit'
-  } else {
-    // Two unsigned amounts: assume [debit, credit] column order (most common UK).
-    const debit = row.amounts[0]!.value
-    const credit = row.amounts[1]!.value
-    if (credit !== 0) {
-      amount = Math.abs(credit)
-      direction = 'credit'
-    } else {
-      amount = Math.abs(debit)
-      direction = 'debit'
-    }
-  }
+  const signed = row.amounts.find((a) => a.raw.trim().startsWith('-') || a.raw.trim().startsWith('('))
+  const chosen = signed ?? row.amounts[0]!
+  amount = Math.abs(chosen.value)
+  direction = chosen.value < 0 ? 'debit' : 'credit'
 
   return {
     date: row.date,
@@ -317,12 +341,46 @@ async function extractPage(doc: PdfDoc, pageNum: number): Promise<CanonicalTrans
   const lines = groupIntoLines(items)
   const txns: CanonicalTransaction[] = []
   let rowIdx = 0
-  for (const line of lines) {
-    const parsed = parseLine(line)
-    if (!parsed) continue
-    const canonical = toCanonical(parsed, pageNum, ++rowIdx)
-    if (canonical) txns.push(canonical)
+
+  // Card-style statements (Wise, many fintechs) split each transaction across
+  // 2-3 visual lines: a description line, an amount/balance line, and a date
+  // line. We accumulate lines into a BLOCK until we hit one containing a date
+  // (the block terminator), then parse the whole block's text as one row — so
+  // the date, amount, balance, and description are reunited regardless of which
+  // line each landed on. Lines before the first date (page headers) are skipped.
+  const DATE_ANYWHERE = /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}/
+  let blockText = ''
+  let hasBlockDate = false
+  const flush = () => {
+    if (!hasBlockDate) {
+      // No date in the accumulated block — it's a header/footer, discard.
+      blockText = ''
+      hasBlockDate = false
+      return
+    }
+    const parsed = parseText(blockText)
+    if (parsed) {
+      const canonical = toCanonical(parsed, pageNum, ++rowIdx)
+      if (canonical) txns.push(canonical)
+    }
+    blockText = ''
+    hasBlockDate = false
   }
+  for (const line of lines) {
+    const lineText = line.items.map((i) => i.str.trim()).filter(Boolean).join(' ')
+    if (!lineText) continue
+    const lineHasDate = DATE_ANYWHERE.test(lineText)
+    if (lineHasDate && hasBlockDate) {
+      // A new dated line starts → flush the previous block first.
+      flush()
+    }
+    blockText = blockText ? `${blockText} ${lineText}` : lineText
+    if (lineHasDate) hasBlockDate = true
+    // If this line has a date AND amounts, the block is complete — flush now so
+    // trailing description fragments don't bleed into the next block.
+    if (lineHasDate && /[\d,]+\.\d{2}/.test(lineText)) flush()
+  }
+  flush()
   return txns
 }
 
