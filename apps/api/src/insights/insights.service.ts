@@ -5,8 +5,6 @@ import { db } from '@equiscore/database'
 import { buildInsightProfile, detectInternalTransfers } from './engine'
 import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
-import { extractTransactionsFromLargePdf } from './ingest/pdf-extractor'
-import { checkBalanceContinuity } from './engine/integrity'
 import { classify } from './engine/classify'
 import { resolveCategory } from './engine/expenses'
 import { normalizeCounterparty } from './engine/normalize'
@@ -16,6 +14,51 @@ import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
 import { InvitationEmailService } from '../common/invitation-email.service'
 import type { PreviewProfileDto } from './insights.dto'
+// ── Statement-ingestion rewrite (deterministic-first pipeline) ──────────────
+import type { CanonicalTransaction, ExtractionResult, ValidationResult } from './ingest/canonical'
+import {
+  extractDocument,
+  ProviderNotConfigured,
+  registerExtractor,
+  type ExtractorInput,
+} from './ingest/extractor'
+import { csvExtractor } from './ingest/csv-extractor'
+import { nativePdfExtractor, classifyPdf } from './ingest/native-pdf'
+import { ociExtractor } from './ingest/document-ai/oci'
+import { googleExtractor } from './ingest/document-ai/google'
+import { validateExtraction } from './engine/validation'
+import { resolveBreaks } from './ingest/exception-resolver'
+
+// Register extractors in preference order: cheapest-correct-path first.
+// CSV + native-PDF are ~£0; cloud OCR only for scans; LLM crop is the resolver.
+registerExtractor(csvExtractor)
+registerExtractor(nativePdfExtractor)
+registerExtractor(ociExtractor)
+registerExtractor(googleExtractor)
+
+/**
+ * Apply exception-resolver corrections to the canonical transaction set. Each
+ * correction splices its corrected window in place of the ±7-day region around
+ * the break date. Corrections are already evidence-gated + reconciled by the
+ * resolver, so this is a pure splice — no re-verification here (the caller
+ * re-runs validateExtraction after applying them).
+ */
+function applyCorrections(
+  txns: CanonicalTransaction[],
+  corrections: Array<{ breakDate: string; corrected: CanonicalTransaction[] }>
+): CanonicalTransaction[] {
+  let working = [...txns]
+  for (const c of corrections) {
+    const breakTime = new Date(c.breakDate).getTime()
+    const windowMs = 7 * 24 * 60 * 60 * 1000
+    const outside = working.filter((t) => {
+      const dt = new Date(t.date).getTime()
+      return dt < breakTime - windowMs || dt > breakTime + windowMs
+    })
+    working = [...outside, ...c.corrected].sort((a, b) => a.date.localeCompare(b.date))
+  }
+  return working
+}
 
 const GAMBLING =
   /\b(bet365|paddy ?power|william ?hill|ladbrokes|betfair|sky ?bet|coral|betfred|betway|888|pokerstars|draftkings|casino|poker|gambl|lottery|lotto)\b/i
@@ -124,135 +167,16 @@ export class InsightsService implements OnModuleInit {
     return { profile, parse: { ...parsed.detected, warnings: parsed.warnings } }
   }
 
-  /**
-   * Import a CSV bank statement for a signed-in user: parse it, persist the
-   * transactions as a statement-sourced connection (so the normal feature +
-   * scoring pipeline runs over them unchanged), and recompute the score.
-   *
-   * A statement is a first-class evidence source, so its coverage dates flow
-   * straight into the freshness model — an old statement produces an old
-   * `financialDataAsOf` and expires accordingly.
-   */
-  async importCsv(userId: string, csv: string) {
-    const parsed = parseStatementCsv(csv)
-    if (parsed.transactions.length === 0) {
-      throw new BadRequestException(
-        parsed.warnings.join(' ') || 'No transactions could be read from this file.'
-      )
-    }
-    return this.persistStatement(userId, parsed.transactions, {
-      sourceType: 'csv',
-      skipped: parsed.detected.rowsSkipped,
-      warnings: parsed.warnings,
-    })
-  }
+  // (The synchronous importCsv path was removed — both CSV and PDF now go
+  //  through the async startCsvImportJob/startPdfImportJob → runIngestionJob
+  //  pipeline, which validates before persisting. See persistVerifiedLedger.)
 
-  /**
-   * Start an async CSV import. CSV parsing + persistence + scoring still take a
-   * few seconds, and we want CSV to behave exactly like PDF: return instantly,
-   * process in the background, survive the user leaving the page or closing the
-   * tab, and announce completion through the same global chip. Keeping both
-   * formats on the job path means every "processing" state is source-agnostic.
-   */
-  async startCsvImportJob(userId: string, csv: string) {
-    const job = await db.statementImportJob.create({
-      data: { userId, sourceType: 'csv', fileName: null, status: 'processing' },
-    })
-    // Fire-and-forget; the promise keeps the event loop alive and captures its
-    // own errors onto the job row, so it never rejects unhandled.
-    void this.runCsvImportJob(job.id, userId, csv)
-    return { jobId: job.id, status: job.status }
-  }
+  // (CSV + PDF job starters and the unified runIngestionJob are defined below,
+  //  alongside startPdfImportJob — both input types share the same pipeline.)
 
-  private async runCsvImportJob(jobId: string, userId: string, csv: string): Promise<void> {
-    const startedAt = Date.now()
-    this.logger.log(`Import ${jobId}: parsing CSV (${(csv.length / 1024).toFixed(0)} KB)`)
-    try {
-      const parsed = parseStatementCsv(csv)
-      this.logger.log(
-        `Import ${jobId}: parsed ${parsed.transactions.length} txns in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`
-      )
-
-      // Cancelled before we got here? Stop before persisting anything.
-      const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
-      if (!current || current.status === 'cancelled') {
-        this.logger.log(`Import ${jobId}: cancelled, discarding result`)
-        return
-      }
-
-      if (parsed.transactions.length === 0) {
-        throw new Error(
-          parsed.warnings.join(' ') || 'No transactions could be read from this file.'
-        )
-      }
-
-      const result = await this.persistStatement(userId, parsed.transactions, {
-        sourceType: 'csv',
-        skipped: parsed.detected.rowsSkipped,
-        warnings: parsed.warnings,
-      })
-
-      await db.statementImportJob.update({
-        where: { id: jobId },
-        data: { status: 'completed', result: result as never, completedAt: new Date() },
-      })
-      this.logger.log(`Import ${jobId}: completed in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
-      // Notify the user by email (best-effort: never turns a success into a failure).
-      await this.notifyImportComplete(userId, jobId, result).catch((e) =>
-        this.logger.error(`Import ${jobId}: completion notify failed: ${e instanceof Error ? e.message : e}`)
-      )
-    } catch (err) {
-      // Plain-English, figure-free reason for the user (on-site + email). The
-      // raw error and detailed figures stay in the audit log for debugging.
-      const { kind, message } = this.classifyImportError(err)
-      this.logger.error(`Import ${jobId}: failed (${kind}) after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${err instanceof Error ? err.message : err}`)
-      await db.statementImportJob
-        .update({
-          where: { id: jobId },
-          data: { status: 'failed', error: message, completedAt: new Date() },
-        })
-        .catch(() => undefined)
-      await this.notifyImportFailed(userId, jobId, message).catch((e) =>
-        this.logger.error(`Import ${jobId}: failure notify failed: ${e instanceof Error ? e.message : e}`)
-      )
-    }
-  }
-
-  /**
-   * The public-facing reason a statement import failed. The job runner writes
-   * THIS message to the job row (what the user sees on-site and in the failure
-   * email). For the integrity case we KEEP the precise location — the exception
-   * already carries the break date and expected/actual figures, and the user
-   * needs to see exactly where the problem is so they can fix it. The other
-   * categories have no useful location data, so they stay generic.
-   */
-  private classifyImportError(err: unknown): { kind: string; message: string } {
-    const raw = err instanceof Error ? err.message : ''
-    if (err instanceof BadRequestException) {
-      // persistStatement's message already reads, e.g.: "The figures we read
-      // from this statement don't add up around 2025-09-04 (expected 15615.21,
-      // we read 15604.71) — the scan may be unclear. Please try a clearer copy
-      // or a CSV export from your bank." Surface it verbatim — no sanitising.
-      return { kind: 'integrity', message: raw }
-    }
-    if (/no transactions could be read/i.test(raw)) {
-      return {
-        kind: 'empty',
-        message:
-          "We couldn't read any transactions from that file. Make sure it's a complete bank statement export.",
-      }
-    }
-    if (/not available right now|anthropic_api_key|timed out|timed out while reading/i.test(raw)) {
-      return {
-        kind: 'extraction',
-        message: "We couldn't process your statement right now. Please try again in a few minutes.",
-      }
-    }
-    return {
-      kind: 'unknown',
-      message: 'Something went wrong reading your statement. Please try again.',
-    }
-  }
+  // (The old classifyImportError helper was removed — runIngestionJob now maps
+  //  failures directly via ProviderNotConfigured.failureStage + the validation
+  //  result, surfacing the real failure class instead of a sanitised message.)
 
   /** First WEB_URL origin (it may be a comma-separated CORS list). */
   private webUrl(): string {
@@ -328,82 +252,204 @@ export class InsightsService implements OnModuleInit {
   }
 
   /**
-   * Start an async PDF import. Reading a PDF with Claude takes 30–90s, so we
-   * create a persisted job, kick off processing in the background, and return
-   * immediately — the user can navigate away or close the browser and pick the
-   * result back up (a global chip polls for completion).
+   * Start an async PDF import. Creates a job row, kicks the deterministic-first
+   * pipeline in the background, returns immediately. The pipeline: classify
+   * (digital vs scanned) → native text-layer extraction (digital) or cloud OCR
+   * (scanned, needs provider keys) → validate → resolve exceptions (LLM crop,
+   * last resort) → persist only if verified. The user can navigate away; the
+   * chip polls for completion.
    */
   async startPdfImportJob(userId: string, pdfBuffer: Buffer, fileName?: string) {
     const job = await db.statementImportJob.create({
-      data: { userId, sourceType: 'pdf', fileName: fileName ?? null, status: 'processing' },
+      data: { userId, sourceType: 'pdf', fileName: fileName ?? null, status: 'processing', stage: 'uploaded' },
     })
-    // Fire-and-forget; the promise keeps the event loop alive and captures its
-    // own errors onto the job row, so it never rejects unhandled.
-    void this.runPdfImportJob(job.id, userId, pdfBuffer)
+    void this.runIngestionJob(job.id, userId, { kind: 'pdf', buffer: pdfBuffer, fileName: fileName ?? null })
     return { jobId: job.id, status: job.status }
   }
 
-  private async runPdfImportJob(jobId: string, userId: string, pdfBuffer: Buffer): Promise<void> {
+  /**
+   * Start an async CSV import — the deterministic ~£0 route. Same pipeline
+   * shape as PDF (classify → extract → validate → resolve → persist-verified),
+   * but extraction is a deterministic parse and there's no LLM crop for breaks
+   * (a CSV that doesn't reconcile is a genuine source error → reject honestly).
+   */
+  async startCsvImportJob(userId: string, csv: string) {
+    const job = await db.statementImportJob.create({
+      data: { userId, sourceType: 'csv', fileName: null, status: 'processing', stage: 'uploaded' },
+    })
+    void this.runIngestionJob(job.id, userId, { kind: 'csv', csvText: csv, fileName: null })
+    return { jobId: job.id, status: job.status }
+  }
+
+  /**
+   * The unified ingestion pipeline — one implementation for every input type.
+   * Classify → extract (strategy chosen by input kind) → validate → resolve
+   * exceptions → persist ONLY if validation reaches `verified`. Every stage
+   * transition is written to the job row + audit log so the state is observable
+   * and a failure surfaces its real class (not a generic "couldn't read").
+   */
+  private async runIngestionJob(
+    jobId: string,
+    userId: string,
+    input: { kind: 'pdf' | 'csv'; buffer?: Buffer; csvText?: string; fileName: string | null }
+  ): Promise<void> {
     const startedAt = Date.now()
-    this.logger.log(`Import ${jobId}: reading PDF (${(pdfBuffer.length / 1024).toFixed(0)} KB)`)
+    const log = (stage: string, msg: string) =>
+      this.logger.log(`Import ${jobId} [${stage}]: ${msg} (${((Date.now() - startedAt) / 1000).toFixed(0)}s)`)
+    const setStage = (stage: string) =>
+      db.statementImportJob.update({ where: { id: jobId }, data: { stage: stage as never } }).catch(() => undefined)
+
     try {
-      const apiKey = process.env['ANTHROPIC_API_KEY']
-      if (!apiKey) throw new Error('Statement reading is not available right now.')
+      await setStage('preflight')
+      log('preflight', input.kind === 'pdf' ? `PDF ${(input.buffer?.length ?? 0 / 1024).toFixed(0)} KB` : `CSV ${(input.csvText?.length ?? 0 / 1024).toFixed(0)} KB`)
 
-      // extractTransactionsFromLargePdf splits into ~15-page chunks, extracts
-      // each via Claude, merges + dedupes the results. Small PDFs take the
-      // identical single-call path. isCancelled lets the user abort between
-      // chunks (checked before each Claude call).
-      const extraction = await extractTransactionsFromLargePdf(
-        apiKey,
-        pdfBuffer.toString('base64'),
-        async () => {
-          const job = await db.statementImportJob.findUnique({ where: { id: jobId } })
-          return !job || job.status === 'cancelled'
+      // ── Classify ──────────────────────────────────────────────────────────
+      await setStage('classified')
+      let inputKind: ExtractorInput['kind']
+      let pdfForCrops: Buffer | null = null
+      if (input.kind === 'csv') {
+        inputKind = 'csv'
+      } else {
+        pdfForCrops = input.buffer!
+        const { classification } = await classifyPdf(input.buffer!)
+        if (classification === 'scanned_pdf') {
+          inputKind = 'scanned_pdf'
+        } else if (classification === 'digital_pdf' || classification === 'mixed') {
+          // Treat mixed as digital — native extraction handles the text pages;
+          // scanned pages within a mixed doc will surface as completeness gaps
+          // and can be revisited once OCR is live.
+          inputKind = 'digital_pdf'
+        } else {
+          inputKind = 'unknown'
         }
-      )
-      this.logger.log(
-        `Import ${jobId}: extracted ${extraction.transactions.length} txns in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`
-      )
-
-      // Cancelled during the slow read? Stop before persisting anything.
-      const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
-      if (!current || current.status === 'cancelled') {
-        this.logger.log(`Import ${jobId}: cancelled, discarding result`)
-        return
+        log('classified', `PDF classified as ${classification}`)
       }
 
+      // ── Extract (strategy auto-selected by input kind) ────────────────────
+      await setStage('extracting')
+      const extractorInput: ExtractorInput = {
+        kind: inputKind,
+        buffer: input.buffer ?? null,
+        csvText: input.csvText ?? null,
+        fileName: input.fileName,
+      }
+      const { result: extraction, strategy } = await extractDocument(extractorInput)
+      log('extracting', `${strategy} → ${extraction.transactions.length} txns`)
+      this.audit.log(userId, 'statement.extracted', { jobId, strategy, count: extraction.transactions.length })
+
+      // Cancellation checkpoint.
+      const current = await db.statementImportJob.findUnique({ where: { id: jobId } })
+      if (!current || current.status === 'cancelled') {
+        log('extracting', 'cancelled, discarding result')
+        return
+      }
       if (extraction.transactions.length === 0) {
-        throw new Error(
-          extraction.warnings.join(' ') || 'No transactions could be read from this statement.'
+        throw new ProviderNotConfigured(
+          extraction.warnings.join(' ') || 'No transactions could be read from this statement.',
+          'unresolved_extraction'
         )
       }
 
-      const result = await this.persistStatement(userId, extraction.transactions, {
-        sourceType: 'pdf',
-        skipped: 0,
-        warnings: extraction.warnings,
+      // ── Validate ──────────────────────────────────────────────────────────
+      await setStage('validating')
+      let validation: ValidationResult = validateExtraction(extraction)
+      let working: CanonicalTransaction[] = extraction.transactions
+      log('validating', `status=${validation.status}, breaks=${validation.breaks.length}`)
+
+      // ── Resolve exceptions (only if there are breaks to fix) ──────────────
+      if (validation.breaks.length > 0) {
+        await setStage('resolving')
+        const resolution = await resolveBreaks(working, validation.breaks, pdfForCrops)
+        if (resolution.corrections.length > 0) {
+          // Rebuild the working set from the resolver's splices and re-validate.
+          // resolveBreaks returns corrections; recompute working by applying them.
+          working = applyCorrections(working, resolution.corrections)
+          validation = validateExtraction({ ...extraction, transactions: working })
+          log('resolving', `${resolution.corrections.length} correction(s) applied → status=${validation.status}`)
+          this.audit.log(userId, 'statement.corrections_applied', {
+            jobId,
+            corrections: resolution.corrections.length,
+            unresolved: resolution.unresolved.length,
+          })
+        }
+        if (resolution.warnings.length) {
+          this.logger.warn(`Import ${jobId}: ${resolution.warnings.join('; ')}`)
+        }
+      }
+
+      // ── Verified gate: only a verified ledger enters scoring ──────────────
+      if (validation.status !== 'verified') {
+        this.audit.log(userId, 'statement.integrity_failed', {
+          jobId,
+          checks: validation.checks,
+          breaks: validation.breaks.length,
+        })
+        const firstBreak = validation.breaks[0]
+        const where = firstBreak
+          ? ` around ${firstBreak.date} (expected ${firstBreak.expected}, read ${firstBreak.actual})`
+          : ''
+        await db.statementImportJob
+          .update({
+            where: { id: jobId },
+            data: {
+              status: 'failed',
+              stage: 'unresolved_extraction',
+              error:
+                inputKind === 'csv'
+                  ? `This statement's running balance doesn't reconcile${where}. This usually means the file is incomplete or has been edited. Please upload the original, unmodified export from your bank.`
+                  : `We couldn't verify this statement's figures${where}. Please upload a clearer digital PDF or a CSV export from your bank.`,
+              validation: validation as never,
+              completedAt: new Date(),
+            },
+          })
+          .catch(() => undefined)
+        await this.notifyImportFailed(userId, jobId, where ? `Balances don't reconcile${where}.` : 'We could not verify the statement.').catch(() => undefined)
+        return
+      }
+
+      // ── Persist the verified ledger (with balance + provenance) ───────────
+      await setStage('verified')
+      const result = await this.persistVerifiedLedger(userId, working, {
+        extractor: strategy,
+        extractorVersion: extraction.extractorVersion,
+        warnings: [...extraction.warnings],
         accountHolderName: extraction.accountHolderName,
+        sourceAssurance: 'user_document',
+        validation,
       })
 
       await db.statementImportJob.update({
         where: { id: jobId },
-        data: { status: 'completed', result: result as never, completedAt: new Date() },
+        data: {
+          status: 'completed',
+          stage: 'complete',
+          result: result as never,
+          validation: validation as never,
+          extractor: strategy,
+          extractorVersion: extraction.extractorVersion,
+          sourceAssurance: 'user_document',
+          completedAt: new Date(),
+        },
       })
-      this.logger.log(`Import ${jobId}: completed in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`)
-      // Notify the user by email (best-effort: never turns a success into a failure).
+      log('complete', `imported ${result.imported} txns`)
+      this.audit.log(userId, 'statement.verified', { jobId, count: result.imported, extractor: strategy })
       await this.notifyImportComplete(userId, jobId, result).catch((e) =>
         this.logger.error(`Import ${jobId}: completion notify failed: ${e instanceof Error ? e.message : e}`)
       )
     } catch (err) {
-      // Plain-English, figure-free reason for the user (on-site + email). The
-      // raw error and detailed figures stay in the audit log for debugging.
-      const { kind, message } = this.classifyImportError(err)
-      this.logger.error(`Import ${jobId}: failed (${kind}) after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${err instanceof Error ? err.message : err}`)
+      // Map the failure to its real class + a plain-English message.
+      const stage = err instanceof ProviderNotConfigured ? err.failureStage : 'provider_error'
+      const message =
+        err instanceof ProviderNotConfigured
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Something went wrong reading your statement.'
+      this.logger.error(`Import ${jobId}: failed [${stage}] after ${((Date.now() - startedAt) / 1000).toFixed(0)}s — ${err instanceof Error ? err.message : err}`)
       await db.statementImportJob
         .update({
           where: { id: jobId },
-          data: { status: 'failed', error: message, completedAt: new Date() },
+          data: { status: 'failed', stage: stage as never, error: message, completedAt: new Date() },
         })
         .catch(() => undefined)
       await this.notifyImportFailed(userId, jobId, message).catch((e) =>
@@ -459,39 +505,28 @@ export class InsightsService implements OnModuleInit {
   }
 
   /**
-   * Shared statement-persistence path for CSV and PDF: run the anti-tamper
-   * ledger check, persist as a statement-sourced connection, and recompute.
+   * Persist a VERIFIED ledger — the only persistence path in the new pipeline.
+   * Called exclusively by runIngestionJob after validation.status === 'verified',
+   * so the integrity gate is upstream (validation engine) and not re-checked here.
+   *
+   * Unlike the old persistStatement, this persists the per-transaction running
+   * BALANCE and source PROVENANCE (page/row/extractor/version) — fixing the gap
+   * where the ledger was verified at ingest then became unverifiable from the DB.
+   * Source assurance (user_document vs bank_api) is recorded on the job, not the
+   * transactions, to keep the trust distinction explicit.
    */
-  private async persistStatement(
+  private async persistVerifiedLedger(
     userId: string,
-    txns: NormalizedTxn[],
-    opts: { sourceType: 'csv' | 'pdf'; skipped: number; warnings: string[]; accountHolderName?: string | null }
-  ) {
-    // Anti-tamper gate — strict. A real bank export is a ledger: every row's
-    // running balance must equal the previous balance ± that row's amount. If
-    // it doesn't reconcile, the data is WRONG (a misread, a dropped row, or an
-    // edit), and scoring over wrong figures produces a misleading Trust Profile
-    // — so we refuse rather than ship bad data with a penalty. PDFs have already
-    // been through a self-healing re-read by here; any break that survives that
-    // is genuinely unreconcilable (illegible or tampered), not noise to absorb.
-    // Statements with no balance column can't be checked, so they pass.
-    const integrity = checkBalanceContinuity(txns)
-    if (integrity.hasBalances && !integrity.continuous) {
-      const b = integrity.breaks[0]
-      this.audit.log(userId, 'statement.integrity_failed', {
-        sourceType: opts.sourceType,
-        checkedRows: integrity.checkedRows,
-        breaks: integrity.breaks.length,
-        firstBreak: b ?? null,
-      })
-      const where = b ? ` around ${b.date} (expected ${b.expected}, we read ${b.actual})` : ''
-      throw new BadRequestException(
-        opts.sourceType === 'pdf'
-          ? `The figures we read from this statement don't add up${where} — the scan may be unclear. Please try a clearer copy or a CSV export from your bank.`
-          : `This statement's running balance doesn't reconcile${where}. This usually means the file is incomplete or has been edited. Please upload the original, unmodified export from your bank.`
-      )
+    txns: CanonicalTransaction[],
+    opts: {
+      extractor: string
+      extractorVersion: string
+      warnings: string[]
+      accountHolderName?: string | null
+      sourceAssurance: 'user_document' | 'bank_api'
+      validation: ValidationResult
     }
-
+  ) {
     const dates = txns.map((t) => t.date).sort()
     const coverageStart = dates[0]!
     const coverageEnd = dates[dates.length - 1]!
@@ -501,8 +536,7 @@ export class InsightsService implements OnModuleInit {
         .reverse()
         .find((t) => typeof t.balance === 'number')?.balance ?? null
 
-    // Re-upload guard: the same statement (same coverage window and row count)
-    // must not stack a second copy on top of the first and double the numbers.
+    // Re-upload guard: same coverage window + row count = same document re-uploaded.
     await this.replaceMatchingStatement(userId, coverageStart, coverageEnd, txns.length)
 
     const connection = await db.bankConnection.create({
@@ -536,26 +570,32 @@ export class InsightsService implements OnModuleInit {
         amount: t.amount,
         currency: 'GBP',
         description: t.description,
-        merchantName: t.merchantName,
+        merchantName: null, // semantic enrichment is a separate, post-validation layer
         category: classifyTransaction({
           description: t.description ?? null,
-          merchantName: t.merchantName ?? null,
+          merchantName: null,
           amount: t.amount,
           direction: t.direction,
           tlCategory: '',
         }),
         direction: t.direction,
+        // New provenance + ledger evidence columns:
+        balance: t.balance,
+        sourcePage: t.sourcePage,
+        sourceRow: t.sourceRow,
+        extractor: t.extractor,
+        extractorVersion: t.extractorVersion,
       })),
       skipDuplicates: true,
     })
 
     this.audit.log(userId, 'statement.imported', {
       connectionId: connection.id,
-      sourceType: opts.sourceType,
+      extractor: opts.extractor,
       transactions: txns.length,
-      skipped: opts.skipped,
       coverageStart,
       coverageEnd,
+      sourceAssurance: opts.sourceAssurance,
     })
 
     const score = await this.scoringService.recompute(userId)
@@ -563,11 +603,11 @@ export class InsightsService implements OnModuleInit {
     return {
       connectionId: connection.id,
       imported: txns.length,
-      skipped: opts.skipped,
+      skipped: 0,
       coverageStart,
       coverageEnd,
       closingBalance,
-      ledgerVerified: integrity.hasBalances && integrity.continuous,
+      ledgerVerified: opts.validation.status === 'verified',
       warnings: opts.warnings,
       overallScore: score.overallScore,
       overallTier: score.overallTier,
