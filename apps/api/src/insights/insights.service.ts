@@ -1192,6 +1192,7 @@ ${context}`
           description: true,
           merchantName: true,
           bankAccountId: true,
+          category: true, // honoured by the engine (classify.ts) — fixes the £0-rent bug
         },
       }),
       db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
@@ -1210,6 +1211,9 @@ ${context}`
       // The Open Banking feed carries no per-transaction running balance;
       // parsed statements do, and will populate this.
       balance: null,
+      // Stored category from the hybrid classifier — honoured by classify()
+      // so the engine doesn't silently discard ingest-time corrections.
+      category: t.category,
     }))
 
     const isOpenBanking = accounts.some((a) => a.bankConnection.providerName === 'truelayer')
@@ -1237,6 +1241,7 @@ ${context}`
         description: true,
         merchantName: true,
         bankAccountId: true,
+        category: true,
       },
     })
     return rows.map((t) => ({
@@ -1247,6 +1252,7 @@ ${context}`
       merchantName: t.merchantName,
       accountId: t.bankAccountId,
       balance: null,
+      category: t.category,
     }))
   }
 

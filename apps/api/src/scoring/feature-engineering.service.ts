@@ -100,6 +100,10 @@ export class FeatureEngineeringService {
         merchantName: t.merchantName ?? null,
         accountId: t.bankAccountId,
         balance: null,
+        // Stored category from the hybrid classifier — honoured by classify()
+        // so the engine doesn't silently discard ingest-time corrections
+        // (the root cause of the £0-rent bug).
+        category: t.category,
       }))
       const answered = await db.insightQuestionAnswer.findMany({
         where: { userId },

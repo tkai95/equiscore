@@ -25,6 +25,15 @@ export interface NormalizedTxn {
   accountId?: string | null
   /** Running balance after this transaction, if the source provides it (statements do). */
   balance?: number | null
+  /**
+   * Category assigned at ingest time (regex + LLM hybrid classifier), if any.
+   * When present the engine HONOURS this rather than re-deriving from the
+   * description — the hybrid classifier is the source of truth, and re-running
+   * a weaker regex at scoring time would silently discard corrections (e.g. a
+   * private-landlord rent labelled 'rent_payment' whose merchant name matches
+   * no keyword). Falls back to regex classification when null/empty.
+   */
+  category?: TransactionCategory | null
 }
 
 export interface ProfileContext {
