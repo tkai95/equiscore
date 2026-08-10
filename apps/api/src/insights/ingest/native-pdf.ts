@@ -149,18 +149,45 @@ function groupIntoLines(items: TextItem[], lineHeightTolerance = 2): Line[] {
 // We recognise columns by content pattern + x-position clustering, not by
 // assuming a fixed layout (every bank differs).
 
-// Numeric dd/mm/yyyy OR long-form "1 August 2026" / "1 Aug 2026" — Wise and
-// several fintech statements use the long form, so both must be recognised.
-const DATE_RE = /^(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})$/
-const AMOUNT_RE = /^[-£$€]?\s*[\d,]+\.\d{2}$/
-const SIGNED_AMOUNT_RE = /^-?\s*[\d,]+\.\d{2}$/
-
 const MONTHS: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
   january: 1, february: 2, march: 3, april: 4, june: 6, july: 7,
   august: 8, september: 9, october: 10, november: 11, december: 12,
 }
+
+// Numeric dd/mm/yyyy OR long-form "1 August 2026" / "1 Aug 2026" — Wise and
+// several fintech statements use the long form, so both must be recognised.
+// Long-form MUST require a real month name (built from MONTHS keys), not just
+// any 3-9 letter word — otherwise reference text like "70 reference 0983" or
+// "55 Account 2026" matches the \d{1,2}\s+[A-Za-z]{3,9}\s+\d{4} shape,
+// normaliseDate returns null (the word isn't a month), and parseText silently
+// drops the whole transaction block. On the Wise statement this lost two
+// Computershare credits (~£1,712 and £24) whose reference lines contained
+// digit-fragments shaped like a long-form date. Building the alternation from
+// MONTHS keeps the matcher and the normaliser in lockstep.
+//
+// The long-form branch also uses a negative lookbehind for [. , \d] before the
+// day digit, so the decimal tail of an amount (e.g. the "40" in "2,208.40")
+// can't be misread as a day when followed by a wrapped month fragment
+// ("2,208.40 OCT 01" must NOT match as the date "40 OCT 01"). Without this,
+// description line-wraps that drop a month abbreviation onto the next visual
+// line produce phantom dates.
+const MONTH_ALT = Object.keys(MONTHS).join('|')
+const DATE_RE = new RegExp(
+  `^(?:\\d{1,2}[\\/.\\-]\\d{1,2}[\\/.\\-]\\d{2,4}|\\d{1,2}\\s+(?:${MONTH_ALT})\\s+\\d{2,4})$`,
+  'i',
+)
+// Anywhere-in-text variant (unanchored) for block-completion detection and for
+// finding the date token inside an accumulated block. Same strict month rule +
+// decimal-tail lookbehind. (?:^|[^\d.,]) ensures the day isn't glued to a
+// preceding decimal/thousands separator or digit.
+const DATE_ANYWHERE = new RegExp(
+  `(?:\\d{1,2}[\\/.\\-]\\d{1,2}[\\/.\\-]\\d{2,4}|(?<![\\d.,])\\d{1,2}\\s+(?:${MONTH_ALT})\\s+\\d{2,4})`,
+  'i',
+)
+const AMOUNT_RE = /^[-£$€]?\s*[\d,]+\.\d{2}$/
+const SIGNED_AMOUNT_RE = /^-?\s*[\d,]+\.\d{2}$/
 
 /** Parse a recognised amount string into a number (handles £, commas, () negatives). */
 function parseAmount(s: string): number | null {
@@ -172,13 +199,21 @@ function parseAmount(s: string): number | null {
 }
 
 /** Normalise a recognised UK date to ISO yyyy-mm-dd. Handles both numeric
- *  (dd/mm/yyyy) and long-form ("1 August 2026", "1 Aug 26"). */
+ *  (dd/mm/yyyy) and long-form ("1 August 2026", "1 Aug 26"). Returns null for
+ *  anything that looks date-shaped but isn't a real calendar date — e.g.
+ *  "40 OCT 01" (where 40 is the tail of an amount like 2,208.40 that bled into
+ *  a long-form date match). Without this guard, a garbage date like 2001-10-40
+ *  gets accepted and the transaction is mis-dated; the validator's date check
+ *  would catch it eventually, but rejecting at parse time is cleaner and
+ *  prevents the spurious row from displacing the real one. */
 function normaliseDate(s: string): string | null {
   const t = s.trim()
   // Numeric form.
   const num = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(t)
   if (num) {
     const [, d, mo, y] = num
+    const day = Number(d), month = Number(mo)
+    if (day < 1 || day > 31 || month < 1 || month > 12) return null
     const year = y!.length === 2 ? `20${y}` : y!
     return `${year}-${mo!.padStart(2, '0')}-${d!.padStart(2, '0')}`
   }
@@ -186,6 +221,8 @@ function normaliseDate(s: string): string | null {
   const long = /^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/.exec(t)
   if (long) {
     const [, d, monName, y] = long
+    const day = Number(d)
+    if (day < 1 || day > 31) return null
     const mo = MONTHS[monName!.toLowerCase()]
     if (!mo) return null
     const year = y!.length === 2 ? `20${y}` : y!
@@ -218,20 +255,26 @@ interface ParsedRow {
  * arbiter — if a row was mis-parsed, the ledger won't reconcile and it escalates.
  */
 function parseText(fullText: string): ParsedRow | null {
-  // Strip descriptive "of N.NN CURRENCY" fragments (e.g. "Card transaction of
-  // 53.78 GBP issued by ...") — these are NOT the transaction amount and were
-  // being captured as one, which corrupted direction detection. The real amount
-  // is the signed standalone token (-53.78) later in the block.
-  let text = fullText.replace(/\bof\s+[\d,]+\.\d{2}\s+[A-Z]{3}\b/gi, '')
-  // Also drop bare "N.NN CURRENCY" mentions inside the description.
-  text = text.replace(/\b[\d,]+\.\d{2}\s+(?:GBP|USD|EUR|AUD)\b/g, '')
+  // Strip descriptive "of [SIGN]N.NN CURRENCY" fragments (e.g. "Card
+  // transaction of 53.78 GBP issued by ...", "Card transaction of -239.20 SAR
+  // issued by ...") — these are NOT the transaction amount, they're the foreign-
+  // currency figure. Without stripping them they get captured as the amount,
+  // corrupting direction + value (we'd record -239.20 instead of the real
+  // GBP-equivalent). The real amount is the signed standalone token (-48.46)
+  // on the block's amount line. MUST accept an optional leading sign — foreign
+  // currency lines are frequently pre-signed (-SAR, -USD).
+  let text = fullText.replace(/\bof\s+-?[\d,]+\.\d{2}\s+[A-Z]{3}\b/gi, '')
+  // Also drop bare "[SIGN]N.NN CURRENCY" mentions inside the description.
+  text = text.replace(/\b-?[\d,]+\.\d{2}\s+(?:GBP|USD|EUR|AUD|SAR|MYR|SGD|HKD|INR|PKR|AED)\b/g, '')
 
   let date: string | null = null
   let dateRaw: string | null = null
   let remainder = text
 
-  // Try to find a date (numeric OR long-form) anywhere in the block.
-  const dateMatch = /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/.exec(text)
+  // Try to find a date (numeric OR long-form) anywhere in the block. Uses the
+  // strict month-name alternation so reference text like "70 reference 0983"
+  // can't masquerade as a long-form date.
+  const dateMatch = DATE_ANYWHERE.exec(text)
   if (dateMatch) {
     const iso = normaliseDate(dateMatch[0]!)
     if (iso) {
@@ -344,11 +387,16 @@ async function extractPage(doc: PdfDoc, pageNum: number): Promise<CanonicalTrans
 
   // Card-style statements (Wise, many fintechs) split each transaction across
   // 2-3 visual lines: a description line, an amount/balance line, and a date
-  // line. We accumulate lines into a BLOCK until we hit one containing a date
-  // (the block terminator), then parse the whole block's text as one row — so
-  // the date, amount, balance, and description are reunited regardless of which
-  // line each landed on. Lines before the first date (page headers) are skipped.
-  const DATE_ANYWHERE = /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}/
+  // line. We accumulate lines into a BLOCK and FLUSH AS SOON AS THE BLOCK IS
+  // COMPLETE — i.e. the moment it contains both a date and an amount. This is
+  // layout-agnostic: a one-line row (date+amount on the same line) flushes
+  // immediately; a two-line row (amount above, date below) flushes on the date
+  // line; a three-line row flushes when the last needed piece arrives. The
+  // previous "flush on next date" rule was wrong — it absorbed the next
+  // transaction's amount line into the current block. Lines before the first
+  // date (page headers) are skipped because a block with no date never flushes.
+  // DATE_ANYWHERE is the module-level strict matcher (real month names only).
+  const AMOUNT_ANYWHERE = /[\d,]+\.\d{2}/
   let blockText = ''
   let hasBlockDate = false
   const flush = () => {
@@ -370,15 +418,15 @@ async function extractPage(doc: PdfDoc, pageNum: number): Promise<CanonicalTrans
     const lineText = line.items.map((i) => i.str.trim()).filter(Boolean).join(' ')
     if (!lineText) continue
     const lineHasDate = DATE_ANYWHERE.test(lineText)
-    if (lineHasDate && hasBlockDate) {
-      // A new dated line starts → flush the previous block first.
-      flush()
-    }
+    // Safety: if a NEW date appears while we already have a complete-ish block
+    // (date but no amount yet — e.g. a heading line that coincidentally matches
+    // a date pattern), close it out before starting fresh so we never merge two
+    // real transactions.
+    if (lineHasDate && hasBlockDate && !AMOUNT_ANYWHERE.test(blockText)) flush()
     blockText = blockText ? `${blockText} ${lineText}` : lineText
     if (lineHasDate) hasBlockDate = true
-    // If this line has a date AND amounts, the block is complete — flush now so
-    // trailing description fragments don't bleed into the next block.
-    if (lineHasDate && /[\d,]+\.\d{2}/.test(lineText)) flush()
+    // Complete = a date AND an amount present anywhere in the accumulated block.
+    if (hasBlockDate && AMOUNT_ANYWHERE.test(blockText)) flush()
   }
   flush()
   return txns
