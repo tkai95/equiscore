@@ -224,7 +224,7 @@ export class InsightsService implements OnModuleInit {
     const delivery = await this.email.sendBrandedEmail({
       to: user.email,
       subject: 'Your statement analysis is complete',
-      eyebrow: 'Trust Profile',
+      eyebrow: 'Analysis complete',
       heading: 'Your statement analysis is complete',
       preview: `We analysed ${result.imported} transactions — your Trust Score is ${result.overallTier}.`,
       intro: `${greeting} we've finished reading your statement and analysed ${result.imported} transactions. Your Trust Score is now ${result.overallTier} / ${result.overallScore}.`,

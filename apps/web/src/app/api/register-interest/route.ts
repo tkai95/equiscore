@@ -244,10 +244,10 @@ function renderWaitlistHtml(input: ReturnType<typeof waitlistEmailInput>): strin
                     <td>
                       <table role="presentation" cellspacing="0" cellpadding="0" style="background: #fffdf5; border-radius: 14px;">
                         <tr>
-                          <td style="padding: 9px 12px;">
+                          <td style="padding: 6px 10px;">
                             <img src="${escapeAttribute(
                               logoUrl
-                            )}" width="160" alt="EquiScore" style="display: block; width: 160px; max-width: 160px; height: auto; border: 0; outline: none; text-decoration: none;" />
+                            )}" width="110" alt="EquiScore" style="display: block; width: 110px; max-width: 110px; height: auto; border: 0; outline: none; text-decoration: none;" />
                           </td>
                         </tr>
                       </table>
