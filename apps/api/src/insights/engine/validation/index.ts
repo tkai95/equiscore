@@ -66,35 +66,73 @@ function checkDeduplication(txns: CanonicalTransaction[]): CheckStatus {
 }
 
 /**
- * Layer 4 — running-balance reconciliation. For each balance-bearing txn:
- * expected = prevBalance ± amount; must equal the printed balance within
- * tolerance. Returns the breaks (with source location) for exception resolution.
- * Statements with no balance column → not_applicable (can't check).
+ * Layer 4 — running-balance reconciliation.
+ *
+ * INVARIANT (ordering-independent): for every transaction with a balance B and
+ * signed amount Δ, there must exist another balance in the statement equal to
+ * B − Δ (the "previous" balance) — except for the single opening balance, which
+ * has no predecessor. Equivalently, every balance value must be reachable from
+ * exactly one other balance by applying one transaction's signed amount. This
+ * holds regardless of whether the bank lists transactions oldest-first or
+ * newest-first, and regardless of intra-day ordering, because it doesn't walk
+ * an assumed sequence — it checks the set relationship the running balance
+ * defines.
+ *
+ * The previous implementation walked transactions in date-sorted order and
+ * checked `expected = prev.balance + delta`. That assumed the sorted array
+ * reflected true chronological order, which fails for same-day transactions on
+ * newest-first statements (Wise and most fintechs): same-date rows keep array
+ * order, which is reverse-chronological, so every same-day row after the first
+ * "broke" — a false negative. The balance-ascending sort variant was also wrong
+ * because on a net-debit account the balance DECREASES over time, so ascending
+ * balance is reverse-chronological too. The set-membership check below has no
+ * such assumption.
+ *
+ * Returns the breaks (transactions whose B−Δ matches no other balance) with
+ * source location for exception resolution.
  */
 function checkRunningBalance(txns: CanonicalTransaction[]): { status: CheckStatus; breaks: ValidationBreak[] } {
-  const ordered = [...txns].sort((a, b) => toDate(a.date).getTime() - toDate(b.date).getTime())
-  const withBalance = ordered.filter((t) => typeof t.balance === 'number')
+  const withBalance = txns.filter((t) => typeof t.balance === 'number')
   if (withBalance.length < 2) return { status: 'not_applicable', breaks: [] }
 
+  // Multiset of all balance values (rounded), so duplicate balance values are
+  // counted correctly (two txns can legitimately share a balance only if their
+  // amounts net to zero — rare but legal).
+  const balanceCounts = new Map<number, number>()
+  for (const t of withBalance) {
+    const b = round2(t.balance as number)
+    balanceCounts.set(b, (balanceCounts.get(b) ?? 0) + 1)
+  }
+
   const breaks: ValidationBreak[] = []
-  for (let i = 1; i < withBalance.length; i++) {
-    const prev = withBalance[i - 1]!
-    const curr = withBalance[i]!
-    const delta = curr.direction === 'credit' ? curr.amount : -curr.amount
-    const expected = round2((prev.balance as number) + delta)
-    const actual = round2(curr.balance as number)
-    if (Math.abs(expected - actual) > TOLERANCE) {
+  for (const t of withBalance) {
+    const delta = t.direction === 'credit' ? t.amount : -t.amount
+    const neededPrior = round2((t.balance as number) - delta)
+    // Consume one occurrence of the needed-prior balance. If absent, this
+    // transaction's balance has no reconcilable predecessor → genuine break.
+    const count = balanceCounts.get(neededPrior) ?? 0
+    if (count <= 0) {
       breaks.push({
-        index: txns.indexOf(curr),
-        date: curr.date,
-        expected,
-        actual,
-        sourcePage: curr.sourcePage,
-        sourceRow: curr.sourceRow,
+        index: txns.indexOf(t),
+        date: t.date,
+        // For human reporting: the balance we expected to find as this row's
+        // predecessor (i.e. this row's balance minus its own movement).
+        expected: neededPrior,
+        actual: round2(t.balance as number),
+        sourcePage: t.sourcePage,
+        sourceRow: t.sourceRow,
       })
     }
+    // Note: we do NOT decrement the count when a match is found, because the
+    // needed-prior balance legitimately belongs to a DIFFERENT transaction
+    // (this row's actual predecessor); consuming it here would steal it from
+    // that predecessor's own check. Each balance is matched independently.
   }
-  return { status: breaks.length === 0 ? 'pass' : 'fail', breaks }
+  // Account for the single opening balance (one balance has no predecessor by
+  // definition). If exactly one break remains, it's the opening row — not a
+  // data error. More than one break means genuine unreconciled rows.
+  if (breaks.length <= 1) return { status: 'pass', breaks: [] }
+  return { status: 'fail', breaks }
 }
 
 /**

@@ -462,16 +462,36 @@ export const nativePdfExtractor: DocumentExtractor = {
     await doc.cleanup()
     await doc.loadingTask.destroy()
 
-    // Statement-period + balance candidates from the transaction set.
+    // Statement-period + balance candidates from the transaction set. Opening
+    // and closing balances are derived from the CHRONOLOGICALLY-earliest and
+    // latest transactions, NOT array position — banks differ in whether they
+    // list transactions oldest-first (most traditional UK banks) or newest-
+    // first (Wise and many fintechs), so transactions[0] is not reliably the
+    // opening row. Opening balance is the earliest txn's balance minus its own
+    // movement (the balance before it applied); closing is the latest txn's
+    // balance (the balance after it applied). Both null if no balances present.
     const dates = transactions.map((t) => t.date).sort()
     const statementPeriodStart = dates[0] ?? null
     const statementPeriodEnd = dates[dates.length - 1] ?? null
 
+    const byDate = [...transactions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    const earliest = byDate[0]
+    const latest = byDate[byDate.length - 1]
+    let openingBalance: number | null = null
+    let closingBalance: number | null = null
+    if (earliest && typeof earliest.balance === 'number') {
+      const ownDelta = earliest.direction === 'credit' ? earliest.amount : -earliest.amount
+      openingBalance = Math.round((earliest.balance - ownDelta) * 100) / 100
+    }
+    if (latest && typeof latest.balance === 'number') {
+      closingBalance = latest.balance
+    }
+
     const result: ExtractionResult = {
       transactions,
       accountHolderName: null, // native text layer doesn't reliably identify the header name yet
-      openingBalance: transactions.length > 0 ? (transactions[0]!.balance ?? null) : null,
-      closingBalance: transactions.length > 0 ? (transactions[transactions.length - 1]!.balance ?? null) : null,
+      openingBalance,
+      closingBalance,
       statementPeriodStart,
       statementPeriodEnd,
       pagesProcessed: doc.numPages,
