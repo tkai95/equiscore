@@ -10,6 +10,7 @@ import { resolveCategory } from './engine/expenses'
 import { normalizeCounterparty } from './engine/normalize'
 import { monthKey, toDate, round2 } from './engine/util'
 import { classifyTransaction } from '../banking/transaction-classifier'
+import { categorizeBatch } from '../banking/transaction-categorizer'
 import { ScoringService } from '../scoring/scoring.service'
 import { AuditService } from '../audit/audit.service'
 import { InvitationEmailService } from '../common/invitation-email.service'
@@ -578,6 +579,50 @@ export class InsightsService implements OnModuleInit {
       },
     })
 
+    // ── Hybrid categorization (regex first, LLM for the rest) ───────────────
+    // Phase 1: deterministic regex pass — free, catches the known merchants.
+    const categories = txns.map((t) =>
+      classifyTransaction({
+        description: t.description ?? null,
+        merchantName: null,
+        amount: t.amount,
+        direction: t.direction,
+        tlCategory: '',
+      }),
+    )
+    // Phase 2: LLM pass on the `other` bucket only. The LLM touches ONLY the
+    // category field (amount/date/balance are already locked by validation).
+    // Fail-closed: if GLM isn't configured or the call fails, we keep the regex
+    // result and the row is just categorized as `other`.
+    const otherIndices = categories
+      .map((c, i) => (c === 'other' ? i : -1))
+      .filter((i) => i >= 0)
+    if (otherIndices.length > 0) {
+      const glmKey = this.config.get<string>('GLM_API_KEY')
+      if (glmKey) {
+        const llmInputs = otherIndices.map((i) => ({
+          description: txns[i]!.description ?? null,
+          direction: txns[i]!.direction,
+        }))
+        const llmCategories = await categorizeBatch(llmInputs, {
+          apiKey: glmKey,
+          baseUrl: this.config.get<string>('GLM_BASE_URL') ?? undefined,
+          model: this.config.get<string>('GLM_MODEL') ?? undefined,
+          logger: this.logger,
+        })
+        // Merge: map the batched (offset-relative) indices back to absolute.
+        for (const [batchIdx, cat] of llmCategories) {
+          const absIdx = otherIndices[batchIdx]
+          if (typeof absIdx === 'number' && absIdx >= 0 && absIdx < categories.length) {
+            categories[absIdx] = cat
+          }
+        }
+        this.logger.log(
+          `Hybrid categorizer: ${otherIndices.length} 'other' txns → LLM reclassified ${llmCategories.size}`,
+        )
+      }
+    }
+
     await db.bankTransaction.createMany({
       data: txns.map((t, i) => ({
         bankAccountId: account.id,
@@ -587,13 +632,7 @@ export class InsightsService implements OnModuleInit {
         currency: 'GBP',
         description: t.description,
         merchantName: null, // semantic enrichment is a separate, post-validation layer
-        category: classifyTransaction({
-          description: t.description ?? null,
-          merchantName: null,
-          amount: t.amount,
-          direction: t.direction,
-          tlCategory: '',
-        }),
+        category: categories[i]!,
         direction: t.direction,
         // New provenance + ledger evidence columns:
         balance: t.balance,
