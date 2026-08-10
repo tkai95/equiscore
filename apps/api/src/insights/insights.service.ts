@@ -178,9 +178,25 @@ export class InsightsService implements OnModuleInit {
   //  failures directly via ProviderNotConfigured.failureStage + the validation
   //  result, surfacing the real failure class instead of a sanitised message.)
 
-  /** First WEB_URL origin (it may be a comma-separated CORS list). */
+  /**
+   * Origin to use for email CTA links. Resolved in priority order:
+   *   1. PUBLIC_APP_URL — the dedicated production consumer origin for email
+   *      links (set this to https://equiscore.app in prod).
+   *   2. The first NON-dev entry in WEB_URL — WEB_URL doubles as a CORS
+   *      allowlist and may be comma-separated, and its first entry can be a
+   *      staging/dev origin (e.g. https://dev.equiscore.app). Skipping dev.*
+   *      origins avoids sending users to staging AND avoids the spam-filter
+   *      penalty for linking to dev subdomains from a transactional email.
+   *   3. The first WEB_URL entry as a last resort.
+   *   4. localhost (dev only).
+   */
   private webUrl(): string {
-    return (this.config.get<string>('WEB_URL') ?? 'http://localhost:3000').split(',')[0]!.trim()
+    const explicit = this.config.get<string>('PUBLIC_APP_URL')
+    if (explicit) return explicit.replace(/\/$/, '')
+    const webUrl = this.config.get<string>('WEB_URL') ?? 'http://localhost:3000'
+    const entries = webUrl.split(',').map((s) => s.trim()).filter(Boolean)
+    const nonDev = entries.find((u) => !/\/\/dev\./i.test(u))
+    return (nonDev ?? entries[0] ?? 'http://localhost:3000').replace(/\/$/, '')
   }
 
   /** Email the user that their statement analysis completed, with a score link. */
