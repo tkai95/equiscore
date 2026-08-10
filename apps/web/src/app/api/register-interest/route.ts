@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 import { Pool } from 'pg'
 
 let pool: Pool | null = null
-const DEFAULT_EMAIL_LOGO_URL = 'https://www.equiscore.app/EquiScore_Full_Logo.svg'
+// Email clients (Gmail, Outlook, Yahoo) refuse to render <img src="*.svg"> —
+// they download but won't paint it, so the SVG shows as a broken image. PNG is
+// universally supported in email, so the branded header points at the PNG
+// wordmark instead of the SVG asset used on the website.
+const DEFAULT_EMAIL_LOGO_URL = 'https://www.equiscore.app/logo.png'
 
 type WaitlistPayload = {
   email?: string
@@ -145,6 +149,9 @@ async function sendWaitlistConfirmation(
       body: JSON.stringify({
         from,
         to,
+        // A Reply-To is a positive deliverability + UX signal. Default to the
+        // sender; override with EMAIL_REPLY_TO when set.
+        reply_to: configValue('EMAIL_REPLY_TO') ?? from,
         subject: input.subject,
         html: renderWaitlistHtml(input),
         text: renderWaitlistText(input),

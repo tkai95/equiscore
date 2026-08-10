@@ -115,6 +115,22 @@ migration.
 - [ ] DB reachable from API; `prisma migrate deploy` run.
 - [ ] `RESEND_API_KEY` + `INVITE_EMAIL_FROM` set, OR accept that invite emails
       won't send (links are still returned for manual copy in the admin UI).
+- [ ] **Email deliverability — DNS authentication (REQUIRED or mail goes to spam).**
+      The domain's SPF record MUST include the provider that actually sends the
+      mail. EquiScore sends via Resend, so the SPF record at `equiscore.app`
+      must contain `include:spf.resend.com`. The current record only includes
+      SpaceMail (`v=spf1 include:spf.spacemail.com ~all`), which means every
+      Resend-sent email **fails SPF** and lands in junk. Correct record:
+      ```
+      v=spf1 include:spf.spacemail.com include:spf.resend.com ~all
+      ```
+      Resend's DKIM selector (`resend._domainkey`) and DMARC (`_dmarc`,
+      `v=DMARC1; p=none`) are already published — only SPF is missing Resend.
+      Verify after the DNS change with Resend's domain dashboard and a test send
+      to a Gmail account (check "Show original" → Authentication-Results should
+      show `spf=pass` and `dkim=pass`).
+- [ ] Optional: set `EMAIL_REPLY_TO` to a monitored mailbox (e.g. support@) for
+      a better deliverability + UX signal. Defaults to the From address.
 - [ ] Smoke test: sign-up path matches the site mode (open = anyone; dev =
       invite link required).
 

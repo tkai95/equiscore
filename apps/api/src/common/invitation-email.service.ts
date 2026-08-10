@@ -34,7 +34,11 @@ interface InvitationEmailInput extends Omit<BrandedEmailInput, 'ctaLabel' | 'cta
 @Injectable()
 export class InvitationEmailService {
   private readonly logger = new Logger(InvitationEmailService.name)
-  private readonly defaultLogoUrl = 'https://www.equiscore.app/EquiScore_Full_Logo.svg'
+  // Email clients (Gmail, Outlook, Yahoo) refuse to render <img src="*.svg"> —
+  // they download the file but won't paint it, so an SVG logo shows as a broken
+  // image. PNG is universally supported in email, so the branded header points
+  // at the PNG wordmark instead of the SVG asset used on the website.
+  private readonly defaultLogoUrl = 'https://www.equiscore.app/logo.png'
 
   constructor(private readonly config: ConfigService) {}
 
@@ -77,6 +81,11 @@ export class InvitationEmailService {
         body: JSON.stringify({
           from,
           to: input.to,
+          // A Reply-To is a positive deliverability + UX signal: several spam
+          // filters penalise transactional mail with no reply address, and real
+          // users hit reply out of habit. Default to the sender; override with
+          // EMAIL_REPLY_TO (e.g. a support mailbox) when set.
+          reply_to: this.configValue('EMAIL_REPLY_TO') ?? from,
           subject: input.subject,
           html: this.renderHtml(input),
           text: this.renderText(input),
