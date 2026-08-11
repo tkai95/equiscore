@@ -117,7 +117,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
     ownAccountKeys,
   })
 
-  const expenses = analyzeExpenses(netTxns, resolvedIds, months, ctx.answers, recurringDebitKeys, ownAccountKeys)
+  const expenses = analyzeExpenses(netTxns, resolvedIds, months, ctx.answers, recurringDebitKeys, ownAccountKeys, jointAccountKeys)
   const { commitments, paymentBehaviour } = analyzeCommitments(debitStreams, netTxns, ctx.answers)
   const integrity = checkBalanceContinuity(txns)
   const risk = detectRisk(netTxns, recurringKeys, paymentBehaviour.overdraftMonths, resolvedIds, integrity)

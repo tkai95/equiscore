@@ -61,8 +61,12 @@ export function analyzeExpenses(
   // regular person-payments, never a one-off transfer that happens to be flagged.
   recurringDebitKeys?: Set<string>,
   // Counterparties confirmed as the customer's own account — internal transfers,
-  // not spending.
-  ownAccountKeys?: Set<string>
+  // not spending. Netted FULLY out of spend.
+  ownAccountKeys?: Set<string>,
+  // Counterparties confirmed as a JOINT household account. These are NOT netted
+  // (the money really left and we don't know what it funded downstream — PRD §23).
+  // Instead they route to a `household_funding` bucket (essential, not discretionary).
+  jointAccountKeys?: Set<string>,
 ): ExpenseProfile {
   const debits = txns.filter((t) => t.direction === 'debit')
 
@@ -73,6 +77,10 @@ export function analyzeExpenses(
         ? 'loan_repayment'
         : null
 
+  // Bucket definition for joint-account funding — declared once so the key/label
+  // are consistent. Essential (household funding is not discretionary spend).
+  const HOUSEHOLD_FUNDING: CatDef = { key: 'household_funding', label: 'Household account funding', essential: true }
+
   const buckets = new Map<string, { def: CatDef; total: number }>()
   let totalSpend = 0
 
@@ -81,6 +89,16 @@ export function analyzeExpenses(
     const key = normalizeCounterparty(t)
     if (base === 'other' && personTransferOverride && looksLikePerson(key) && recurringDebitKeys?.has(key)) {
       base = personTransferOverride
+    }
+    // Confirmed joint-account transfer: NOT netted. Route to the household_funding
+    // bucket (essential), never discretionary. This is the critical distinction
+    // from ownAccountKeys — collapsing the two would hide real co-spending (PRD §40).
+    if (jointAccountKeys?.has(key)) {
+      const b = buckets.get(HOUSEHOLD_FUNDING.key) ?? { def: HOUSEHOLD_FUNDING, total: 0 }
+      b.total += t.amount
+      buckets.set(HOUSEHOLD_FUNDING.key, b)
+      totalSpend += t.amount
+      continue
     }
     // Savings/investment outflows and confirmed own-account transfers are not
     // spending — exclude, like the analytics summary does.
