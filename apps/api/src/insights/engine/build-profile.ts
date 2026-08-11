@@ -127,7 +127,7 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   // persisted CounterpartyResolution. Passed to generateQuestions so it doesn't
   // re-ask about a relationship the user already confirmed.
   const resolvedCounterpartyKeys = new Set<string>([...(ctx.counterpartyResolutions ?? new Map()).keys()])
-  const questions = generateQuestions({ income, expenses, unusual: risk.unusual, debitStreams, externalAccounts, resolvedIds, resolvedCounterpartyKeys })
+  const questions = generateQuestions({ income, expenses, unusual: risk.unusual, debitStreams, externalAccounts, resolvedIds, resolvedCounterpartyKeys, debitTxns: netTxns })
   const stability = deriveStability(income, expenses, paymentBehaviour, commitments, months)
   const nameMatch = nameMatchScore(ctx.profileName, ctx.accountHolderName) > 0.7
 

@@ -1,8 +1,8 @@
-import type { FollowUpQuestion, IncomeProfile, ExpenseProfile, UnusualTransaction } from './types'
+import type { FollowUpQuestion, IncomeProfile, ExpenseProfile, UnusualTransaction, NormalizedTxn } from './types'
 import type { RecurringStream } from './recurrence'
 import type { InferredAccount } from './external-accounts'
 import { classify } from './classify'
-import { looksLikePerson } from './normalize'
+import { normalizeCounterparty, looksLikePerson } from './normalize'
 import { looksLikeCreditCardProvider } from './merchant-patterns'
 
 /**
@@ -23,6 +23,11 @@ export function generateQuestions(input: {
   /** Counterparty keys the user has already resolved via a CounterpartyResolution.
    *  Questions for these are suppressed (the relationship inherits across uploads). */
   resolvedCounterpartyKeys?: Set<string>
+  /** Raw debit transactions — used to detect credit-card/loan provider payments
+   *  that didn't form a clean recurring stream (variable amounts, irregular
+   *  cadence). Without this, the credit-card question misses real card payments
+   *  like Barclaycard where the monthly amount varies from £20 to £4,000. */
+  debitTxns?: NormalizedTxn[]
 }): FollowUpQuestion[] {
   const { income, expenses, unusual, debitStreams, externalAccounts, resolvedIds } = input
   const resolvedCounterpartyKeys = input.resolvedCounterpartyKeys ?? new Set<string>()
@@ -113,17 +118,14 @@ export function generateQuestions(input: {
     })
   }
 
-  // 3. Recurring credit-card / loan provider payments — whose debt is this?
-  //    A recurring stream to a known credit-card/loan provider (Barclaycard,
-  //    Amex, etc.) or classified loan_repayment is financially ambiguous: it
-  //    may be the user's OWN card repayment, a joint card, someone else's debt,
-  //    or a regular bill. Only the user can say (PRD §21, §77). The answer
-  //    establishes a financial ROLE (debt service, not new consumption) — it
-  //    does NOT net out the cashflow (the £4,000 really left the account).
-  //    Suppressed by persisted CounterpartyResolution (PRD §29).
+  // 3. Credit-card / loan provider payments — whose debt is this?
+  //    Scans BOTH recurring streams AND raw debit transactions. The raw scan
+  //    catches variable-amount card payments (e.g. Barclaycard £20-£4,000/month)
+  //    that the recurrence engine discards for high CoV + irregular cadence —
+  //    without it, real credit-card repayments are invisible (PRD §37: "bills
+  //    may vary materially every month").
+  const streamProviderKeys = new Set<string>()
   for (const s of debitStreams) {
-    // Only merchant streams that look like credit-card/loan providers OR are
-    // classified loan_repayment. Person streams are handled by block 2 above.
     if (looksLikePerson(s.key)) continue
     const isCreditCardLike =
       classify(s.txns[Math.floor(s.txns.length / 2)]!) === 'loan_repayment' ||
@@ -132,6 +134,7 @@ export function generateQuestions(input: {
     if (s.occurrences < 2) continue
     if (resolvedCounterpartyKeys.has(s.key)) continue
     if (externalKeys.has(s.key)) continue
+    streamProviderKeys.add(s.key)
     const id = `role:${s.key}`
     if (resolvedIds.has(id)) continue
     out.push({
@@ -144,6 +147,39 @@ export function generateQuestions(input: {
       clarifies: 'Debt servicing & affordability',
       priority: s.amount * s.occurrences,
     })
+  }
+  // Raw-debit fallback: scan transactions that didn't form recurring streams
+  // for known credit-card providers. Groups by counterparty key; fires if ≥2
+  // debits to the same provider and no existing question/resolution.
+  if (input.debitTxns) {
+    const providerCounts = new Map<string, { count: number; total: number; name: string }>()
+    for (const t of input.debitTxns) {
+      if (t.direction !== 'debit') continue
+      const key = normalizeCounterparty(t)
+      if (!looksLikeCreditCardProvider(key)) continue
+      if (streamProviderKeys.has(key)) continue // already handled via stream
+      if (resolvedCounterpartyKeys.has(key)) continue
+      const entry = providerCounts.get(key) ?? { count: 0, total: 0, name: key }
+      entry.count++
+      entry.total += t.amount
+      providerCounts.set(key, entry)
+    }
+    for (const [key, info] of providerCounts) {
+      if (info.count < 2) continue
+      const id = `role:${key}`
+      if (resolvedIds.has(id)) continue
+      if (externalKeys.has(key)) continue
+      out.push({
+        id,
+        question: `You've made ${info.count} payments totalling £${info.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} to ${key}. Is this your own credit card or loan?`,
+        detail:
+          'This tells us the payment is debt servicing rather than new spending. The amount still counts as real cash leaving your account.',
+        options: ['My credit card', 'My loan', "Someone else's debt", 'A regular bill', 'Something else'],
+        relatedTxnIds: [],
+        clarifies: 'Debt servicing & affordability',
+        priority: info.total, // total volume across all payments
+      })
+    }
   }
 
   // 4. Confirm gig income as regular income.
