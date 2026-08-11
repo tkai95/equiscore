@@ -3,7 +3,12 @@ import { ConfigService } from '@nestjs/config'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@equiscore/database'
 import { buildInsightProfile, detectInternalTransfers } from './engine'
-import type { InsightProfile, NormalizedTxn, ProfileContext } from './engine'
+import type {
+  InsightProfile,
+  NormalizedTxn,
+  ProfileContext,
+  CounterpartyResolutionEntry,
+} from './engine'
 import { parseStatementCsv } from './ingest/csv-statement'
 import { classify } from './engine/classify'
 import { resolveCategory } from './engine/expenses'
@@ -721,6 +726,29 @@ export class InsightsService implements OnModuleInit {
   }
 
   /**
+   * Persisted counterparty resolutions for the user, keyed by normalized
+   * counterparty key. This is the relationship-persistence + MVP-provenance
+   * layer (PRD §14/§15 simplified): a confirmed role ("Barclaycard = my credit
+   * card", "account X = joint household account") that inherits across uploads
+   * and drives downstream financial semantics without mutating the stored
+   * transaction category. Loaded into ProfileContext for the engine to consume.
+   */
+  async getCounterpartyResolutions(
+    userId: string,
+  ): Promise<Map<string, CounterpartyResolutionEntry>> {
+    const rows = await db.counterpartyResolution.findMany({
+      where: { userId },
+      select: { counterpartyKey: true, role: true, source: true, confidence: true },
+    })
+    return new Map(
+      rows.map((r) => [
+        r.counterpartyKey,
+        { role: r.role, source: r.source, confidence: r.confidence },
+      ]),
+    )
+  }
+
+  /**
    * Capture the user's explanation of a flagged/ambiguous transaction. The
    * answer resolves the follow-up question (so it stops being asked), raises
    * transaction clarity, and — because the Trust Score now reads the same engine
@@ -1176,28 +1204,30 @@ ${context}`
 
   /** Build a profile from whatever transactions the user already has stored. */
   async getProfileForUser(userId: string): Promise<InsightProfile> {
-    const [user, accounts, transactions, rentalProfile, answers] = await Promise.all([
-      db.user.findUnique({ where: { id: userId }, include: { profile: true } }),
-      db.bankAccount.findMany({
-        where: { bankConnection: { userId } },
-        include: { bankConnection: { select: { providerName: true } } },
-      }),
-      db.bankTransaction.findMany({
-        where: { bankAccount: { bankConnection: { userId } } },
-        orderBy: { bookedAt: 'asc' },
-        select: {
-          bookedAt: true,
-          amount: true,
-          direction: true,
-          description: true,
-          merchantName: true,
-          bankAccountId: true,
-          category: true, // honoured by the engine (classify.ts) — fixes the £0-rent bug
-        },
-      }),
-      db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
-      this.getQuestionAnswers(userId),
-    ])
+    const [user, accounts, transactions, rentalProfile, answers, counterpartyResolutions] =
+      await Promise.all([
+        db.user.findUnique({ where: { id: userId }, include: { profile: true } }),
+        db.bankAccount.findMany({
+          where: { bankConnection: { userId } },
+          include: { bankConnection: { select: { providerName: true } } },
+        }),
+        db.bankTransaction.findMany({
+          where: { bankAccount: { bankConnection: { userId } } },
+          orderBy: { bookedAt: 'asc' },
+          select: {
+            bookedAt: true,
+            amount: true,
+            direction: true,
+            description: true,
+            merchantName: true,
+            bankAccountId: true,
+            category: true, // honoured by the engine (classify.ts) — fixes the £0-rent bug
+          },
+        }),
+        db.rentalProfile.findFirst({ where: { userId, isCurrent: true } }),
+        this.getQuestionAnswers(userId),
+        this.getCounterpartyResolutions(userId),
+      ])
 
     if (!user) throw new NotFoundException('User not found')
 
@@ -1225,6 +1255,7 @@ ${context}`
       declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
       resolvedQuestionIds: Object.keys(answers),
       answers,
+      counterpartyResolutions,
     }
 
     return buildInsightProfile(txns, ctx)

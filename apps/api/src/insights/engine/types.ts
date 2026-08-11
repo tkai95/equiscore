@@ -1,4 +1,4 @@
-import type { TransactionCategory } from '@prisma/client'
+import type { TransactionCategory, CounterpartyRole } from '@prisma/client'
 import type { InferredAccount } from './external-accounts'
 
 /**
@@ -49,6 +49,23 @@ export interface ProfileContext {
   resolvedQuestionIds?: string[]
   /** The actual answer text per question id, for answer-specific reclassification. */
   answers?: Record<string, string>
+  /**
+   * Persisted counterparty resolutions (CounterpartyResolution rows), keyed by
+   * normalized counterparty key. This is the relationship-persistence layer
+   * (PRD §14/§15 simplified): a user-confirmed role ("Barclaycard = my credit
+   * card", "account X = joint household account") that inherits across uploads.
+   * Drives downstream financial semantics WITHOUT mutating the stored category
+   * — category and role are separate axes (PRD §19). Undefined = no resolutions
+   * loaded (callers that don't pass this get the legacy answers-only behaviour).
+   */
+  counterpartyResolutions?: ReadonlyMap<string, CounterpartyResolutionEntry>
+}
+
+/** A single persisted counterparty resolution, as consumed by the engine. */
+export interface CounterpartyResolutionEntry {
+  role: CounterpartyRole
+  source: 'machine_inferred' | 'user_confirmed'
+  confidence: number | null
 }
 
 // ─── Output ───────────────────────────────────────────────────────────────────

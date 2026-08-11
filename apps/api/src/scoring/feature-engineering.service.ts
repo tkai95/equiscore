@@ -109,6 +109,21 @@ export class FeatureEngineeringService {
         where: { userId },
         select: { questionId: true, answer: true },
       })
+      // Counterparty resolutions — mirrors InsightsService.getCounterpartyResolutions.
+      // Loaded inline (same pattern as the question-answer load above) to avoid a
+      // circular dependency between the scoring and insights modules. These drive
+      // the same financial-role semantics the profile page uses, so the Trust
+      // Score agrees with the profile the user sees.
+      const resolutionRows = await db.counterpartyResolution.findMany({
+        where: { userId },
+        select: { counterpartyKey: true, role: true, source: true, confidence: true },
+      })
+      const counterpartyResolutions = new Map(
+        resolutionRows.map((r) => [
+          r.counterpartyKey,
+          { role: r.role, source: r.source, confidence: r.confidence },
+        ]),
+      )
       const insight = buildInsightProfile(normTxns, {
         source: features.openBankingConnected ? 'open_banking' : 'statement_upload',
         accountHolderName: allAccounts.find((a) => a.accountHolderName)?.accountHolderName ?? null,
@@ -116,6 +131,7 @@ export class FeatureEngineeringService {
         declaredMonthlyRent: rentalProfile?.monthlyRentDeclared ?? null,
         resolvedQuestionIds: answered.map((a) => a.questionId),
         answers: Object.fromEntries(answered.map((a) => [a.questionId, a.answer])),
+        counterpartyResolutions,
       })
 
       // Partial coverage: the statement/account reveals other accounts (savings,

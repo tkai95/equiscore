@@ -62,6 +62,7 @@ model User {
   devAccessInvitesSent               DevAccessInvite[]           @relation("DevAccessInviteInviter")
   devAccessInvitesAccepted           DevAccessInvite[]           @relation("DevAccessInviteAccepter")
   commitmentSettings                 CommitmentSetting[]
+  counterpartyResolutions            CounterpartyResolution[]
   reminders                          Reminder[]
   savingsGoals                       SavingsGoal[]
   consumerGoals                      ConsumerGoal[]
@@ -1532,6 +1533,66 @@ enum CommitmentStatus {
   unknown
 
   @@map("commitment_status")
+}
+
+/// A user-confirmed (or machine-inferred) role for a recurring counterparty.
+/// This is the minimum-viable provenance + relationship-persistence layer
+/// (PRD §14/§15, simplified): it records WHAT was concluded about a
+/// counterparty, WHERE the conclusion came from (machine vs user), and the
+/// stream it applies to — so a single confirmation ("Barclaycard = my credit
+/// card", "account X = joint household account", "Strideup = rent provider")
+/// inherits across future statement uploads instead of being re-asked.
+///
+/// Distinct from InsightQuestionAnswer (free-text, no source/provenance) and
+/// from CommitmentSetting (active/inactive only, no role). Keyed by the
+/// engine's normalized counterparty key, unique per user.
+model CounterpartyResolution {
+  id             String             @id @default(cuid())
+  userId         String             @map("user_id")
+  /// Engine-normalized counterparty key (normalizeCounterparty() output).
+  counterpartyKey String            @map("counterparty_key")
+  role           CounterpartyRole
+  source         ResolutionSource
+  /// 0–1 confidence for machine-inferred rows; null for user-confirmed.
+  confidence     Float?
+  /// The recurring-stream key this resolution was derived from, if any.
+  streamKey      String?            @map("stream_key")
+  /// Minimum-viable evidence: { txnIds, occurrenceCount, medianAmount, cadence }.
+  evidence       Json?
+  confirmedAt    DateTime?          @map("confirmed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, counterpartyKey])
+  @@map("counterparty_resolutions")
+}
+
+/// The confirmed financial role of a counterparty from the user's perspective.
+/// Drives downstream financial semantics (own-account netting, household-funding
+/// bucket, debt-service flag, rent detection) WITHOUT mutating the stored
+/// transaction category — the category and the role are separate axes (PRD §19).
+enum CounterpartyRole {
+  own_account
+  joint_household_account
+  credit_card
+  loan
+  rent_provider
+  employer
+  person_other
+  unknown
+
+  @@map("counterparty_role")
+}
+
+/// How a counterparty resolution was established. user_confirmed rows persist
+/// across uploads; machine_inferred rows are recomputed and may be overridden.
+enum ResolutionSource {
+  machine_inferred
+  user_confirmed
+
+  @@map("resolution_source")
 }
 
 /// A renewal/review reminder. Fires by being surfaced in-app once now >=

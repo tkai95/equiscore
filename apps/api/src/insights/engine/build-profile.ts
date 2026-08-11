@@ -9,6 +9,7 @@ import type {
   ExpenseProfile,
   PaymentBehaviour,
   SubScore,
+  CounterpartyResolutionEntry,
 } from './types'
 import { detectRecurringStreams } from './recurrence'
 import { analyzeIncome, incomeEligibleKeys } from './income'
@@ -60,13 +61,39 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
   const income = analyzeIncome(netTxns, creditStreams, resolvedIds, incomeKeys)
   const recurringDebitKeys = new Set(debitStreams.map((s) => s.key))
 
-  // Counterparties the customer has confirmed are their own account (via the
-  // "who do you send this to?" question) — these transfers are internal, not
-  // spending, so they're netted out of expenses.
-  const ownAccountKeys = new Set<string>(
-    Object.entries(ctx.answers ?? {})
+  // ── Counterparty resolutions → three DISTINCT key sets ───────────────────
+  // These MUST stay separate: collapsing them would repeat the exact double-
+  // counting / wrong-netting failure the PRD (§19, §21, §22, §40) warns against.
+  //
+  // ownAccountKeys: genuinely the user's own account → transfers are internal,
+  //   netted OUT of spend and cashflow (existing semantics, unchanged).
+  // jointAccountKeys: a joint household account → NOT netted out (the money
+  //   really left and we don't know what it funded downstream), but routed to
+  //   a household_funding bucket instead of discretionary spend.
+  // creditCardKeys: the user's own credit card → NOT netted out (the £4,000
+  //   really left), but the commitment is flagged debt_service / not new
+  //   consumption. Proper netting only when the card statement is also ingested.
+  //
+  // Legacy `transfer:` answers continue to feed ownAccountKeys for backward
+  // compatibility; persisted CounterpartyResolution rows are the canonical
+  // source going forward.
+  const resolutions = ctx.counterpartyResolutions ?? new Map<string, CounterpartyResolutionEntry>()
+  const ownAccountKeys = new Set<string>([
+    // Legacy: free-text "transfer:<key>" answers matching "own account".
+    ...Object.entries(ctx.answers ?? {})
       .filter(([id, ans]) => id.startsWith('transfer:') && /own account|my own|myself/i.test(ans))
-      .map(([id]) => id.slice('transfer:'.length))
+      .map(([id]) => id.slice('transfer:'.length)),
+    // Canonical: persisted resolutions with role own_account.
+    ...[...resolutions.entries()].filter(([, r]) => r.role === 'own_account').map(([k]) => k),
+  ])
+  const jointAccountKeys = new Set<string>(
+    [...resolutions.entries()].filter(([, r]) => r.role === 'joint_household_account').map(([k]) => k),
+  )
+  const creditCardKeys = new Set<string>(
+    [...resolutions.entries()].filter(([, r]) => r.role === 'credit_card' || r.role === 'loan').map(([k]) => k),
+  )
+  const rentProviderKeys = new Set<string>(
+    [...resolutions.entries()].filter(([, r]) => r.role === 'rent_provider').map(([k]) => k),
   )
   // The day salary lands — used to spot money swept out just after payday.
   // Cadence allow-list mirrors detectSalaryStream (income.ts): monthly, four-
