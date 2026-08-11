@@ -195,6 +195,60 @@ function streamCategory(s: RecurringStream): TransactionCategory {
 }
 
 /**
+ * Dominant-amount detection for variable salary streams (PRD §16).
+ *
+ * Real salary packages mix amounts: base salary + bonus + allowance + dividends
+ * under one employer. The aggregate CoV is high, but there IS a stable dominant
+ * amount (the base salary) buried in the mix. This function checks whether the
+ * stream has a dominant amount band — an amount ±5% that covers ≥40% of the
+ * stream's transactions with low internal variance (CoV ≤ 0.05 within the
+ * band) and a median ≥ £300. If so, the stream qualifies as salary despite the
+ * high aggregate CoV.
+ *
+ * This avoids false positives: a genuinely variable stream (freelance/gig income
+ * where every payment differs) has no dominant band and is correctly rejected.
+ */
+function hasDominantSalaryAmount(stream: RecurringStream): boolean {
+  const amounts = stream.txns.map((t) => t.amount)
+  if (amounts.length < 3) return false
+
+  // Cluster amounts into bands (±5% of each anchor). Greedy: sort, then group
+  // by proximity.
+  const sorted = [...amounts].sort((a, b) => a - b)
+  const bands: number[][] = []
+  for (const amt of sorted) {
+    const last = bands[bands.length - 1]
+    if (last && last.length > 0) {
+      const anchor = last[0]!
+      if (Math.abs(amt - anchor) / anchor <= 0.05) {
+        last.push(amt)
+        continue
+      }
+    }
+    bands.push([amt])
+  }
+
+  // Find the largest band.
+  const largest = bands.sort((a, b) => b.length - a.length)[0] ?? []
+  if (largest.length < 3) return false
+
+  // Dominant: covers ≥40% of the stream's transactions.
+  if (largest.length / amounts.length < 0.4) return false
+
+  // Low internal variance within the band (CoV ≤ 0.05 — the band is tight).
+  const bandMean = largest.reduce((s, x) => s + x, 0) / largest.length
+  const bandStd = Math.sqrt(largest.reduce((s, x) => s + (x - bandMean) ** 2, 0) / largest.length)
+  const bandCoV = bandMean > 0 ? bandStd / bandMean : 1
+  if (bandCoV > 0.05) return false
+
+  // Materially sized (median of the band ≥ £300).
+  const bandMedian = largest.sort((a, b) => a - b)[Math.floor(largest.length / 2)]!
+  if (bandMedian < 300) return false
+
+  return true
+}
+
+/**
  * A salary is a *shape*: monthly-ish, stable amount, same source, materially
  * sized. Prefer a stream the keyword rules already call salary; otherwise take
  * the largest qualifying stream that isn't clearly benefits or gig work.
@@ -206,14 +260,29 @@ function detectSalaryStream(creditStreams: RecurringStream[]): RecurringStream |
   // fortnightly-paid users even when the stream was perfectly stable. Weekly
   // is admitted too: a stable weekly credit from one source with a salary-
   // shaped description is legitimately salary for weekly-paid roles.
+  const cadenceOk = (s: RecurringStream) =>
+    s.cadence === 'monthly' || s.cadence === 'four_weekly' || s.cadence === 'fortnightly' || s.cadence === 'weekly'
+
+  // Strict candidates: stable amount (CoV ≤ 0.15).
   const candidates = creditStreams.filter(
-    (s) =>
-      (s.cadence === 'monthly' || s.cadence === 'four_weekly' || s.cadence === 'fortnightly' || s.cadence === 'weekly') &&
-      s.occurrences >= 3 &&
-      s.amountCoV <= 0.15 &&
-      s.amount >= 300
+    (s) => cadenceOk(s) && s.occurrences >= 3 && s.amountCoV <= 0.15 && s.amount >= 300,
   )
-  if (candidates.length === 0) return undefined
+
+  // Fallback: dominant-amount detection (PRD §16: "Do NOT assume recurring =
+  // same amount"). Real salary packages mix amounts under one counterparty —
+  // base salary + bonus + allowance + dividends — inflating the aggregate CoV
+  // far above 0.15. If the strict filter finds nothing, look for a stream with
+  // the right cadence where ONE amount band (±5%) covers ≥40% of transactions
+  // with low internal variance. That dominant band is the core salary.
+  if (candidates.length === 0) {
+    const dominantCandidates = creditStreams.filter(
+      (s) => cadenceOk(s) && s.occurrences >= 3 && hasDominantSalaryAmount(s),
+    )
+    if (dominantCandidates.length === 0) return undefined
+    const keywordMatch = dominantCandidates.find((s) => streamCategory(s) === 'salary')
+    if (keywordMatch) return keywordMatch
+    return dominantCandidates.sort((a, b) => b.amount - a.amount)[0]
+  }
 
   const keywordMatch = candidates.find((s) => streamCategory(s) === 'salary')
   if (keywordMatch) return keywordMatch
