@@ -1,7 +1,9 @@
 import type { FollowUpQuestion, IncomeProfile, ExpenseProfile, UnusualTransaction } from './types'
 import type { RecurringStream } from './recurrence'
 import type { InferredAccount } from './external-accounts'
+import { classify } from './classify'
 import { looksLikePerson } from './normalize'
+import { looksLikeCreditCardProvider } from './merchant-patterns'
 
 /**
  * Turn ambiguity into questions. This is the fairness engine: instead of
@@ -104,7 +106,39 @@ export function generateQuestions(input: {
     })
   }
 
-  // 3. Confirm gig income as regular income.
+  // 3. Recurring credit-card / loan provider payments — whose debt is this?
+  //    A recurring stream to a known credit-card/loan provider (Barclaycard,
+  //    Amex, etc.) or classified loan_repayment is financially ambiguous: it
+  //    may be the user's OWN card repayment, a joint card, someone else's debt,
+  //    or a regular bill. Only the user can say (PRD §21, §77). The answer
+  //    establishes a financial ROLE (debt service, not new consumption) — it
+  //    does NOT net out the cashflow (the £4,000 really left the account).
+  //    Suppressed by persisted CounterpartyResolution (PRD §29).
+  for (const s of debitStreams) {
+    // Only merchant streams that look like credit-card/loan providers OR are
+    // classified loan_repayment. Person streams are handled by block 2 above.
+    if (looksLikePerson(s.key)) continue
+    const isCreditCardLike =
+      classify(s.txns[Math.floor(s.txns.length / 2)]!) === 'loan_repayment' ||
+      looksLikeCreditCardProvider(s.key)
+    if (!isCreditCardLike) continue
+    if (s.occurrences < 2) continue
+    if (resolvedCounterpartyKeys.has(s.key)) continue
+    if (externalKeys.has(s.key)) continue
+    const id = `role:${s.key}`
+    if (resolvedIds.has(id)) continue
+    out.push({
+      id,
+      question: `You pay about £${s.amount.toLocaleString('en-GB')} to ${s.name} regularly. Is this your own credit card or loan?`,
+      detail:
+        'This tells us the payment is debt servicing rather than new spending. The amount still counts as real cash leaving your account.',
+      options: ['My credit card', 'My loan', "Someone else's debt", 'A regular bill', 'Something else'],
+      relatedTxnIds: [],
+      clarifies: 'Debt servicing & affordability',
+    })
+  }
+
+  // 4. Confirm gig income as regular income.
   for (const src of income.sources) {
     if (src.category !== 'gig_income' || !src.pendingConfirmation) continue
     out.push({

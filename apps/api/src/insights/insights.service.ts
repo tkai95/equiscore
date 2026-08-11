@@ -80,9 +80,13 @@ const GAMBLING =
  */
 function answerToRole(answer: string): CounterpartyRole | null {
   const a = answer.toLowerCase()
+  // Person-transfer options (block 2 in questions.ts).
   if (a.includes('own') || a.includes('joint')) return 'joint_household_account'
   if (a.includes('rent')) return 'rent_provider'
   if (a.includes('family') || a.includes('support')) return 'person_other'
+  // Credit-card / loan options (block 3 in questions.ts). 'My credit card' is
+  // checked before 'My loan' because a credit card IS a loan — order matters.
+  if (a.includes('credit card')) return 'credit_card'
   if (a.includes('loan')) return 'loan'
   return null
 }
