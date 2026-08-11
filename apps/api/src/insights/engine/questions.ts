@@ -1,7 +1,6 @@
 import type { FollowUpQuestion, IncomeProfile, ExpenseProfile, UnusualTransaction } from './types'
 import type { RecurringStream } from './recurrence'
 import type { InferredAccount } from './external-accounts'
-import { classify } from './classify'
 import { looksLikePerson } from './normalize'
 
 /**
@@ -19,8 +18,12 @@ export function generateQuestions(input: {
   debitStreams: RecurringStream[]
   externalAccounts: InferredAccount[]
   resolvedIds: Set<string>
+  /** Counterparty keys the user has already resolved via a CounterpartyResolution.
+   *  Questions for these are suppressed (the relationship inherits across uploads). */
+  resolvedCounterpartyKeys?: Set<string>
 }): FollowUpQuestion[] {
   const { income, expenses, unusual, debitStreams, externalAccounts, resolvedIds } = input
+  const resolvedCounterpartyKeys = input.resolvedCounterpartyKeys ?? new Set<string>()
   const out: FollowUpQuestion[] = []
 
   // 0. Regular outgoing transfers detected by pattern. Ask whenever we're not
@@ -69,27 +72,36 @@ export function generateQuestions(input: {
     }
   }
 
-  // 2. Recurring payments to an individual — rent, family support, or other?
-  const familyUnconfirmed = expenses.categories.some((c) => c.key === 'family_support' && c.unconfirmed)
-  if (familyUnconfirmed && !resolvedIds.has('expense:family_support')) {
-    const personStream = debitStreams.find(
-      (s) =>
-        looksLikePerson(s.key) &&
-        classify(s.txns[0]!) === 'other' &&
-        (s.cadence === 'monthly' || s.cadence === 'four_weekly') &&
-        // Not already covered by the "who do you send this to?" transfer question.
-        !externalKeys.has(s.key)
-    )
-    if (personStream) {
-      out.push({
-        id: 'expense:family_support',
-        question: `Is the £${personStream.amount.toLocaleString('en-GB')} you pay ${personStream.name} every month rent, family support, or something else?`,
-        detail: 'This changes how we classify it — rent counts toward rental reliability, family support toward your commitments.',
-        options: ['Rent', 'Family support', 'Repaying a loan', 'Something else'],
-        relatedTxnIds: [],
-        clarifies: 'Rental reliability & clarity',
-      })
-    }
+  // 2. Recurring material transfers to a person — rent, family support, joint
+  //    account, or other? This is the meaning-based trigger (PRD §24): the
+  //    question fires whenever a MATERIAL recurring transfer to a person has an
+  //    UNRESOLVED financial meaning — NOT when a classifier happens to return a
+  //    particular category. The previous trigger required `classify() === 'other'`,
+  //    which silently broke when the hybrid classifier labelled person transfers
+  //    `savings_transfer`. Category now informs the options, not whether to ask.
+  //    One question per counterparty (id `role:<key>`); the answer persists as a
+  //    CounterpartyResolution so it inherits across uploads and is never re-asked.
+  const MATERIAL_PERSON_AMOUNT = 200 // below this, not worth a question (PRD §25)
+  for (const s of debitStreams) {
+    if (!looksLikePerson(s.key)) continue
+    if (s.amount < MATERIAL_PERSON_AMOUNT) continue
+    if (s.occurrences < 3) continue
+    // Already resolved (persisted CounterpartyResolution) — don't re-ask.
+    if (resolvedCounterpartyKeys.has(s.key)) continue
+    // Already covered by the "who do you send this to?" external-account question.
+    if (externalKeys.has(s.key)) continue
+    const id = `role:${s.key}`
+    if (resolvedIds.has(id)) continue
+    const cadenceWord = s.cadence === 'fortnightly' ? 'fortnight' : s.cadence === 'weekly' ? 'week' : 'month'
+    out.push({
+      id,
+      question: `You send about £${s.amount.toLocaleString('en-GB')} to ${s.name} every ${cadenceWord}. What is this for?`,
+      detail:
+        'This changes how we treat it — rent counts toward rental reliability, a joint-account transfer is household funding, family support is a commitment.',
+      options: ['My own/joint account', 'Rent', 'Family support', 'Repaying a loan', 'Something else'],
+      relatedTxnIds: [],
+      clarifies: 'Rental reliability, commitments & clarity',
+    })
   }
 
   // 3. Confirm gig income as regular income.

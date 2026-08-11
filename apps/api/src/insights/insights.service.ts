@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Anthropic from '@anthropic-ai/sdk'
+import type { CounterpartyRole } from '@prisma/client'
 import { db } from '@equiscore/database'
 import { buildInsightProfile, detectInternalTransfers } from './engine'
 import type {
@@ -68,6 +69,23 @@ function applyCorrections(
 
 const GAMBLING =
   /\b(bet365|paddy ?power|william ?hill|ladbrokes|betfair|sky ?bet|coral|betfred|betway|888|pokerstars|draftkings|casino|poker|gambl|lottery|lotto)\b/i
+
+/**
+ * Map a free-text answer to a person-transfer `role:<key>` question onto a
+ * CounterpartyRole. Returns null for "Something else" / unrecognised answers —
+ * those don't establish a reusable relationship, so no resolution is persisted
+ * and the question could resurface (but the InsightQuestionAnswer still records
+ * the user's input for clarity/audit). The option text must stay in lockstep
+ * with the options array in questions.ts.
+ */
+function answerToRole(answer: string): CounterpartyRole | null {
+  const a = answer.toLowerCase()
+  if (a.includes('own') || a.includes('joint')) return 'joint_household_account'
+  if (a.includes('rent')) return 'rent_provider'
+  if (a.includes('family') || a.includes('support')) return 'person_other'
+  if (a.includes('loan')) return 'loan'
+  return null
+}
 
 // The one tool the assistant can call to pull exact transaction evidence.
 const TRANSACTION_TOOL: Anthropic.Tool = {
@@ -753,6 +771,13 @@ export class InsightsService implements OnModuleInit {
    * answer resolves the follow-up question (so it stops being asked), raises
    * transaction clarity, and — because the Trust Score now reads the same engine
    * — can move the score. Recomputes so every surface reflects the answer.
+   *
+   * For `role:<counterpartyKey>` questions, the answer also creates (or updates)
+   * a CounterpartyResolution — the persisted relationship that inherits across
+   * uploads and drives downstream financial semantics (own-account netting,
+   * household-funding bucket, debt-service flag, rent detection) without
+   * mutating the stored transaction category. This is the minimum-viable-
+   * provenance + relationship-persistence layer (PRD §14/§15/§29).
    */
   async answerQuestion(userId: string, questionId: string, answer: string) {
     await db.insightQuestionAnswer.upsert({
@@ -760,6 +785,28 @@ export class InsightsService implements OnModuleInit {
       create: { userId, questionId, answer },
       update: { answer },
     })
+
+    // Map a `role:<key>` answer to a persisted CounterpartyResolution so the
+    // resolved meaning inherits and the question is never re-asked.
+    if (questionId.startsWith('role:')) {
+      const counterpartyKey = questionId.slice('role:'.length)
+      const role = answerToRole(answer)
+      if (role) {
+        await db.counterpartyResolution.upsert({
+          where: { userId_counterpartyKey: { userId, counterpartyKey } },
+          create: {
+            userId,
+            counterpartyKey,
+            role,
+            source: 'user_confirmed',
+            confirmedAt: new Date(),
+          },
+          update: { role, source: 'user_confirmed', confirmedAt: new Date() },
+        })
+        this.audit.log(userId, 'counterparty.resolved', { counterpartyKey, role, answer })
+      }
+    }
+
     this.audit.log(userId, 'insight.question_answered', { questionId })
     const score = await this.scoringService.recompute(userId)
     return { ok: true, overallScore: score.overallScore, overallTier: score.overallTier }
