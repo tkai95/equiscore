@@ -35,6 +35,9 @@ export function generateQuestions(input: {
   for (const a of externalAccounts) {
     const uncertain = a.type === 'unknown' || (a.type === 'own_current' && a.confidence !== 'high')
     if (!uncertain) continue
+    // Suppress if the user already resolved this counterparty via any question
+    // path (role: or transfer:) — the relationship inherits, never re-ask (PRD §29).
+    if (resolvedCounterpartyKeys.has(a.key)) continue
     const id = `transfer:${a.key}`
     if (resolvedIds.has(id)) continue
     out.push({
@@ -45,6 +48,7 @@ export function generateQuestions(input: {
       options: ['My own account', 'My rent', 'Someone I support', 'A regular bill', 'Someone else'],
       relatedTxnIds: [],
       clarifies: 'Spending & account coverage',
+      priority: a.monthlyFlow * 3, // recurring monthly flow — materiality × recurrence
     })
   }
 
@@ -60,6 +64,7 @@ export function generateQuestions(input: {
         options: ['My own account', 'Family support', 'Paying someone', 'Other'],
         relatedTxnIds: [u.id],
         clarifies: 'Transaction clarity',
+        priority: u.amount, // one-off — materiality is the amount itself
       })
     } else {
       const verb = u.direction === 'debit' ? 'you sent to' : 'you received from'
@@ -70,6 +75,7 @@ export function generateQuestions(input: {
         options: ['Savings', 'Family support', 'Gift', 'Rent deposit', 'Sold something', 'Other'],
         relatedTxnIds: [u.id],
         clarifies: 'Transaction clarity',
+        priority: u.amount,
       })
     }
   }
@@ -103,6 +109,7 @@ export function generateQuestions(input: {
       options: ['My own/joint account', 'Rent', 'Family support', 'Repaying a loan', 'Something else'],
       relatedTxnIds: [],
       clarifies: 'Rental reliability, commitments & clarity',
+      priority: s.amount * s.occurrences, // total volume — materiality × recurrence
     })
   }
 
@@ -135,6 +142,7 @@ export function generateQuestions(input: {
       options: ['My credit card', 'My loan', "Someone else's debt", 'A regular bill', 'Something else'],
       relatedTxnIds: [],
       clarifies: 'Debt servicing & affordability',
+      priority: s.amount * s.occurrences,
     })
   }
 
@@ -148,11 +156,15 @@ export function generateQuestions(input: {
       options: ['Yes, regular income', 'Occasional', 'One-off', 'No longer active'],
       relatedTxnIds: [],
       clarifies: 'Income stability',
+      priority: src.monthlyAverage * 3,
     })
   }
 
-  // Keep it to a manageable set; most-valuable first (unusual → recurring → income).
-  return out.slice(0, 6)
+  // No hard cap (PRD §25: "do not ask about every coffee" — but DO ask about
+  // every MATERIALLY ambiguous item). Sort by priority descending so the
+  // highest-impact questions surface first. The frontend can paginate/progressively
+  // disclose if the list is long, but the engine surfaces everything that matters.
+  return out.sort((a, b) => b.priority - a.priority)
 }
 
 function fmt(iso: string): string {

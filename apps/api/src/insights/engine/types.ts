@@ -221,6 +221,10 @@ export interface FollowUpQuestion {
   options: string[]
   relatedTxnIds: string[]
   clarifies: string // what answering it improves
+  /** Materiality-based priority (higher = more important). Questions are sorted
+   *  by this so the user sees the highest-impact ambiguities first (PRD §25-26).
+   *  No hard cap — all material unresolved questions are surfaced. */
+  priority: number
 }
 
 export interface SubScore {
