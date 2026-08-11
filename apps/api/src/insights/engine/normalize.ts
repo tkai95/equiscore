@@ -30,9 +30,14 @@ const AGGREGATOR = /\b(paypal|sq|sumup|zettle|izettle|stripe|gocardless)\b\s*/gi
 /**
  * Payment verbs and rails. Stripped from the *grouping key* only — never from
  * the description the classifier reads — so "TRANSFER TO J SMITH" and
- * "FP TO J SMITH" collapse to the same counterparty.
+ * "FP TO J SMITH" collapse to the same counterparty. Includes Wise-style verbs
+ * ("sent money to X", "received money from X") so the person name surfaces as
+ * the key — without this, "sent money kohinoor choudhury" is 4 tokens and
+ * fails looksLikePerson's 2-3 token check, suppressing the person-transfer
+ * question for Wise users entirely.
  */
-const RAIL_NOISE = /\b(transfer|payment|pymt|paid|to|from|via|bacs|fps|faster|standing order|direct debit|credit|debit)\b/gi
+const RAIL_NOISE =
+  /\b(transfer|payment|pymt|paid|to|from|via|bacs|fps|faster|standing order|direct debit|credit|debit|sent|received|money)\b/gi
 
 export function normalizeCounterparty(txn: Pick<NormalizedTxn, 'description' | 'merchantName'>): string {
   const merchant = (txn.merchantName ?? '').trim()

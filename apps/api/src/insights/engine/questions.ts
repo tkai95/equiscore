@@ -95,6 +95,7 @@ export function generateQuestions(input: {
   //    One question per counterparty (id `role:<key>`); the answer persists as a
   //    CounterpartyResolution so it inherits across uploads and is never re-asked.
   const MATERIAL_PERSON_AMOUNT = 200 // below this, not worth a question (PRD §25)
+  const streamPersonKeys = new Set<string>()
   for (const s of debitStreams) {
     if (!looksLikePerson(s.key)) continue
     if (s.amount < MATERIAL_PERSON_AMOUNT) continue
@@ -103,6 +104,7 @@ export function generateQuestions(input: {
     if (resolvedCounterpartyKeys.has(s.key)) continue
     // Already covered by the "who do you send this to?" external-account question.
     if (externalKeys.has(s.key)) continue
+    streamPersonKeys.add(s.key)
     const id = `role:${s.key}`
     if (resolvedIds.has(id)) continue
     const cadenceWord = s.cadence === 'fortnightly' ? 'fortnight' : s.cadence === 'weekly' ? 'week' : 'month'
@@ -116,6 +118,40 @@ export function generateQuestions(input: {
       clarifies: 'Rental reliability, commitments & clarity',
       priority: s.amount * s.occurrences, // total volume — materiality × recurrence
     })
+  }
+  // Raw-debit fallback for person transfers: catches irregular/variable transfers
+  // (e.g. £12,250 to a spouse at varying intervals) that the recurrence engine
+  // discards. Same pattern as the credit-card raw-debit scan. Groups by
+  // counterparty key; fires if ≥3 material debits to the same person.
+  if (input.debitTxns) {
+    const personCounts = new Map<string, { count: number; total: number }>()
+    for (const t of input.debitTxns) {
+      if (t.direction !== 'debit' || t.amount < MATERIAL_PERSON_AMOUNT) continue
+      const key = normalizeCounterparty(t)
+      if (!looksLikePerson(key)) continue
+      if (streamPersonKeys.has(key)) continue // already handled via stream
+      if (resolvedCounterpartyKeys.has(key)) continue
+      if (externalKeys.has(key)) continue
+      const entry = personCounts.get(key) ?? { count: 0, total: 0 }
+      entry.count++
+      entry.total += t.amount
+      personCounts.set(key, entry)
+    }
+    for (const [key, info] of personCounts) {
+      if (info.count < 3) continue
+      const id = `role:${key}`
+      if (resolvedIds.has(id)) continue
+      out.push({
+        id,
+        question: `You've sent £${info.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} to ${key} across ${info.count} payments. What is this for?`,
+        detail:
+          'This changes how we treat it — a joint-account transfer is household funding, rent counts toward rental reliability, family support is a commitment.',
+        options: ['My own/joint account', 'Rent', 'Family support', 'Repaying a loan', 'Something else'],
+        relatedTxnIds: [],
+        clarifies: 'Rental reliability, commitments & clarity',
+        priority: info.total,
+      })
+    }
   }
 
   // 3. Credit-card / loan provider payments — whose debt is this?
