@@ -247,8 +247,17 @@ export function InsightProfileView() {
       const token = await getToken()
       return api.insights.answerQuestion(token!, questionId, answer)
     },
-    onSuccess: () => {
-      for (const key of [['insight-profile'], ['score'], ['analytics-summary']]) {
+    onSuccess: (data) => {
+      // The response carries the fresh overallScore/overallTier — merge into
+      // the cached score instantly so the number updates without a GET round-
+      // trip. The background invalidate (below) then refetches the full data.
+      queryClient.setQueryData<CanonicalScore | null>(['score', 'general'], (old) =>
+        old ? { ...old, overallScore: data.overallScore, overallTier: data.overallTier as TrustTier } : old,
+      )
+      // Invalidate all affected caches. Added ['score-improvements'] — the
+      // old code omitted it, so the "what could improve" surfaces stayed stale
+      // after answering a question.
+      for (const key of [['insight-profile'], ['score'], ['analytics-summary'], ['score-improvements']]) {
         void queryClient.invalidateQueries({ queryKey: key })
       }
     },

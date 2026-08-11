@@ -187,10 +187,19 @@ export function TrustScoreView() {
   const recompute = useMutation({
     mutationFn: async () => {
       const token = await getToken()
-      return api.scores.recompute(token!, 'general')
+      return api.scores.recompute(token!, 'general') as Promise<TrustScoreData>
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['score'] })
+    onSuccess: (data) => {
+      // Write the fresh score DIRECTLY into the cache from the response —
+      // instant update, no second GET round-trip. The old code discarded the
+      // response and relied on a follow-up refetch that had a visible timing
+      // gap (the number didn't change until the refetch completed).
+      queryClient.setQueryData(['score', 'general'], data)
+      // Invalidate sibling caches so the surrounding page context (insights,
+      // analytics, improvements) also refreshes. The recompute path was
+      // missing these — every other score-mutating flow invalidates them.
+      queryClient.invalidateQueries({ queryKey: ['insight-profile'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-summary'] })
       queryClient.invalidateQueries({ queryKey: ['score-improvements'] })
     },
   })
