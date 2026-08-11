@@ -112,7 +112,15 @@ export function analyzeIncome(
   let salaryMonthlyNet: number | null = null
   let estimatedGrossAnnualSalary: number | null = null
   if (salaryStream) {
-    const paymentsPerYear = salaryStream.cadence === 'four_weekly' ? 13 : 12
+    // Cadence-aware annualisation. The per-payment amount must be multiplied by
+    // the number of payments per year — NOT treated as a monthly figure. Using
+    // ×12 for a fortnightly salary under-counts by ~46% (12/26). Weekly → 52,
+    // fortnightly → 26, four-weekly → 13, monthly/else → 12.
+    const paymentsPerYear =
+      salaryStream.cadence === 'weekly' ? 52
+      : salaryStream.cadence === 'fortnightly' ? 26
+      : salaryStream.cadence === 'four_weekly' ? 13
+      : 12
     const netAnnualSalary = salaryStream.amount * paymentsPerYear
     if (netAnnualSalary > PERSONAL_ALLOWANCE) {
       salaryMonthlyNet = round2((salaryStream.amount * paymentsPerYear) / 12)
@@ -192,9 +200,15 @@ function streamCategory(s: RecurringStream): TransactionCategory {
  * the largest qualifying stream that isn't clearly benefits or gig work.
  */
 function detectSalaryStream(creditStreams: RecurringStream[]): RecurringStream | undefined {
+  // Cadence allow-list. Salary may be paid monthly, four-weekly, OR fortnightly
+  // (common in the UK — e.g. Wise payroll). The previous allow-list excluded
+  // fortnightly, which silently suppressed recurringSalaryDetected for
+  // fortnightly-paid users even when the stream was perfectly stable. Weekly
+  // is admitted too: a stable weekly credit from one source with a salary-
+  // shaped description is legitimately salary for weekly-paid roles.
   const candidates = creditStreams.filter(
     (s) =>
-      (s.cadence === 'monthly' || s.cadence === 'four_weekly') &&
+      (s.cadence === 'monthly' || s.cadence === 'four_weekly' || s.cadence === 'fortnightly' || s.cadence === 'weekly') &&
       s.occurrences >= 3 &&
       s.amountCoV <= 0.15 &&
       s.amount >= 300

@@ -69,9 +69,18 @@ export function buildInsightProfile(input: NormalizedTxn[], ctx: ProfileContext)
       .map(([id]) => id.slice('transfer:'.length))
   )
   // The day salary lands — used to spot money swept out just after payday.
+  // Cadence allow-list mirrors detectSalaryStream (income.ts): monthly, four-
+  // weekly, fortnightly, or weekly. Fortnightly/weekly salaries don't have a
+  // stable "day of month" (they drift), but typicalDayOfMonth is nullable and
+  // downstream consumers tolerate null — keeping them in the candidate set
+  // preserves parity with the salary-detection flag.
   const salaryDayOfMonth =
     creditStreams
-      .filter((s) => (s.cadence === 'monthly' || s.cadence === 'four_weekly') && s.occurrences >= 3)
+      .filter(
+        (s) =>
+          (s.cadence === 'monthly' || s.cadence === 'four_weekly' || s.cadence === 'fortnightly' || s.cadence === 'weekly') &&
+          s.occurrences >= 3,
+      )
       .sort((a, b) => b.amount - a.amount)[0]?.typicalDayOfMonth ?? null
 
   const externalAccounts = detectExternalAccounts(netTxns, debitStreams, {
