@@ -50,3 +50,4 @@ logs_debug.json
 logs_full.json
 logs_heal.json
 apps/api/src/banking/reclassify.ts
+apps/api/src/insights/engine/diagnostic.ts
