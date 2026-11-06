@@ -138,6 +138,28 @@ the gate. **Do not remove this gate** — without it, new sign-ups see a broken
 dashboard. If you add a new entry route into the dashboard, it inherits this
 gate automatically because it lives in the layout.
 
+### Local auth bypass (`APP_ENV=local`)
+
+For reproducing bugs locally without a Clerk instance, `APP_ENV=local` signs
+every request in as one fixed user (`local@equiscore.test`). Set it in **both**
+`apps/web/.env.local` and `apps/api/.env`, then restart the dev servers.
+
+- **Web:** `next.config.mjs` aliases `@clerk/nextjs` and `@clerk/nextjs/server`
+  to stubs in `apps/web/src/lib/local-auth/`, so components stay unchanged.
+- **API:** `ClerkAuthGuard` accepts the stub's fixed token from loopback clients
+  (`apps/api/src/common/utils/local-auth.ts`).
+- Clerk flows (password, MFA, connected accounts, real sign-out) are not
+  exercised. Reproduce bugs in those with a real Clerk dev instance.
+- `next dev` listens on all interfaces, so anyone who can reach port 3000 is
+  signed in as the local user. Local data only, but avoid untrusted networks.
+
+**INVARIANTS:**
+- The web alias applies only in the `next dev` phase. A production build ignores
+  `APP_ENV` and never contains the stubs. Do not widen this to other phases.
+- With `APP_ENV=local`, the API must refuse to boot unless `NODE_ENV=development`
+  and `DATABASE_URL` is on localhost. Do not relax these checks.
+- Never set `APP_ENV=local` on a deployed host.
+
 
 ---
 
