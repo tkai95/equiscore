@@ -198,7 +198,7 @@ function ProfileField({ label, value }: { label: string; value: string | number 
 }
 
 const inputClass =
-  'w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
+  'w-full rounded-lg border border-line bg-surface-card px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
 const labelClass = 'mb-1.5 block text-sm font-medium text-content'
 
 // ── Edit drawers ──────────────────────────────────────────────────────────
