@@ -1,5 +1,7 @@
+import { Controller } from 'react-hook-form'
 import type { UseFormReturn } from 'react-hook-form'
 import type { Step4Data } from '@equiscore/shared'
+import { MonthYearSelect } from './month-year-select'
 
 interface Props {
   form: UseFormReturn<Step4Data>
@@ -17,7 +19,7 @@ const REASON_OPTIONS = [
 ]
 
 export function Step4Rental({ form }: Props) {
-  const { register, formState: { errors } } = form
+  const { register, control, formState: { errors } } = form
 
   return (
     <div className="space-y-5">
@@ -60,11 +62,21 @@ export function Step4Rental({ form }: Props) {
         <label className="mb-1.5 block text-sm font-medium text-content">
           Tenancy start date <span className="text-content-muted">(optional)</span>
         </label>
-        <input
-          {...register('tenancyStartDate')}
-          type="month"
-          className={inputClass}
+        <Controller
+          control={control}
+          name="tenancyStartDate"
+          render={({ field }) => (
+            <MonthYearSelect
+              label="Tenancy start date"
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
         />
+        {errors.tenancyStartDate && (
+          <p className="mt-1 text-xs text-danger-strong">{errors.tenancyStartDate.message}</p>
+        )}
       </div>
 
       <div>
