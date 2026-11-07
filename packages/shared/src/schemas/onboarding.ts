@@ -80,26 +80,48 @@ export const step3Schema = z.object({
   ),
 })
 
-export const step4Schema = z.object({
-  monthlyRentDeclared: z.preprocess(
-    emptyToUndefined,
-    z.number().min(0, 'Rent must be 0 or more').max(50_000).optional()
-  ),
-  landlordName: z.string().optional(),
-  tenancyStartDate: optionalPastMonth,
-  reasonForUsingEquiscore: z.preprocess(
-    emptyToUndefined,
-    z
-      .enum([
-        'rental_application',
-        'financial_product',
-        'employment_check',
-        'identity_verification',
-        'other',
-      ])
-      .optional()
-  ),
-})
+// Landlord and tenancy details only apply when rent is above 0. The rent input
+// yields NaN when empty, so anything but a positive number is "not above 0".
+export const isRentAboveZero = (rent: unknown): boolean => typeof rent === 'number' && rent > 0
+
+// The form hides these details without rent but keeps their values, so they
+// survive retyping the amount. Drop them here so a hidden value is neither
+// validated nor submitted (the API rejects them without rent).
+const withoutRentalDetailsUnlessRent = (value: unknown) => {
+  if (!value || typeof value !== 'object') return value
+  const data = value as Record<string, unknown>
+  if (isRentAboveZero(data.monthlyRentDeclared)) return value
+  const { landlordName: _landlordName, tenancyStartDate: _tenancyStartDate, ...rest } = data
+  return rest
+}
+
+export const step4Schema = z.preprocess(
+  withoutRentalDetailsUnlessRent,
+  z.object({
+    monthlyRentDeclared: z.preprocess(
+      emptyToUndefined,
+      z
+        .number()
+        .min(0, 'Rent must be 0 or more')
+        .max(50_000, 'Rent must be £50,000 or less')
+        .optional()
+    ),
+    landlordName: z.string().optional(),
+    tenancyStartDate: optionalPastMonth,
+    reasonForUsingEquiscore: z.preprocess(
+      emptyToUndefined,
+      z
+        .enum([
+          'rental_application',
+          'financial_product',
+          'employment_check',
+          'identity_verification',
+          'other',
+        ])
+        .optional()
+    ),
+  })
+)
 
 export type Step1Data = z.infer<typeof step1Schema>
 export type Step2Data = z.infer<typeof step2Schema>

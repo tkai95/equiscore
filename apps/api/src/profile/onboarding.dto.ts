@@ -10,6 +10,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator'
 import { isValidPastMonth } from '@equiscore/shared'
+import { RequiresRentAboveZero } from './requires-rent-above-zero.validator'
 
 // The service passes these to `new Date()`, which turns free text into a wrong
 // date or an Invalid Date that fails to write. An empty string means not given.
@@ -94,10 +95,12 @@ export class OnboardingDto {
   @Max(50_000)
   monthlyRentDeclared?: number
 
+  @RequiresRentAboveZero()
   @IsOptional()
   @IsString()
   landlordName?: string
 
+  @RequiresRentAboveZero()
   @IsOptional()
   @Validate(IsOptionalPastMonth)
   tenancyStartDate?: string
