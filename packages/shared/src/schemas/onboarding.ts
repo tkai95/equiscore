@@ -3,6 +3,29 @@ import { z } from 'zod'
 const emptyToUndefined = (value: unknown) =>
   value === '' || (typeof value === 'number' && Number.isNaN(value)) ? undefined : value
 
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+const EARLIEST_YEAR = 1900
+// Largest UTC offset (UTC+14), so "this month" is never rejected for someone
+// whose new month has started before the server's has.
+const MAX_UTC_OFFSET_MS = 14 * 60 * 60 * 1000
+
+const isFutureMonth = (value: string) =>
+  value > new Date(Date.now() + MAX_UTC_OFFSET_MS).toISOString().slice(0, 7)
+
+/** A real `YYYY-MM` month that isn't in the future. Shared by the form and API. */
+export const isValidPastMonth = (value: string) =>
+  MONTH_PATTERN.test(value) && Number(value.slice(0, 4)) >= EARLIEST_YEAR && !isFutureMonth(value)
+
+const optionalPastMonth = z
+  .string()
+  .refine((value) => value === '' || MONTH_PATTERN.test(value), 'Please select a month and a year')
+  .refine((value) => value === '' || !isFutureMonth(value), 'This date cannot be in the future')
+  .refine(
+    (value) => value === '' || Number(value.slice(0, 4)) >= EARLIEST_YEAR,
+    'Please select a valid year'
+  )
+  .optional()
+
 export const step1Schema = z.object({
   firstName: z.string().min(1, 'Please enter your first name').max(80),
   lastName: z.string().min(1, 'Please enter your last name').max(80),
@@ -20,7 +43,7 @@ export const step2Schema = z.object({
     'asylum_seeker',
     'other',
   ]),
-  ukMoveDate: z.string().optional(),
+  ukMoveDate: optionalPastMonth,
   addressLine1: z.string().min(3, 'Please enter your address'),
   addressLine2: z.string().optional(),
   city: z.string().min(2, 'Please enter your city'),
@@ -63,7 +86,7 @@ export const step4Schema = z.object({
     z.number().min(0, 'Rent must be 0 or more').max(50_000).optional()
   ),
   landlordName: z.string().optional(),
-  tenancyStartDate: z.string().optional(),
+  tenancyStartDate: optionalPastMonth,
   reasonForUsingEquiscore: z.preprocess(
     emptyToUndefined,
     z

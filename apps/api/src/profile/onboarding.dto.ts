@@ -1,4 +1,28 @@
-import { IsOptional, IsString, IsNumber, Min, Max, Matches } from 'class-validator'
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  Min,
+  Max,
+  Matches,
+  Validate,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
+} from 'class-validator'
+import { isValidPastMonth } from '@equiscore/shared'
+
+// The service passes these to `new Date()`, which turns free text into a wrong
+// date or an Invalid Date that fails to write. An empty string means not given.
+@ValidatorConstraint({ name: 'isOptionalPastMonth' })
+class IsOptionalPastMonth implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return typeof value === 'string' && (value === '' || isValidPastMonth(value))
+  }
+
+  defaultMessage(): string {
+    return 'Date must be a month in YYYY-MM format that is not in the future'
+  }
+}
 
 // DTO for PUT /profile/onboarding. The global ValidationPipe runs with
 // `whitelist: true, forbidNonWhitelisted: true`, which REQUIRES a real class to
@@ -24,7 +48,7 @@ export class OnboardingDto {
   residencyStatus!: string
 
   @IsOptional()
-  @IsString()
+  @Validate(IsOptionalPastMonth)
   ukMoveDate?: string
 
   @IsString()
@@ -75,7 +99,7 @@ export class OnboardingDto {
   landlordName?: string
 
   @IsOptional()
-  @IsString()
+  @Validate(IsOptionalPastMonth)
   tenancyStartDate?: string
 
   @IsOptional()

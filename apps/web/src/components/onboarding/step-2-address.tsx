@@ -1,5 +1,7 @@
+import { Controller } from 'react-hook-form'
 import type { UseFormReturn } from 'react-hook-form'
 import type { Step2Data } from '@equiscore/shared'
+import { MonthYearSelect } from './month-year-select'
 
 interface Props {
   form: UseFormReturn<Step2Data>
@@ -20,7 +22,7 @@ const RESIDENCY_OPTIONS = [
 ]
 
 export function Step2Address({ form }: Props) {
-  const { register, formState: { errors } } = form
+  const { register, control, formState: { errors } } = form
 
   return (
     <div className="space-y-5">
@@ -51,11 +53,21 @@ export function Step2Address({ form }: Props) {
         <label className="mb-1.5 block text-sm font-medium text-content">
           When did you move to the UK? <span className="text-content-muted">(optional)</span>
         </label>
-        <input
-          {...register('ukMoveDate')}
-          type="month"
-          className={inputClass}
+        <Controller
+          control={control}
+          name="ukMoveDate"
+          render={({ field }) => (
+            <MonthYearSelect
+              label="When did you move to the UK?"
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
         />
+        {errors.ukMoveDate && (
+          <p className="mt-1 text-xs text-danger-strong">{errors.ukMoveDate.message}</p>
+        )}
       </div>
 
       <div>
