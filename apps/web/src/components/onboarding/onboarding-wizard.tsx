@@ -68,9 +68,9 @@ export function OnboardingWizard() {
 
   const handleNext = async (data: Record<string, unknown>) => {
     const merged = { ...formData, ...data }
-    setFormData(merged)
 
     if (step < 4) {
+      setFormData(merged)
       track('onboarding_step_completed', { step })
       setStep(step + 1)
       return

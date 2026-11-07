@@ -1,5 +1,6 @@
 import { Controller } from 'react-hook-form'
 import type { UseFormReturn } from 'react-hook-form'
+import { isRentAboveZero } from '@equiscore/shared'
 import type { Step4Data } from '@equiscore/shared'
 import { MonthYearSelect } from './month-year-select'
 
@@ -19,7 +20,10 @@ const REASON_OPTIONS = [
 ]
 
 export function Step4Rental({ form }: Props) {
-  const { register, control, formState: { errors } } = form
+  const { register, control, watch, formState: { errors } } = form
+  // Hidden details keep their values, so retyping rent doesn't lose them.
+  // step4Schema drops them from the submission while rent isn't above 0.
+  const hasRent = isRentAboveZero(watch('monthlyRentDeclared'))
 
   return (
     <div className="space-y-5">
@@ -45,39 +49,46 @@ export function Step4Rental({ form }: Props) {
             className="w-full rounded-lg border border-line py-2.5 pl-7 pr-3 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-content">
-          Landlord or letting agent name <span className="text-content-muted">(optional)</span>
-        </label>
-        <input
-          {...register('landlordName')}
-          placeholder="e.g. Foxtons, or individual landlord name"
-          className={inputClass}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-content">
-          Tenancy start date <span className="text-content-muted">(optional)</span>
-        </label>
-        <Controller
-          control={control}
-          name="tenancyStartDate"
-          render={({ field }) => (
-            <MonthYearSelect
-              label="Tenancy start date"
-              value={field.value ?? ''}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-            />
-          )}
-        />
-        {errors.tenancyStartDate && (
-          <p className="mt-1 text-xs text-danger-strong">{errors.tenancyStartDate.message}</p>
+        {errors.monthlyRentDeclared && (
+          <p className="mt-1 text-xs text-danger-strong">{errors.monthlyRentDeclared.message}</p>
         )}
       </div>
+
+      {hasRent && (
+        <>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-content">
+              Landlord or letting agent name <span className="text-content-muted">(optional)</span>
+            </label>
+            <input
+              {...register('landlordName')}
+              placeholder="e.g. Foxtons, or individual landlord name"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-content">
+              Tenancy start date <span className="text-content-muted">(optional)</span>
+            </label>
+            <Controller
+              control={control}
+              name="tenancyStartDate"
+              render={({ field }) => (
+                <MonthYearSelect
+                  label="Tenancy start date"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
+            {errors.tenancyStartDate && (
+              <p className="mt-1 text-xs text-danger-strong">{errors.tenancyStartDate.message}</p>
+            )}
+          </div>
+        </>
+      )}
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-content">
