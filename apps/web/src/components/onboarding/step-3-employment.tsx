@@ -7,7 +7,7 @@ interface Props {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-line px-3 py-2.5 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
+  'w-full rounded-lg border border-line bg-surface-card px-3 py-2.5 text-sm text-content focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20'
 
 const EMPLOYMENT_OPTIONS = [
   { value: 'employed_full_time', label: 'Employed full-time' },
